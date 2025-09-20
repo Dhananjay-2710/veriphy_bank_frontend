@@ -13,7 +13,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContextFixed';
 import { useSystemSettings } from '../../hooks/useDashboardData';
 import { SupabaseDatabaseService } from '../../services/supabase-database';
 import { SystemSetting } from '../../types';

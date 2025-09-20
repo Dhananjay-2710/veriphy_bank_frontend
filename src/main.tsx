@@ -4,7 +4,7 @@ import App from './App.tsx';
 import './index.css';
 import { AuthProvider } from "./contexts/AuthContextFixed.tsx";
 import { ErrorBoundary } from './components/ErrorBoundary';
-import './utils/clearStorage'; // Auto-clear storage on startup
+// import './utils/clearStorage'; // Auto-clear storage on startup - DISABLED
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

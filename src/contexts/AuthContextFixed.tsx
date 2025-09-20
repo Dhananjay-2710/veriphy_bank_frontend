@@ -28,12 +28,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       // First try Supabase Auth
+      console.log("Trying Supabase authentication...");
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (authData?.user) {
+        console.log("Supabase Auth successful:", authData.user.email);
         // User exists in Supabase Auth
         const profile = await fetchProfile(authData.user);
         setUser(profile);
@@ -42,7 +44,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // If Supabase Auth fails, try database-only authentication
       if (authError) {
-        console.log("Supabase Auth failed, trying database authentication...");
+        console.log("Supabase Auth failed with error:", authError.message);
+        console.log("Trying database-only authentication...");
         
         // Get all users to see the actual structure
         const { data: allUsers, error: allUsersError } = await supabase
@@ -257,25 +260,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function init() {
       try {
-        const { data } = await supabase.auth.getUser();
-        if (data?.user) {
-          const profile = await fetchProfile(data.user);
-          if (mounted) setUser(profile);
-        } else {
-          // Check for stored database user
-          const storedUser = localStorage.getItem('veriphy_user');
-          if (storedUser) {
-            try {
-              const user = JSON.parse(storedUser);
-              if (mounted) setUser(user);
-            } catch (error) {
-              console.error('Error parsing stored user:', error);
-              if (mounted) setUser(null);
+        console.log('Initializing authentication...');
+
+        // First, check if there's a stored database user (for non-Supabase auth users)
+        const storedUser = localStorage.getItem('veriphy_user');
+        if (storedUser) {
+          try {
+            const user = JSON.parse(storedUser);
+            console.log('Found stored database user:', user);
+            if (mounted) {
+              setUser(user);
+              setLoading(false);
+              return;
             }
-          } else {
-            if (mounted) setUser(null);
+          } catch (error) {
+            console.error('Error parsing stored user:', error);
+            localStorage.removeItem('veriphy_user');
           }
         }
+
+        // Then try to get Supabase session
+        const { data, error } = await supabase.auth.getUser();
+        if (error) {
+          console.warn('Supabase auth error:', error);
+        }
+
+        if (data?.user) {
+          console.log('Found Supabase user:', data.user.email);
+          const profile = await fetchProfile(data.user);
+          if (mounted) {
+            setUser(profile);
+          }
+        } else {
+          console.log('No authenticated user found');
+          if (mounted) setUser(null);
+        }
+      } catch (error) {
+        console.error('Authentication initialization error:', error);
+        if (mounted) setUser(null);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -283,17 +305,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     init();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        fetchProfile(session.user).then((profile) => setUser(profile));
-      } else {
+    // Listen for auth state changes
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.email);
+
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (session?.user) {
+          try {
+            const profile = await fetchProfile(session.user);
+            setUser(profile);
+          } catch (error) {
+            console.error('Error fetching profile after auth change:', error);
+            setUser(null);
+          }
+        }
+      } else if (event === 'SIGNED_OUT') {
         setUser(null);
       }
     });
 
     return () => {
       mounted = false;
-      sub.subscription.unsubscribe();
+      if (sub?.subscription) {
+        sub.subscription.unsubscribe();
+      }
     };
   }, []);
 

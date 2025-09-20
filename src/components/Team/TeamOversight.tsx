@@ -340,26 +340,25 @@ export function TeamOversight({ onBack, onNavigateToCase }: TeamOversightProps) 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="outline" onClick={onBack}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Team Oversight</h1>
-              <p className="text-gray-600">Monitor team performance and manage case assignments</p>
-            </div>
+        <div className="flex items-center space-x-4">
+          <Button variant="outline" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Team Oversight</h1>
+            <p className="text-gray-600">Monitor team performance and manage case assignments</p>
           </div>
-          <div className="flex space-x-3">
-            <Button variant="outline" onClick={handleRefresh} disabled={teamLoading || casesLoading || statsLoading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${(teamLoading || casesLoading || statsLoading) ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-            <Button>
-              <Users className="h-4 w-4 mr-2" />
-              Bulk Reassign
-            </Button>
-          </div>
+        </div>
+        <div className="flex space-x-3">
+          <Button variant="outline" onClick={handleRefresh} disabled={teamLoading || casesLoading || statsLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${(teamLoading || casesLoading || statsLoading) ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button onClick={() => {}}>
+            <Users className="h-4 w-4 mr-2" />
+            Bulk Reassign
+          </Button>
         </div>
       </div>
 
@@ -749,5 +748,5 @@ export function TeamOversight({ onBack, onNavigateToCase }: TeamOversightProps) 
         </div>
       )}
     </div>
-  );
+  )
 }

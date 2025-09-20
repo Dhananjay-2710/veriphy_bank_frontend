@@ -21,7 +21,6 @@ import { Button } from '../ui/Button';
 import { useAdminDashboardStats, useSystemHealth, useSystemAlerts } from '../../hooks/useDashboardData';
 import { DatabaseTest } from '../Test/DatabaseTest';
 import { DatabasePopulator } from '../Test/DatabasePopulator';
-import { populateSampleData } from '../../scripts/populate-sample-data';
 import { DatabaseSchemaTest } from '../Test/DatabaseSchemaTest';
 import { SimpleSchemaTest } from '../Test/SimpleSchemaTest';
 import { QuickSetup } from '../Test/QuickSetup';

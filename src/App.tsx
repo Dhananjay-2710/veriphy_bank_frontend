@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useParams } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContextFixed';
 import { LoginPage } from './components/Auth/LoginPage';
 import { SalespersonDashboard } from './components/Dashboard/SalespersonDashboard';
@@ -29,7 +30,6 @@ import { DashboardLayout } from './components/Layout/DashboardLayout';
 import { SuperAdminDashboardFixed } from './components/Dashboard/SuperAdminDashboardFixed';
 import { SetupInstructions } from './components/Test/SetupInstructions';
 import { SupabaseTest } from './components/Test/SupabaseTest';
-import { useParams } from 'react-router-dom';
 
 // DocumentManager wrapper to handle URL parameters
 function DocumentManagerWrapper() {

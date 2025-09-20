@@ -31,7 +31,15 @@ export function clearAllStorage() {
   }
 }
 
-// Auto-clear on import in development
-if (process.env.NODE_ENV === 'development') {
-  clearAllStorage();
+// Auto-clear on import in development - DISABLED to prevent auth issues
+// if (process.env.NODE_ENV === 'development') {
+//   clearAllStorage();
+// }
+
+// Manual clear function for debugging only
+export function clearStorageForDebugging() {
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Clearing storage for debugging...');
+    clearAllStorage();
+  }
 }

@@ -217,7 +217,7 @@ display_connection_info() {
     echo "==========="
     echo "1. Update your application configuration with the connection details"
     echo "2. Test the connection using: psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME"
-    echo "3. Review the database documentation in database/README.md"
+    echo "3. Review the database documentation in docs/database/README.md"
     echo "4. Run example queries from database/examples/common_queries.sql"
     echo
 }

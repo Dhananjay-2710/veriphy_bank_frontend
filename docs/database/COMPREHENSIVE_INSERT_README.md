@@ -1,18 +1,18 @@
 # Comprehensive Mock Data Insertion
 
-This directory contains scripts to insert dummy data into ALL tables of the Veriphy Bank database schema.
+This guide explains how to insert dummy data into ALL tables of the Veriphy Bank database schema.
 
-## 📁 Files Created
+## 📁 File Locations
 
-### SQL Scripts
-- `comprehensive_mock_data_insert.sql` - Part 1: Basic entities (organizations, users, roles, etc.)
-- `comprehensive_mock_data_insert_part2.sql` - Part 2: Business entities (customers, cases, documents, etc.)
-- `comprehensive_mock_data_insert_final.sql` - Part 3: System entities (logs, notifications, webhooks, etc.)
-- `execute_comprehensive_data_insert.sql` - Combined executor script
+### SQL Scripts (now organized in `database/data/`)
+- `database/data/comprehensive_mock_data_insert.sql` - Part 1: Basic entities (organizations, users, roles, etc.)
+- `database/data/comprehensive_mock_data_insert_part2.sql` - Part 2: Business entities (customers, cases, documents, etc.)
+- `database/data/comprehensive_mock_data_insert_final.sql` - Part 3: System entities (logs, notifications, webhooks, etc.)
+- `database/setup/execute_comprehensive_data_insert.sql` - Combined executor script
 
 ### Execution Scripts
-- `run_comprehensive_insert.ps1` - PowerShell script for Windows
-- `run_comprehensive_insert.sh` - Bash script for Linux/Mac
+- `database/run_comprehensive_insert.ps1` - PowerShell script for Windows
+- `database/run_comprehensive_insert.sh` - Bash script for Linux/Mac
 
 ## 🚀 How to Execute
 
@@ -29,9 +29,9 @@ This directory contains scripts to insert dummy data into ALL tables of the Veri
 ### Option 3: Manual SQL Execution
 ```sql
 -- Execute in this order:
-\i comprehensive_mock_data_insert.sql
-\i comprehensive_mock_data_insert_part2.sql
-\i comprehensive_mock_data_insert_final.sql
+\i data/comprehensive_mock_data_insert.sql
+\i data/comprehensive_mock_data_insert_part2.sql
+\i data/comprehensive_mock_data_insert_final.sql
 ```
 
 ## 📊 Data Inserted
