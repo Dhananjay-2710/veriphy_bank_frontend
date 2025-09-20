@@ -1,0 +1,572 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.assign_case_setting (
+  id bigint NOT NULL DEFAULT nextval('assign_case_setting_id_seq'::regclass),
+  organization_id bigint NOT NULL,
+  case_id bigint NOT NULL,
+  user_id bigint NOT NULL,
+  role character varying,
+  assigned_at timestamp with time zone NOT NULL DEFAULT now(),
+  metadata jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone,
+  CONSTRAINT assign_case_setting_pkey PRIMARY KEY (id),
+  CONSTRAINT assign_case_setting_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+  CONSTRAINT assign_case_setting_case_id_fkey FOREIGN KEY (case_id) REFERENCES public.cases(id),
+  CONSTRAINT assign_case_setting_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.assign_permission (
+  id bigint NOT NULL DEFAULT nextval('assign_permission_id_seq'::regclass),
+  role_id bigint NOT NULL,
+  permission_id bigint NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone,
+  CONSTRAINT assign_permission_pkey PRIMARY KEY (id),
+  CONSTRAINT assign_permission_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.roles(id),
+  CONSTRAINT assign_permission_permission_id_fkey FOREIGN KEY (permission_id) REFERENCES public.permissions(id)
+);
+CREATE TABLE public.audit_log (
+  id bigint NOT NULL DEFAULT nextval('audit_log_id_seq'::regclass),
+  organization_id bigint,
+  user_id bigint,
+  action character varying NOT NULL,
+  entity_type character varying,
+  entity_id bigint,
+  before_state jsonb,
+  after_state jsonb,
+  ip_address character varying,
+  session_id character varying,
+  duration integer,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT audit_log_pkey PRIMARY KEY (id),
+  CONSTRAINT audit_log_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+  CONSTRAINT audit_log_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.auth_accounts (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id bigint,
+  customer_id bigint,
+  identifier character varying NOT NULL,
+  identifier_type character varying NOT NULL CHECK (identifier_type::text = ANY (ARRAY['email'::character varying, 'mobile'::character varying, 'username'::character varying]::text[])),
+  password_hash character varying,
+  password_algo character varying NOT NULL DEFAULT 'bcrypt'::character varying,
+  password_changed_at timestamp with time zone,
+  provider character varying NOT NULL DEFAULT 'local'::character varying,
+  provider_id character varying,
+  provider_data jsonb,
+  is_active boolean NOT NULL DEFAULT true,
+  email_verified_at timestamp with time zone,
+  phone_verified_at timestamp with time zone,
+  failed_attempts integer NOT NULL DEFAULT 0,
+  locked_until timestamp with time zone,
+  last_login_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone,
+  normalized_identifier character varying,
+  CONSTRAINT auth_accounts_pkey PRIMARY KEY (id),
+  CONSTRAINT auth_accounts_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT auth_accounts_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id)
+);
+CREATE TABLE public.cache (
+  key character varying NOT NULL,
+  value text NOT NULL,
+  expiration integer NOT NULL,
+  CONSTRAINT cache_pkey PRIMARY KEY (key)
+);
+CREATE TABLE public.cache_locks (
+  key character varying NOT NULL,
+  owner character varying NOT NULL,
+  expiration integer NOT NULL,
+  CONSTRAINT cache_locks_pkey PRIMARY KEY (key)
+);
+CREATE TABLE public.case_status_history (
+  id bigint NOT NULL DEFAULT nextval('case_status_history_id_seq'::regclass),
+  organization_id bigint NOT NULL,
+  case_id bigint NOT NULL,
+  old_status character varying,
+  new_status character varying NOT NULL,
+  changed_by bigint,
+  department_id bigint,
+  changed_at timestamp with time zone NOT NULL DEFAULT now(),
+  remarks text,
+  metadata jsonb,
+  CONSTRAINT case_status_history_pkey PRIMARY KEY (id),
+  CONSTRAINT case_status_history_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+  CONSTRAINT case_status_history_case_id_fkey FOREIGN KEY (case_id) REFERENCES public.cases(id),
+  CONSTRAINT case_status_history_changed_by_fkey FOREIGN KEY (changed_by) REFERENCES public.users(id),
+  CONSTRAINT case_status_history_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id)
+);
+CREATE TABLE public.case_workflow_stage (
+  id bigint NOT NULL DEFAULT nextval('case_workflow_stage_id_seq'::regclass),
+  organization_id bigint NOT NULL,
+  case_id bigint NOT NULL,
+  from_department_id bigint,
+  to_department_id bigint,
+  from_user_id bigint,
+  to_user_id bigint,
+  handover_reason text,
+  handover_at timestamp with time zone NOT NULL DEFAULT now(),
+  accepted_at timestamp with time zone,
+  completed_at timestamp with time zone,
+  status character varying NOT NULL DEFAULT 'pending'::character varying,
+  remarks text,
+  metadata jsonb,
+  CONSTRAINT case_workflow_stage_pkey PRIMARY KEY (id),
+  CONSTRAINT case_workflow_stage_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+  CONSTRAINT case_workflow_stage_case_id_fkey FOREIGN KEY (case_id) REFERENCES public.cases(id),
+  CONSTRAINT case_workflow_stage_from_department_id_fkey FOREIGN KEY (from_department_id) REFERENCES public.departments(id),
+  CONSTRAINT case_workflow_stage_to_department_id_fkey FOREIGN KEY (to_department_id) REFERENCES public.departments(id),
+  CONSTRAINT case_workflow_stage_from_user_id_fkey FOREIGN KEY (from_user_id) REFERENCES public.users(id),
+  CONSTRAINT case_workflow_stage_to_user_id_fkey FOREIGN KEY (to_user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.cases (
+  id bigint NOT NULL DEFAULT nextval('cases_id_seq'::regclass),
+  organization_id bigint NOT NULL,
+  case_number character varying NOT NULL UNIQUE,
+  customer_id bigint NOT NULL,
+  product_id bigint NOT NULL,
+  sub_product_id bigint,
+  title character varying,
+  description text,
+  status USER-DEFINED NOT NULL DEFAULT 'open'::case_status_t,
+  priority USER-DEFINED NOT NULL DEFAULT 'medium'::case_priority_t,
+  created_by bigint,
+  assigned_to bigint,
+  due_date timestamp with time zone,
+  started_at timestamp with time zone,
+  closed_at timestamp with time zone,
+  tat_compliance boolean,
+  metadata jsonb,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT cases_pkey PRIMARY KEY (id),
+  CONSTRAINT cases_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+  CONSTRAINT cases_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id),
+  CONSTRAINT cases_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
+  CONSTRAINT cases_sub_product_id_fkey FOREIGN KEY (sub_product_id) REFERENCES public.sub_products(id),
+  CONSTRAINT cases_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
+  CONSTRAINT cases_assigned_to_fkey FOREIGN KEY (assigned_to) REFERENCES public.users(id)
+);
+CREATE TABLE public.customers (
+  id bigint NOT NULL DEFAULT nextval('customers_id_seq'::regclass),
+  full_name character varying NOT NULL,
+  dob date,
+  mobile character varying,
+  email character varying,
+  address text,
+  external_customer_code character varying UNIQUE,
+  kyc_status USER-DEFINED NOT NULL DEFAULT 'pending'::kyc_status_t,
+  metadata jsonb,
+  organization_id bigint NOT NULL,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT customers_pkey PRIMARY KEY (id),
+  CONSTRAINT customers_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+);
+CREATE TABLE public.departments (
+  id bigint NOT NULL DEFAULT nextval('departments_id_seq'::regclass),
+  name character varying NOT NULL,
+  description text,
+  metadata jsonb,
+  organization_id bigint,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT departments_pkey PRIMARY KEY (id),
+  CONSTRAINT departments_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+);
+CREATE TABLE public.doc_against_sub_product (
+  id bigint NOT NULL DEFAULT nextval('doc_against_sub_product_id_seq'::regclass),
+  organization_id bigint NOT NULL,
+  sub_product_id bigint NOT NULL,
+  document_type_id bigint NOT NULL,
+  mandatory boolean NOT NULL DEFAULT true,
+  notes text,
+  metadata jsonb,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT doc_against_sub_product_pkey PRIMARY KEY (id),
+  CONSTRAINT doc_against_sub_product_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+  CONSTRAINT doc_against_sub_product_document_type_id_fkey FOREIGN KEY (document_type_id) REFERENCES public.document_types(id),
+  CONSTRAINT doc_against_sub_product_sub_product_id_fkey FOREIGN KEY (sub_product_id) REFERENCES public.sub_products(id)
+);
+CREATE TABLE public.document_against_product (
+  id bigint NOT NULL DEFAULT nextval('document_against_product_id_seq'::regclass),
+  organization_id bigint NOT NULL,
+  product_id bigint NOT NULL,
+  document_type_id bigint NOT NULL,
+  mandatory boolean NOT NULL DEFAULT true,
+  notes text,
+  metadata jsonb,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT document_against_product_pkey PRIMARY KEY (id),
+  CONSTRAINT document_against_product_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+  CONSTRAINT document_against_product_document_type_id_fkey FOREIGN KEY (document_type_id) REFERENCES public.document_types(id),
+  CONSTRAINT document_against_product_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
+);
+CREATE TABLE public.document_types (
+  id bigint NOT NULL DEFAULT nextval('document_types_id_seq'::regclass),
+  organization_id bigint,
+  name character varying NOT NULL,
+  description text,
+  mime_types jsonb,
+  metadata jsonb,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT document_types_pkey PRIMARY KEY (id),
+  CONSTRAINT document_types_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+);
+CREATE TABLE public.documents (
+  id bigint NOT NULL DEFAULT nextval('documents_id_seq'::regclass),
+  organization_id bigint NOT NULL,
+  customer_id bigint NOT NULL,
+  document_type_id bigint,
+  file_id bigint,
+  uploaded_by bigint,
+  status USER-DEFINED NOT NULL DEFAULT 'pending'::doc_status_t,
+  submitted_at timestamp with time zone,
+  review_started_at timestamp with time zone,
+  review_completed_at timestamp with time zone,
+  verified_by bigint,
+  verified_on timestamp with time zone,
+  expiry_date date,
+  metadata jsonb,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT documents_pkey PRIMARY KEY (id),
+  CONSTRAINT documents_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+  CONSTRAINT documents_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id),
+  CONSTRAINT documents_document_type_id_fkey FOREIGN KEY (document_type_id) REFERENCES public.document_types(id),
+  CONSTRAINT documents_file_id_fkey FOREIGN KEY (file_id) REFERENCES public.files(id),
+  CONSTRAINT documents_uploaded_by_fkey FOREIGN KEY (uploaded_by) REFERENCES public.users(id),
+  CONSTRAINT documents_verified_by_fkey FOREIGN KEY (verified_by) REFERENCES public.users(id)
+);
+CREATE TABLE public.employment_types (
+  id bigint NOT NULL DEFAULT nextval('employment_types_id_seq'::regclass),
+  name character varying NOT NULL,
+  description text,
+  metadata jsonb,
+  organization_id bigint,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT employment_types_pkey PRIMARY KEY (id),
+  CONSTRAINT employment_types_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+);
+CREATE TABLE public.failed_jobs (
+  id bigint NOT NULL DEFAULT nextval('failed_jobs_id_seq'::regclass),
+  uuid character varying NOT NULL,
+  connection text NOT NULL,
+  queue text NOT NULL,
+  payload jsonb NOT NULL,
+  exception text NOT NULL,
+  failed_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT failed_jobs_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.file_signatures (
+  id bigint NOT NULL DEFAULT nextval('file_signatures_id_seq'::regclass),
+  file_id bigint NOT NULL,
+  user_id bigint,
+  customer_id bigint,
+  signature_type character varying NOT NULL DEFAULT 'image'::character varying,
+  signature_file character varying,
+  signature_params jsonb,
+  signed_at timestamp with time zone,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT file_signatures_pkey PRIMARY KEY (id),
+  CONSTRAINT file_signatures_file_id_fkey FOREIGN KEY (file_id) REFERENCES public.files(id),
+  CONSTRAINT file_signatures_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT file_signatures_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id)
+);
+CREATE TABLE public.files (
+  id bigint NOT NULL DEFAULT nextval('files_id_seq'::regclass),
+  filename character varying NOT NULL,
+  storage_path character varying NOT NULL,
+  file_type USER-DEFINED,
+  size_bytes bigint,
+  checksum character varying,
+  metadata jsonb,
+  folder_id bigint,
+  organization_id bigint,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT files_pkey PRIMARY KEY (id),
+  CONSTRAINT files_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+);
+CREATE TABLE public.folders (
+  id bigint NOT NULL DEFAULT nextval('folders_id_seq'::regclass),
+  name character varying NOT NULL,
+  description text,
+  parent_id bigint,
+  department_id bigint,
+  user_id bigint,
+  customer_id bigint,
+  metadata jsonb,
+  organization_id bigint,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT folders_pkey PRIMARY KEY (id),
+  CONSTRAINT folders_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.folders(id),
+  CONSTRAINT folders_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id),
+  CONSTRAINT folders_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT folders_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+);
+CREATE TABLE public.job_batches (
+  id character varying NOT NULL,
+  name character varying NOT NULL,
+  total_jobs integer NOT NULL,
+  pending_jobs integer NOT NULL,
+  failed_jobs integer NOT NULL,
+  failed_job_ids jsonb NOT NULL,
+  options jsonb,
+  cancelled_at integer,
+  created_at integer NOT NULL,
+  finished_at integer,
+  CONSTRAINT job_batches_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.jobs (
+  id bigint NOT NULL DEFAULT nextval('jobs_id_seq'::regclass),
+  queue character varying NOT NULL,
+  payload jsonb NOT NULL,
+  attempts smallint NOT NULL,
+  reserved_at integer,
+  available_at integer NOT NULL,
+  created_at integer NOT NULL,
+  CONSTRAINT jobs_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.logs (
+  id bigint NOT NULL DEFAULT nextval('logs_id_seq'::regclass),
+  organization_id bigint,
+  user_id bigint,
+  action character varying NOT NULL,
+  entity_type character varying,
+  entity_id bigint,
+  description text,
+  metadata jsonb,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT logs_pkey PRIMARY KEY (id),
+  CONSTRAINT logs_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+  CONSTRAINT logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.migrations (
+  id integer NOT NULL DEFAULT nextval('migrations_id_seq'::regclass),
+  migration character varying NOT NULL,
+  batch integer NOT NULL,
+  CONSTRAINT migrations_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.notifications (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  type character varying NOT NULL,
+  notifiable_type character varying NOT NULL,
+  notifiable_id bigint NOT NULL,
+  data jsonb NOT NULL,
+  read_at timestamp with time zone,
+  organization_id bigint,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT notifications_pkey PRIMARY KEY (id),
+  CONSTRAINT notifications_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+);
+CREATE TABLE public.organizations (
+  id bigint NOT NULL,
+  name character varying NOT NULL,
+  address text,
+  metadata jsonb,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT organizations_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.password_reset_tokens (
+  email character varying NOT NULL,
+  token character varying NOT NULL,
+  created_at timestamp with time zone,
+  CONSTRAINT password_reset_tokens_pkey PRIMARY KEY (email)
+);
+CREATE TABLE public.permissions (
+  id bigint NOT NULL DEFAULT nextval('permissions_id_seq'::regclass),
+  name character varying NOT NULL UNIQUE,
+  description text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone,
+  CONSTRAINT permissions_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.personal_access_tokens (
+  id bigint NOT NULL DEFAULT nextval('personal_access_tokens_id_seq'::regclass),
+  tokenable_type character varying NOT NULL,
+  tokenable_id bigint NOT NULL,
+  name text NOT NULL,
+  token character varying NOT NULL UNIQUE,
+  abilities jsonb,
+  last_used_at timestamp with time zone,
+  expires_at timestamp with time zone,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT personal_access_tokens_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.products (
+  id bigint NOT NULL DEFAULT nextval('products_id_seq'::regclass),
+  name character varying NOT NULL,
+  code character varying NOT NULL UNIQUE,
+  description text,
+  status character varying NOT NULL DEFAULT 'active'::character varying,
+  metadata jsonb,
+  organization_id bigint,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT products_pkey PRIMARY KEY (id),
+  CONSTRAINT products_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+);
+CREATE TABLE public.roles (
+  id bigint NOT NULL DEFAULT nextval('roles_id_seq'::regclass),
+  organization_id bigint,
+  name character varying NOT NULL,
+  description text,
+  is_active boolean NOT NULL DEFAULT false,
+  metadata jsonb,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone,
+  CONSTRAINT roles_pkey PRIMARY KEY (id),
+  CONSTRAINT roles_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+);
+CREATE TABLE public.sessions (
+  id character varying NOT NULL,
+  user_id bigint,
+  ip_address character varying,
+  user_agent text,
+  payload jsonb NOT NULL,
+  last_activity integer NOT NULL,
+  CONSTRAINT sessions_pkey PRIMARY KEY (id),
+  CONSTRAINT sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.sub_products (
+  id bigint NOT NULL DEFAULT nextval('sub_products_id_seq'::regclass),
+  name character varying NOT NULL,
+  code character varying NOT NULL UNIQUE,
+  description text,
+  status character varying NOT NULL DEFAULT 'active'::character varying,
+  product_id bigint NOT NULL,
+  metadata jsonb,
+  organization_id bigint,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT sub_products_pkey PRIMARY KEY (id),
+  CONSTRAINT sub_products_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
+  CONSTRAINT sub_products_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+);
+CREATE TABLE public.task_sla_policies (
+  id bigint NOT NULL DEFAULT nextval('task_sla_policies_id_seq'::regclass),
+  task_type_id bigint NOT NULL,
+  target_time_minutes integer NOT NULL,
+  escalation_level character varying NOT NULL DEFAULT 'medium'::character varying,
+  metadata jsonb,
+  organization_id bigint,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT task_sla_policies_pkey PRIMARY KEY (id),
+  CONSTRAINT task_sla_policies_task_type_id_fkey FOREIGN KEY (task_type_id) REFERENCES public.task_types(id),
+  CONSTRAINT task_sla_policies_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+);
+CREATE TABLE public.task_types (
+  id bigint NOT NULL DEFAULT nextval('task_types_id_seq'::regclass),
+  name character varying NOT NULL,
+  description text,
+  is_active boolean NOT NULL DEFAULT true,
+  metadata jsonb,
+  organization_id bigint,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT task_types_pkey PRIMARY KEY (id),
+  CONSTRAINT task_types_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+);
+CREATE TABLE public.tasks (
+  id bigint NOT NULL DEFAULT nextval('tasks_id_seq'::regclass),
+  case_id bigint,
+  task_type_id bigint,
+  sla_policy_id bigint,
+  title character varying NOT NULL,
+  description text,
+  status USER-DEFINED NOT NULL DEFAULT 'open'::task_status_t,
+  priority USER-DEFINED NOT NULL DEFAULT 'normal'::task_priority_t,
+  assigned_to bigint,
+  created_by bigint,
+  due_date timestamp with time zone,
+  started_at timestamp with time zone,
+  completed_at timestamp with time zone,
+  estimated_time integer,
+  actual_time_spent integer,
+  tat_in_minutes integer,
+  sla_compliance boolean,
+  metadata jsonb,
+  organization_id bigint,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT tasks_pkey PRIMARY KEY (id),
+  CONSTRAINT tasks_case_id_fkey FOREIGN KEY (case_id) REFERENCES public.cases(id),
+  CONSTRAINT tasks_task_type_id_fkey FOREIGN KEY (task_type_id) REFERENCES public.task_types(id),
+  CONSTRAINT tasks_sla_policy_id_fkey FOREIGN KEY (sla_policy_id) REFERENCES public.task_sla_policies(id),
+  CONSTRAINT tasks_assigned_to_fkey FOREIGN KEY (assigned_to) REFERENCES public.users(id),
+  CONSTRAINT tasks_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
+  CONSTRAINT tasks_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+);
+CREATE TABLE public.third_party_api_log (
+  id bigint NOT NULL DEFAULT nextval('third_party_api_log_id_seq'::regclass),
+  organization_id bigint,
+  api_name character varying NOT NULL,
+  url character varying,
+  request_payload jsonb,
+  response_payload jsonb,
+  status_code integer,
+  method character varying NOT NULL DEFAULT 'POST'::character varying,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT third_party_api_log_pkey PRIMARY KEY (id),
+  CONSTRAINT third_party_api_log_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+);
+CREATE TABLE public.user_roles (
+  id bigint NOT NULL DEFAULT nextval('user_roles_id_seq'::regclass),
+  user_id bigint NOT NULL,
+  role_id bigint NOT NULL,
+  assigned_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone,
+  CONSTRAINT user_roles_pkey PRIMARY KEY (id),
+  CONSTRAINT user_roles_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT user_roles_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.roles(id)
+);
+CREATE TABLE public.users (
+  id bigint NOT NULL DEFAULT nextval('users_id_seq'::regclass),
+  full_name character varying NOT NULL,
+  email character varying NOT NULL UNIQUE,
+  mobile character varying,
+  email_verified_at timestamp with time zone,
+  remember_token character varying,
+  department_id bigint,
+  employment_type_id bigint,
+  organization_id bigint,
+  status USER-DEFINED NOT NULL DEFAULT 'active'::user_status_t,
+  metadata jsonb,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  deleted_at timestamp with time zone,
+  auth_id uuid UNIQUE,
+  role character varying,
+  CONSTRAINT users_pkey PRIMARY KEY (id),
+  CONSTRAINT users_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id),
+  CONSTRAINT users_employment_type_id_fkey FOREIGN KEY (employment_type_id) REFERENCES public.employment_types(id),
+  CONSTRAINT users_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+  CONSTRAINT users_auth_id_fkey FOREIGN KEY (auth_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.webhooks (
+  id bigint NOT NULL DEFAULT nextval('webhooks_id_seq'::regclass),
+  provider character varying NOT NULL,
+  payload jsonb NOT NULL,
+  status USER-DEFINED NOT NULL DEFAULT 'pending'::webhook_status_t,
+  processed_at timestamp with time zone,
+  metadata jsonb,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  CONSTRAINT webhooks_pkey PRIMARY KEY (id)
+);

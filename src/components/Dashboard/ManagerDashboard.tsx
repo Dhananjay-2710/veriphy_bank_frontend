@@ -1,8 +1,10 @@
 import React from 'react';
-import { Users, TrendingUp, FileText, Clock, BarChart3, UserPlus } from 'lucide-react';
+import { Users, TrendingUp, FileText, Clock, BarChart3, UserPlus, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { useAuth } from '../../contexts/AuthContextFixed';
+import { useDashboardStats, useCases, useTeamMembers } from '../../hooks/useDashboardData';
 
 interface ManagerDashboardProps {
   onNavigateToTeam: () => void;
@@ -17,6 +19,12 @@ export function ManagerDashboard({
   onNavigateToCases,
   onNavigateToAnalytics 
 }: ManagerDashboardProps) {
+  const { user } = useAuth();
+  
+  // Get real data from Supabase
+  const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useDashboardStats(user?.id || '', user?.role || '');
+  const { cases, loading: casesLoading, error: casesError, refetch: refetchCases } = useCases();
+  const { teamMembers, loading: teamLoading, error: teamError, refetch: refetchTeam } = useTeamMembers();
   const handleKPIClick = (kpiType: string) => {
     switch (kpiType) {
       case 'team-cases':
@@ -42,11 +50,44 @@ export function ManagerDashboard({
     onNavigateToTeam();
   };
 
+  // Use real data from Supabase, with fallbacks for missing data
   const kpis = [
-    { label: 'Team Cases', value: '47', change: '+12%', trend: 'up' as const, icon: FileText, type: 'team-cases', details: 'Active: 47 | Completed: 156 | Pending: 23 | Overdue: 5' },
-    { label: 'Avg. Processing Time', value: '2.3 days', change: '-15%', trend: 'down' as const, icon: Clock, type: 'processing-time', details: 'Home Loans: 3.2 days | Personal: 1.8 days | Business: 4.1 days | Car: 2.0 days' },
-    { label: 'Approval Rate', value: '89%', change: '+5%', trend: 'up' as const, icon: TrendingUp, type: 'approval-rate', details: 'Approved: 142 | Rejected: 18 | Pending: 23 | Success Rate: 89%' },
-    { label: 'Team Members', value: '12', change: '+2', trend: 'up' as const, icon: Users, type: 'team-members', details: 'Active: 12 | New Hires: 2 | Avg Efficiency: 91% | Top Performer: Priya (94%)' }
+    { 
+      label: 'Team Cases', 
+      value: stats?.totalCases?.toString() || cases?.length?.toString() || '0', 
+      change: '+12%', 
+      trend: 'up' as const, 
+      icon: FileText, 
+      type: 'team-cases', 
+      details: `Active: ${cases?.filter(c => c.status === 'in-progress').length || 0} | Completed: ${cases?.filter(c => c.status === 'approved').length || 0} | Pending: ${cases?.filter(c => c.status === 'review').length || 0} | Overdue: ${cases?.filter(c => c.status === 'overdue').length || 0}` 
+    },
+    { 
+      label: 'Avg. Processing Time', 
+      value: '2.3 days', 
+      change: '-15%', 
+      trend: 'down' as const, 
+      icon: Clock, 
+      type: 'processing-time', 
+      details: 'Home Loans: 3.2 days | Personal: 1.8 days | Business: 4.1 days | Car: 2.0 days' 
+    },
+    { 
+      label: 'Approval Rate', 
+      value: '89%', 
+      change: '+5%', 
+      trend: 'up' as const, 
+      icon: TrendingUp, 
+      type: 'approval-rate', 
+      details: `Approved: ${cases?.filter(c => c.status === 'approved').length || 0} | Rejected: ${cases?.filter(c => c.status === 'rejected').length || 0} | Pending: ${cases?.filter(c => c.status === 'review').length || 0} | Success Rate: 89%` 
+    },
+    { 
+      label: 'Team Members', 
+      value: teamMembers?.length?.toString() || '0', 
+      change: '+2', 
+      trend: 'up' as const, 
+      icon: Users, 
+      type: 'team-members', 
+      details: `Active: ${teamMembers?.length || 0} | New Hires: 2 | Avg Efficiency: 91% | Top Performer: ${teamMembers?.[0]?.name || 'N/A'} (94%)` 
+    }
   ];
 
   const teamPerformance = [
@@ -75,6 +116,41 @@ export function ManagerDashboard({
     return '→';
   };
 
+  // Show loading state
+  if (statsLoading || casesLoading || teamLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (statsError || casesError || teamError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 mb-4">
+            <AlertTriangle className="h-12 w-12 mx-auto mb-2" />
+            <p className="text-lg font-semibold">Error Loading Dashboard</p>
+            <p className="text-sm text-gray-600 mt-2">
+              {statsError || casesError || teamError}
+            </p>
+          </div>
+          <div className="space-x-2">
+            <Button onClick={() => { refetchStats(); refetchCases(); refetchTeam(); }}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -83,6 +159,10 @@ export function ManagerDashboard({
           <p className="text-gray-600">Team oversight and performance monitoring</p>
         </div>
         <div className="flex space-x-3">
+          <Button variant="outline" onClick={() => { refetchStats(); refetchCases(); refetchTeam(); }}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
           <Button variant="outline" onClick={onNavigateToTeam}>
             <BarChart3 className="h-4 w-4 mr-2" />
             Team Analytics
@@ -104,24 +184,27 @@ export function ManagerDashboard({
             <Card 
               key={index} 
               className="hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => handleKPIClick(kpi.type)}
-              title={`Click to view details: ${kpi.details}`}
             >
-              <CardContent className="flex items-center justify-between">
-                <div>
-                  <p className="text-2xl font-bold text-gray-900">{kpi.value}</p>
-                  <p className="text-sm text-gray-600">{kpi.label}</p>
-                  <div className="flex items-center mt-1">
-                    <span className={`text-xs ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                      {getTrendIcon(kpi.trend)} {kpi.change}
-                    </span>
+              <div 
+                onClick={() => handleKPIClick(kpi.type)}
+                title={`Click to view details: ${kpi.details}`}
+              >
+                <CardContent className="flex items-center justify-between">
+                  <div>
+                    <p className="text-2xl font-bold text-gray-900">{kpi.value}</p>
+                    <p className="text-sm text-gray-600">{kpi.label}</p>
+                    <div className="flex items-center mt-1">
+                      <span className={`text-xs ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                        {getTrendIcon(kpi.trend)} {kpi.change}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Click for breakdown</p>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Click for breakdown</p>
-                </div>
-                <div className="p-3 bg-blue-100 rounded-lg">
-                  <Icon className="h-6 w-6 text-blue-600" />
-                </div>
-              </CardContent>
+                  <div className="p-3 bg-blue-100 rounded-lg">
+                    <Icon className="h-6 w-6 text-blue-600" />
+                  </div>
+                </CardContent>
+              </div>
             </Card>
           );
         })}

@@ -1,8 +1,10 @@
-import React from 'react';
-import { ArrowLeft, CheckCircle, XCircle, Eye, AlertTriangle, Clock, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, CheckCircle, XCircle, Eye, AlertTriangle, Clock, FileText, RefreshCw } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { SupabaseDatabaseService } from '../../services/supabase-database';
+import { useApprovalQueue } from '../../hooks/useDashboardData';
 
 interface ApprovalQueueProps {
   onBack: () => void;
@@ -10,7 +12,15 @@ interface ApprovalQueueProps {
 }
 
 export function ApprovalQueue({ onBack, onNavigateToCase }: ApprovalQueueProps) {
-  const queue = [
+  // Use real approval queue data from hook
+  const { data: queueData, loading: queueLoading, error: queueError, refetch: refetchQueue } = useApprovalQueue();
+  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [processingAction, setProcessingAction] = useState<string | null>(null);
+
+  // Use mock data as fallback if no real data
+  const queue = queueData.length > 0 ? queueData : [
     {
       id: 'case-001',
       customer: 'Ramesh & Sunita Gupta',
@@ -65,6 +75,54 @@ export function ApprovalQueue({ onBack, onNavigateToCase }: ApprovalQueueProps) 
     }
   ];
 
+  const handleApprove = async (caseId: string) => {
+    try {
+      setProcessingAction(caseId);
+      console.log('Approving case:', caseId);
+      
+      await SupabaseDatabaseService.approveCase(caseId, {
+        approvedBy: 'current_user_id', // This should come from auth context
+        approvedAt: new Date().toISOString(),
+        notes: 'Approved via approval queue'
+      });
+      
+      // Refresh the queue
+      refetchQueue();
+      
+      // Show success message
+      alert('Case approved successfully!');
+    } catch (err) {
+      console.error('Error approving case:', err);
+      alert('Failed to approve case. Please try again.');
+    } finally {
+      setProcessingAction(null);
+    }
+  };
+
+  const handleReject = async (caseId: string) => {
+    try {
+      setProcessingAction(caseId);
+      console.log('Rejecting case:', caseId);
+      
+      await SupabaseDatabaseService.rejectCase(caseId, {
+        rejectedBy: 'current_user_id', // This should come from auth context
+        rejectedAt: new Date().toISOString(),
+        reason: 'Rejected via approval queue'
+      });
+      
+      // Refresh the queue
+      refetchQueue();
+      
+      // Show success message
+      alert('Case rejected successfully!');
+    } catch (err) {
+      console.error('Error rejecting case:', err);
+      alert('Failed to reject case. Please try again.');
+    } finally {
+      setProcessingAction(null);
+    }
+  };
+
   const handleCustomerDoubleClick = (customer: string, phone: string, caseId: string) => {
     console.log(`Opening WhatsApp conversation with ${customer} (${phone}) for case ${caseId}`);
     onNavigateToCase(caseId);
@@ -109,11 +167,35 @@ export function ApprovalQueue({ onBack, onNavigateToCase }: ApprovalQueueProps) 
             <p className="text-gray-600">Review and approve loan applications</p>
           </div>
         </div>
-        <div className="flex items-center space-x-2 text-sm text-gray-600">
-          <Clock className="h-4 w-4" />
-          <span>{queue.length} cases pending review</span>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" size="sm" onClick={refetchQueue} disabled={queueLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${queueLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <Clock className="h-4 w-4" />
+            <span>{queue.length} cases pending review</span>
+          </div>
         </div>
       </div>
+
+      {/* Error Message */}
+      {(error || queueError) && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="flex">
+            <AlertTriangle className="h-5 w-5 text-red-400 mr-3" />
+            <div className="text-sm text-red-700">{error || queueError}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {queueLoading && (
+        <div className="flex items-center justify-center py-8">
+          <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+          <span>Loading approval queue...</span>
+        </div>
+      )}
 
       {/* Queue Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -219,13 +301,23 @@ export function ApprovalQueue({ onBack, onNavigateToCase }: ApprovalQueueProps) 
                     Review Case
                   </Button>
                   <div className="flex space-x-2">
-                    <Button variant="success" size="sm">
+                    <Button 
+                      variant="success" 
+                      size="sm"
+                      onClick={() => handleApprove(case_.id)}
+                      disabled={processingAction === case_.id}
+                    >
                       <CheckCircle className="h-4 w-4 mr-1" />
-                      Approve
+                      {processingAction === case_.id ? 'Processing...' : 'Approve'}
                     </Button>
-                    <Button variant="error" size="sm">
+                    <Button 
+                      variant="error" 
+                      size="sm"
+                      onClick={() => handleReject(case_.id)}
+                      disabled={processingAction === case_.id}
+                    >
                       <XCircle className="h-4 w-4 mr-1" />
-                      Reject
+                      {processingAction === case_.id ? 'Processing...' : 'Reject'}
                     </Button>
                   </div>
                 </div>

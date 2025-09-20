@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Shield, Search, Filter, Download, Eye, AlertTriangle, CheckCircle, Info, Clock, RefreshCw, Settings } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { SupabaseDatabaseService } from '../../services/supabase-database';
 
 interface AuditLogsProps {
   onBack: () => void;
@@ -12,113 +13,62 @@ export function AuditLogs({ onBack }: AuditLogsProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('all');
   const [selectedSeverity, setSelectedSeverity] = useState('all');
-
-  const auditLogs = [
-    {
-      id: 'audit-001',
-      timestamp: '2025-01-09T16:15:00Z',
-      user: 'Dr. Suresh Krishnamurthy',
-      action: 'User Account Created',
-      details: 'Created new salesperson account for Rohit Gupta',
-      type: 'user_management',
-      severity: 'info',
-      ipAddress: '192.168.1.100',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    },
-    {
-      id: 'audit-002',
-      timestamp: '2025-01-09T15:45:00Z',
-      user: 'Anita Patel',
-      action: 'Document Access',
-      details: 'Accessed PAN card for case HBI-HL-2025-001',
-      type: 'document_access',
-      severity: 'info',
-      ipAddress: '192.168.1.105',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    },
-    {
-      id: 'audit-003',
-      timestamp: '2025-01-09T15:30:00Z',
-      user: 'Unknown',
-      action: 'Failed Login Attempt',
-      details: 'Multiple failed login attempts from external IP',
-      type: 'security',
-      severity: 'high',
-      ipAddress: '203.45.67.89',
-      userAgent: 'curl/7.68.0'
-    },
-    {
-      id: 'audit-004',
-      timestamp: '2025-01-09T14:20:00Z',
-      user: 'Priya Sharma',
-      action: 'Case Status Update',
-      details: 'Updated case HBI-HL-2025-001 status to approved',
-      type: 'case_management',
-      severity: 'info',
-      ipAddress: '192.168.1.102',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    },
-    {
-      id: 'audit-005',
-      timestamp: '2025-01-09T13:15:00Z',
-      user: 'System',
-      action: 'Compliance Check',
-      details: 'Automated AML screening completed for 15 new applications',
-      type: 'compliance',
-      severity: 'info',
-      ipAddress: 'localhost',
-      userAgent: 'VERIPHY-System/1.0'
-    },
-    {
-      id: 'audit-006',
-      timestamp: '2025-01-09T12:30:00Z',
-      user: 'Rajesh Kumar',
-      action: 'Permission Change',
-      details: 'Updated document access permissions for Vikram Joshi',
-      type: 'permission_change',
-      severity: 'medium',
-      ipAddress: '192.168.1.103',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    },
-    {
-      id: 'audit-007',
-      timestamp: '2025-01-09T11:45:00Z',
-      user: 'System',
-      action: 'Data Backup',
-      details: 'Automated daily backup completed successfully',
-      type: 'system',
-      severity: 'info',
-      ipAddress: 'localhost',
-      userAgent: 'VERIPHY-Backup/1.0'
-    },
-    {
-      id: 'audit-008',
-      timestamp: '2025-01-09T10:20:00Z',
-      user: 'Anita Patel',
-      action: 'Compliance Flag',
-      details: 'Flagged document mismatch in case HBI-BL-2025-004',
-      type: 'compliance',
-      severity: 'high',
-      ipAddress: '192.168.1.105',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    }
-  ];
-
-  const logStats = [
-    { label: 'Total Logs Today', value: '1,247', color: 'blue' },
-    { label: 'Security Events', value: '23', color: 'red' },
-    { label: 'User Actions', value: '892', color: 'green' },
-    { label: 'System Events', value: '332', color: 'purple' }
-  ];
-
-  const filteredLogs = auditLogs.filter(log => {
-    const matchesSearch = log.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         log.details.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = selectedType === 'all' || log.type === selectedType;
-    const matchesSeverity = selectedSeverity === 'all' || log.severity === selectedSeverity;
-    return matchesSearch && matchesType && matchesSeverity;
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [logStats, setLogStats] = useState({
+    totalLogsToday: 0,
+    securityEvents: 0,
+    userActions: 0,
+    systemEvents: 0
   });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch audit logs and stats
+  const fetchAuditData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const [logs, stats] = await Promise.all([
+        SupabaseDatabaseService.getAuditLogs({
+          searchTerm: searchTerm || undefined,
+          type: selectedType !== 'all' ? selectedType : undefined,
+          severity: selectedSeverity !== 'all' ? selectedSeverity : undefined,
+          limit: 100
+        }),
+        SupabaseDatabaseService.getAuditLogStats()
+      ]);
+
+      setAuditLogs(logs);
+      setLogStats(stats);
+    } catch (err) {
+      console.error('Error fetching audit data:', err);
+      setError('Failed to load audit logs. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load data on component mount and when filters change
+  useEffect(() => {
+    fetchAuditData();
+  }, [searchTerm, selectedType, selectedSeverity]);
+
+  // Set up real-time subscription
+  useEffect(() => {
+    const subscription = SupabaseDatabaseService.subscribeToAuditLogs((payload) => {
+      console.log('New audit log received:', payload);
+      // Refresh data when new audit logs are added
+      fetchAuditData();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Filter logs (now handled by the service, but keeping for client-side filtering if needed)
+  const filteredLogs = auditLogs;
 
   const getSeverityBadge = (severity: string) => {
     switch (severity) {
@@ -168,8 +118,8 @@ export function AuditLogs({ onBack }: AuditLogsProps) {
             <Download className="h-4 w-4 mr-2" />
             Export Logs
           </Button>
-          <Button variant="outline">
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button variant="outline" onClick={fetchAuditData} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
@@ -177,7 +127,12 @@ export function AuditLogs({ onBack }: AuditLogsProps) {
 
       {/* Log Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {logStats.map((stat, index) => {
+        {[
+          { label: 'Total Logs Today', value: logStats.totalLogsToday.toLocaleString(), color: 'blue' },
+          { label: 'Security Events', value: logStats.securityEvents.toLocaleString(), color: 'red' },
+          { label: 'User Actions', value: logStats.userActions.toLocaleString(), color: 'green' },
+          { label: 'System Events', value: logStats.systemEvents.toLocaleString(), color: 'purple' }
+        ].map((stat, index) => {
           const colorClasses = {
             blue: 'text-blue-600 bg-blue-100',
             red: 'text-red-600 bg-red-100',
@@ -247,8 +202,24 @@ export function AuditLogs({ onBack }: AuditLogsProps) {
           <CardTitle>Audit Trail ({filteredLogs.length} entries)</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {filteredLogs.map((log) => (
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+              <span>Loading audit logs...</span>
+            </div>
+          ) : error ? (
+            <div className="flex items-center justify-center py-8 text-red-600">
+              <AlertTriangle className="h-6 w-6 mr-2" />
+              <span>{error}</span>
+            </div>
+          ) : filteredLogs.length === 0 ? (
+            <div className="flex items-center justify-center py-8 text-gray-500">
+              <Info className="h-6 w-6 mr-2" />
+              <span>No audit logs found</span>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredLogs.map((log) => (
               <div 
                 key={log.id}
                 className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
@@ -280,8 +251,9 @@ export function AuditLogs({ onBack }: AuditLogsProps) {
                   </Button>
                 </div>
               </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

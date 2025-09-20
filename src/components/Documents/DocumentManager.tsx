@@ -1,25 +1,40 @@
-import React, { useState } from 'react';
-import { ArrowLeft, FileText, CheckCircle, XCircle, Clock, AlertTriangle, Eye, Download, MessageCircle, Upload, Filter, Search } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { ArrowLeft, FileText, CheckCircle, XCircle, Clock, AlertTriangle, Eye, Download, MessageCircle, Upload, Filter, Search, Plus, X } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Document } from '../../types';
+import { useDocuments, useRealtimeDocuments } from '../../hooks/useDashboardData';
 import { getDocumentRequirements } from '../../data/documentRequirements';
+import { SupabaseDatabaseService } from '../../services/supabase-database';
+import { useAuth } from '../../contexts/AuthContextFixed';
 
 interface DocumentManagerProps {
+  caseId?: string;
   onBack: () => void;
   onSendMessage?: (message: string, documentId?: string) => void;
 }
 
-export function DocumentManager({ onBack, onSendMessage }: DocumentManagerProps) {
+export function DocumentManager({ caseId, onBack, onSendMessage }: DocumentManagerProps) {
+  const { user } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [reviewMode, setReviewMode] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [documentTypes, setDocumentTypes] = useState<any[]>([]);
+  const [selectedDocumentType, setSelectedDocumentType] = useState('');
 
-  // Mock documents with enhanced data
-  const documents: Document[] = [
+  // Get real documents data from database
+  const { documents, loading: documentsLoading, error: documentsError, refetch } = useDocuments(caseId || '');
+
+  // Mock documents with enhanced data (fallback)
+  const mockDocuments: Document[] = [
     {
       id: 'doc1',
       name: 'Aadhaar Card',
@@ -119,15 +134,47 @@ export function DocumentManager({ onBack, onSendMessage }: DocumentManagerProps)
     { id: 'employment', label: 'Employment', count: documents.filter(d => d.category === 'employment').length }
   ];
 
+  // Use dynamic documents if available, otherwise fallback to mock
+  const displayDocuments = documents.length > 0 ? documents : mockDocuments;
+
+  // If no caseId is provided, show case selection interface
+  if (!caseId) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center space-x-4">
+          <Button variant="outline" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Document Manager</h1>
+            <p className="text-gray-600">Select a case to manage documents</p>
+          </div>
+        </div>
+
+        <Card>
+          <CardContent className="text-center py-12">
+            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Case Selected</h3>
+            <p className="text-gray-600 mb-4">Please select a case to view and manage its documents.</p>
+            <Button onClick={() => window.location.href = '/cases'}>
+              View Cases
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const statusCounts = {
-    all: documents.length,
-    pending: documents.filter(d => d.status === 'pending').length,
-    received: documents.filter(d => d.status === 'received').length,
-    verified: documents.filter(d => d.status === 'verified').length,
-    rejected: documents.filter(d => d.status === 'rejected').length
+    all: displayDocuments.length,
+    pending: displayDocuments.filter(d => d.status === 'pending').length,
+    received: displayDocuments.filter(d => d.status === 'received').length,
+    verified: displayDocuments.filter(d => d.status === 'verified').length,
+    rejected: displayDocuments.filter(d => d.status === 'rejected').length
   };
 
-  const filteredDocuments = documents.filter(doc => {
+  const filteredDocuments = displayDocuments.filter(doc => {
     const matchesCategory = selectedCategory === 'all' || doc.category === selectedCategory;
     const matchesStatus = selectedStatus === 'all' || doc.status === selectedStatus;
     const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -173,32 +220,120 @@ export function DocumentManager({ onBack, onSendMessage }: DocumentManagerProps)
     }
   };
 
-  const handleDocumentAction = (action: string, document: Document) => {
-    switch (action) {
-      case 'approve':
-        console.log('Approving document:', document.id);
-        break;
-      case 'reject':
-        setSelectedDocument(document);
-        setReviewMode(true);
-        break;
-      case 'request_reupload':
-        if (onSendMessage) {
-          onSendMessage(
-            `Hi! We need you to re-upload your ${document.name}. ${document.rejectionReason || 'Please ensure the document is clear and complete.'}`,
-            document.id
-          );
-        }
-        break;
+  const handleDocumentAction = async (action: string, document: Document) => {
+    if (!user?.id) return;
+
+    try {
+      switch (action) {
+        case 'approve':
+          await SupabaseDatabaseService.approveDocument(document.id, user.id);
+          await refetch();
+          break;
+        case 'reject':
+          setSelectedDocument(document);
+          setReviewMode(true);
+          break;
+        case 'request_reupload':
+          if (onSendMessage) {
+            onSendMessage(
+              `Hi! We need you to re-upload your ${document.name}. ${document.rejectionReason || 'Please ensure the document is clear and complete.'}`,
+              document.id
+            );
+          }
+          break;
+      }
+    } catch (error) {
+      console.error('Error handling document action:', error);
     }
   };
 
-  const handleRejectDocument = (reason: string) => {
-    if (selectedDocument && onSendMessage) {
-      onSendMessage(
-        `Hi! Your ${selectedDocument.name} has been reviewed. ${reason} Please upload a corrected version.`,
-        selectedDocument.id
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile || !selectedDocumentType || !caseId || !user?.id) return;
+
+    try {
+      setUploading(true);
+      setUploadProgress(0);
+
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 200);
+
+      // For now, we'll use a mock file path. In a real app, you'd upload to Supabase Storage first
+      const filePath = `documents/${caseId}/${selectedFile.name}`;
+      
+      await SupabaseDatabaseService.uploadDocument(
+        caseId,
+        selectedDocumentType,
+        selectedFile.name,
+        filePath,
+        selectedFile.size,
+        selectedFile.type.split('/')[1] || 'unknown'
       );
+
+      setUploadProgress(100);
+      await refetch();
+      
+      setShowUploadModal(false);
+      setSelectedFile(null);
+      setSelectedDocumentType('');
+      setUploadProgress(0);
+    } catch (error) {
+      console.error('Error uploading document:', error);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const loadDocumentTypes = async () => {
+    try {
+      const types = await SupabaseDatabaseService.getDocumentTypes();
+      setDocumentTypes(types);
+    } catch (error) {
+      console.error('Error loading document types:', error);
+    }
+  };
+
+  React.useEffect(() => {
+    if (showUploadModal) {
+      loadDocumentTypes();
+    }
+  }, [showUploadModal]);
+
+  // Real-time updates for documents
+  useRealtimeDocuments(caseId || '', (payload) => {
+    console.log('Document update received:', payload);
+    refetch(); // Refresh the documents list when changes occur
+  });
+
+  const handleRejectDocument = async (reason: string) => {
+    if (selectedDocument && user?.id) {
+      try {
+        await SupabaseDatabaseService.rejectDocument(selectedDocument.id, reason, user.id);
+        await refetch();
+        
+        if (onSendMessage) {
+          onSendMessage(
+            `Hi! Your ${selectedDocument.name} has been reviewed. ${reason} Please upload a corrected version.`,
+            selectedDocument.id
+          );
+        }
+      } catch (error) {
+        console.error('Error rejecting document:', error);
+      }
     }
     setSelectedDocument(null);
     setReviewMode(false);
@@ -279,6 +414,46 @@ export function DocumentManager({ onBack, onSendMessage }: DocumentManagerProps)
     );
   }
 
+  if (documentsLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="outline" size="sm" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+          <h1 className="text-2xl font-bold text-gray-900">Document Manager</h1>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading documents...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (documentsError) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="outline" size="sm" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+          <h1 className="text-2xl font-bold text-gray-900">Document Manager</h1>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">Error loading documents: {documentsError}</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -293,13 +468,13 @@ export function DocumentManager({ onBack, onSendMessage }: DocumentManagerProps)
           </div>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => setShowUploadModal(true)}>
             <Upload className="h-4 w-4 mr-2" />
-            Request Documents
+            Upload Document
           </Button>
-          <Button>
+          <Button variant="outline">
             <MessageCircle className="h-4 w-4 mr-2" />
-            Send Message
+            Request Documents
           </Button>
         </div>
       </div>
@@ -471,6 +646,92 @@ export function DocumentManager({ onBack, onSendMessage }: DocumentManagerProps)
             <p className="text-gray-600">Try adjusting your search terms or filters.</p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Upload Document</CardTitle>
+                <Button variant="outline" size="sm" onClick={() => setShowUploadModal(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Document Type
+                </label>
+                <select
+                  value={selectedDocumentType}
+                  onChange={(e) => setSelectedDocumentType(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select document type</option>
+                  {documentTypes.map((type) => (
+                    <option key={type.id} value={type.id}>
+                      {type.name} ({type.category})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  File
+                </label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={handleFileSelect}
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {selectedFile && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Selected: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                  </p>
+                )}
+              </div>
+
+              {uploading && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Uploading...</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex space-x-3">
+                <Button
+                  onClick={handleUpload}
+                  disabled={!selectedFile || !selectedDocumentType || uploading}
+                  className="flex-1"
+                >
+                  {uploading ? 'Uploading...' : 'Upload'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowUploadModal(false)}
+                  disabled={uploading}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );

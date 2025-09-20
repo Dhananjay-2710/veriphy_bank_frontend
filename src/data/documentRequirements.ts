@@ -278,3 +278,11 @@ export const getDocumentRequirements = (productType: string, customerProfile?: a
 
   return allDocuments;
 };
+
+
+
+
+
+
+
+

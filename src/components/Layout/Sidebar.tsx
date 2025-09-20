@@ -1,4 +1,3 @@
-import React from 'react';
 import { 
   Home, 
   FileText, 
@@ -10,18 +9,42 @@ import {
   Clock,
   MessageCircle
 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContextFixed';
+import { Link, useLocation } from "react-router-dom";
 
 interface SidebarProps {
   activeView: string;
   setActiveView: (view: string) => void;
 }
 
-export function Sidebar({ activeView, setActiveView }: SidebarProps) {
-  const { user } = useAuth();
+export function Sidebar({  }: SidebarProps) {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return (
+      <aside className="w-64 bg-gray-900 text-white flex flex-col">
+        {/* You can put a spinner or skeleton loader here */}
+        <div className="p-6 text-gray-400">Loading...</div>
+      </aside>
+    );
+  }
 
   const getMenuItems = () => {
-    switch (user?.role) {
+    if (!user) {
+      return []; // Return an empty array if there's no user
+    }
+    console.log("User role in Sidebar:", user.role);
+    switch (user.role) {
+      case 'super-admin':
+      return [
+        { id: 'dashboard', label: 'Master Dashboard', icon: Home },
+        { id: 'user-management', label: 'User Management', icon: Users },
+        { id: 'all-orgs', label: 'Organizations', icon: Users },
+        { id: 'settings', label: 'Global Settings', icon: Shield },
+        { id: 'audit', label: 'System Audit', icon: FileText },
+        { id: 'analytics', label: 'Global Analytics', icon: BarChart3 },
+      ];
       case 'salesperson':
         return [
           { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -76,26 +99,44 @@ export function Sidebar({ activeView, setActiveView }: SidebarProps) {
         <ul className="space-y-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activeView === item.id;
+            const isActive = location.pathname.includes(item.id);
+            // const isActive = activeView === item.id;
             
             return (
               <li key={item.id}>
-                <button
-                  onClick={() => setActiveView(item.id)}
+                <Link
+                  to={item.id === 'dashboard' ? '/' : `/${item.id}`}
                   className={`
-                    w-full flex items-center space-x-3 px-3 py-2 rounded-md text-left
+                    w-full flex items-center space-x-3 px-3 py-2 rounded-md
                     transition-colors duration-200
                     ${isActive 
-                      ? 'bg-blue-600 text-white' 
-                      : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-                    }
+                      ? "bg-blue-600 text-white"
+                      : "text-gray-300 hover:bg-gray-800 hover:text-white"}
                   `}
                 >
                   <Icon className="h-5 w-5" />
                   <span className="font-medium">{item.label}</span>
-                </button>
+                </Link>
               </li>
             );
+            // return (
+            //   <li key={item.id}>
+            //     <button
+            //       onClick={() => setActiveView(item.id)}
+            //       className={`
+            //         w-full flex items-center space-x-3 px-3 py-2 rounded-md text-left
+            //         transition-colors duration-200
+            //         ${isActive 
+            //           ? 'bg-blue-600 text-white' 
+            //           : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+            //         }
+            //       `}
+            //     >
+            //       <Icon className="h-5 w-5" />
+            //       <span className="font-medium">{item.label}</span>
+            //     </button>
+            //   </li>
+            // );
           })}
         </ul>
       </nav>

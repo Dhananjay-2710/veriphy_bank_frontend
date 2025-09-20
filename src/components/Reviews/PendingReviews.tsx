@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Clock, FileText, User, AlertCircle, CheckCircle, XCircle, Eye, Filter, AlertTriangle } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, Clock, FileText, AlertCircle, CheckCircle, XCircle, Eye, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { SupabaseDatabaseService } from '../../services/supabase-database';
+import { usePendingReviews } from '../../hooks/useDashboardData';
 
 interface PendingReviewsProps {
   onBack: () => void;
@@ -12,8 +14,15 @@ interface PendingReviewsProps {
 export function PendingReviews({ onBack, onNavigateToCase }: PendingReviewsProps) {
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [sortBy, setSortBy] = useState('priority');
-
-  const pendingReviews = [
+  
+  // Use real pending reviews data from hook
+  const { data: pendingReviewsData, loading: reviewsLoading, error: reviewsError, refetch: refetchReviews } = usePendingReviews({
+    reviewType: selectedFilter !== 'all' ? selectedFilter : undefined,
+    sortBy: sortBy
+  });
+  
+  // Use fallback mock data if real data is not available
+  const pendingReviews = pendingReviewsData && pendingReviewsData.length > 0 ? pendingReviewsData : [
     {
       id: 'review-001',
       caseId: 'case-001',
@@ -100,6 +109,102 @@ export function PendingReviews({ onBack, onNavigateToCase }: PendingReviewsProps
       reviewNotes: 'Property valuation pending. Income verification complete.'
     }
   ];
+  
+  const [processingAction, setProcessingAction] = useState<string | null>(null);
+
+  // Filter and sort reviews based on selected criteria
+  const filteredReviews = pendingReviews.filter(review => {
+    if (selectedFilter === 'all') return true;
+    return review.reviewType === selectedFilter;
+  });
+
+  const sortedReviews = [...filteredReviews].sort((a, b) => {
+    switch (sortBy) {
+      case 'priority':
+        const priorityOrder = { high: 3, medium: 2, low: 1 };
+        return priorityOrder[b.priority as keyof typeof priorityOrder] - priorityOrder[a.priority as keyof typeof priorityOrder];
+      case 'waitTime':
+        return b.waitTime.localeCompare(a.waitTime);
+      case 'amount':
+        const amountA = parseFloat(a.amount.replace(/[₹,]/g, ''));
+        const amountB = parseFloat(b.amount.replace(/[₹,]/g, ''));
+        return amountB - amountA;
+      default:
+        return 0;
+    }
+  });
+
+  const handleApproveReview = async (reviewId: string) => {
+    try {
+      setProcessingAction(reviewId);
+      console.log('Approving review:', reviewId);
+      
+      await SupabaseDatabaseService.approveReview(reviewId, {
+        approvedBy: 'current_user_id', // This should come from auth context
+        approvedAt: new Date().toISOString(),
+        approvalNotes: 'Approved via pending reviews'
+      });
+      
+      // Refresh the reviews list
+      refetchReviews();
+      
+      // Show success message
+      alert('Review approved successfully!');
+    } catch (err) {
+      console.error('Error approving review:', err);
+      alert('Failed to approve review. Please try again.');
+    } finally {
+      setProcessingAction(null);
+    }
+  };
+
+  const handleRejectReview = async (reviewId: string) => {
+    try {
+      setProcessingAction(reviewId);
+      console.log('Rejecting review:', reviewId);
+      
+      await SupabaseDatabaseService.rejectReview(reviewId, {
+        rejectedBy: 'current_user_id', // This should come from auth context
+        rejectedAt: new Date().toISOString(),
+        rejectionReason: 'Rejected via pending reviews'
+      });
+      
+      // Refresh the reviews list
+      refetchReviews();
+      
+      // Show success message
+      alert('Review rejected successfully!');
+    } catch (err) {
+      console.error('Error rejecting review:', err);
+      alert('Failed to reject review. Please try again.');
+    } finally {
+      setProcessingAction(null);
+    }
+  };
+
+  const handleRequestInfo = async (reviewId: string) => {
+    try {
+      setProcessingAction(reviewId);
+      console.log('Requesting additional info for review:', reviewId);
+      
+      await SupabaseDatabaseService.requestAdditionalInfo(reviewId, {
+        requestedBy: 'current_user_id', // This should come from auth context
+        requestedAt: new Date().toISOString(),
+        infoRequest: 'Additional documentation required'
+      });
+      
+      // Refresh the reviews list
+      refetchReviews();
+      
+      // Show success message
+      alert('Information request sent successfully!');
+    } catch (err) {
+      console.error('Error requesting information:', err);
+      alert('Failed to request information. Please try again.');
+    } finally {
+      setProcessingAction(null);
+    }
+  };
 
   const handleCustomerDoubleClick = (customer: string, phone: string, caseId: string) => {
     console.log(`Opening WhatsApp conversation with ${customer} (${phone}) for case ${caseId}`);
@@ -154,23 +259,7 @@ export function PendingReviews({ onBack, onNavigateToCase }: PendingReviewsProps
     }
   };
 
-  const filteredReviews = selectedFilter === 'all' 
-    ? pendingReviews 
-    : pendingReviews.filter(review => review.reviewType === selectedFilter);
 
-  const sortedReviews = [...filteredReviews].sort((a, b) => {
-    switch (sortBy) {
-      case 'priority':
-        const priorityOrder = { high: 3, medium: 2, low: 1 };
-        return priorityOrder[b.priority as keyof typeof priorityOrder] - priorityOrder[a.priority as keyof typeof priorityOrder];
-      case 'time':
-        return new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime();
-      case 'amount':
-        return parseInt(b.amount.replace(/[₹L]/g, '')) - parseInt(a.amount.replace(/[₹L]/g, ''));
-      default:
-        return 0;
-    }
-  });
 
   return (
     <div className="space-y-6">
@@ -185,11 +274,35 @@ export function PendingReviews({ onBack, onNavigateToCase }: PendingReviewsProps
             <p className="text-gray-600">Cases awaiting credit operations review</p>
           </div>
         </div>
-        <div className="flex items-center space-x-2 text-sm text-gray-600">
-          <Clock className="h-4 w-4" />
-          <span>{pendingReviews.length} cases pending</span>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" size="sm" onClick={refetchReviews} disabled={reviewsLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${reviewsLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <Clock className="h-4 w-4" />
+            <span>{sortedReviews.length} cases pending</span>
+          </div>
         </div>
       </div>
+
+      {/* Error Message */}
+      {reviewsError && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="flex">
+            <AlertTriangle className="h-5 w-5 text-red-400 mr-3" />
+            <div className="text-sm text-red-700">{reviewsError}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {reviewsLoading && (
+        <div className="flex items-center justify-center py-8">
+          <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+          <span>Loading pending reviews...</span>
+        </div>
+      )}
 
       {/* Review Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -223,7 +336,10 @@ export function PendingReviews({ onBack, onNavigateToCase }: PendingReviewsProps
               {['all', 'final_approval', 'credit_assessment', 'document_verification', 'risk_assessment'].map((filter) => (
                 <button
                   key={filter}
-                  onClick={() => setSelectedFilter(filter)}
+                  onClick={() => {
+                    setSelectedFilter(filter);
+                    refetchReviews();
+                  }}
                   className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
                     selectedFilter === filter
                       ? 'bg-blue-100 text-blue-700'
@@ -238,7 +354,10 @@ export function PendingReviews({ onBack, onNavigateToCase }: PendingReviewsProps
               <span className="text-sm font-medium text-gray-700">Sort by:</span>
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
+                onChange={(e) => {
+                  setSortBy(e.target.value);
+                  refetchReviews();
+                }}
                 className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="priority">Priority</option>
@@ -328,17 +447,32 @@ export function PendingReviews({ onBack, onNavigateToCase }: PendingReviewsProps
                     Review Case
                   </Button>
                   <div className="flex space-x-2">
-                    <Button variant="success" size="sm">
+                    <Button 
+                      variant="success" 
+                      size="sm"
+                      onClick={() => handleApproveReview(review.id)}
+                      disabled={processingAction === review.id}
+                    >
                       <CheckCircle className="h-4 w-4 mr-1" />
-                      Approve
+                      {processingAction === review.id ? 'Processing...' : 'Approve'}
                     </Button>
-                    <Button variant="error" size="sm">
+                    <Button 
+                      variant="error" 
+                      size="sm"
+                      onClick={() => handleRejectReview(review.id)}
+                      disabled={processingAction === review.id}
+                    >
                       <XCircle className="h-4 w-4 mr-1" />
-                      Reject
+                      {processingAction === review.id ? 'Processing...' : 'Reject'}
                     </Button>
-                    <Button variant="warning" size="sm">
+                    <Button 
+                      variant="warning" 
+                      size="sm"
+                      onClick={() => handleRequestInfo(review.id)}
+                      disabled={processingAction === review.id}
+                    >
                       <AlertCircle className="h-4 w-4 mr-1" />
-                      Request Info
+                      {processingAction === review.id ? 'Processing...' : 'Request Info'}
                     </Button>
                   </div>
                 </div>

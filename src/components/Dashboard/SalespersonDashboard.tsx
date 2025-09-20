@@ -1,8 +1,10 @@
-import React from 'react';
-import { FileText, Clock, CheckCircle, AlertTriangle, Calendar, Plus, TrendingUp, Target, Award, Users } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { FileText, Clock, CheckCircle, AlertTriangle, Calendar, Plus, TrendingUp, Target, Award, Users, RefreshCw } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { useAuth } from '../../contexts/AuthContextFixed';
+import { useDashboardStats, useCases } from '../../hooks/useDashboardData';
 
 interface SalespersonDashboardProps {
   onNavigateToCase: (caseId: string) => void;
@@ -16,22 +18,34 @@ export function SalespersonDashboard({
   onNavigateToCase, 
   onNavigateToWorkload, 
   onNavigateToCases,
-  onNavigateToDocumentManager,
+  onNavigateToDocumentManager: _onNavigateToDocumentManager,
   onNavigateToCommunicator 
 }: SalespersonDashboardProps) {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useDashboardStats(user?.id || '', user?.role || '');
+  const { cases, loading: casesLoading, error: casesError, refetch: refetchCases } = useCases({
+    assignedTo: user?.id,
+    status: 'in-progress'
+  });
   const handleStatDoubleClick = (statType: string) => {
     switch (statType) {
       case 'active-cases':
-        onNavigateToCases();
+        navigate('/cases');
         break;
       case 'pending-documents':
-        onNavigateToDocumentManager();
+        // Navigate to the first active case's document manager
+        if (cases.length > 0) {
+          navigate(`/document-manager/${cases[0].id}`);
+        } else {
+          navigate('/document-manager');
+        }
         break;
       case 'completed-today':
-        onNavigateToCases();
+        navigate('/cases');
         break;
       case 'overdue-tasks':
-        onNavigateToWorkload();
+        navigate('/workload');
         break;
       default:
         break;
@@ -42,7 +56,7 @@ export function SalespersonDashboard({
     handleStatDoubleClick(statType);
   };
 
-  const handleCustomerDoubleClick = (customerName: string, phone: string) => {
+  const handleCustomerDoubleClick = (_customerName: string, _phone: string) => {
     // Navigate to WhatsApp-style conversation view
     onNavigateToCommunicator();
   };
@@ -69,11 +83,73 @@ export function SalespersonDashboard({
   const handleMetricClick = (metricType: string) => {
     handleMetricDoubleClick(metricType);
   };
-  const stats = [
-    { label: 'Active Cases', value: '8', icon: FileText, color: 'blue', type: 'active-cases', details: 'Home Loans: 3, Personal Loans: 2, Car Loans: 2, Business Loans: 1' },
-    { label: 'Pending Documents', value: '12', icon: Clock, color: 'yellow', type: 'pending-documents', details: 'GST Returns: 4, Bank Statements: 3, Property Docs: 2, Others: 3' },
-    { label: 'Completed Today', value: '3', icon: CheckCircle, color: 'green', type: 'completed-today', details: 'Pradeep Kumar (₹25L), Amit Verma (₹5L), Neha Singh (₹8L)' },
-    { label: 'Overdue Tasks', value: '2', icon: AlertTriangle, color: 'red', type: 'overdue-tasks', details: 'GST follow-up: Ramesh Gupta, Property docs: Kavya Menon' }
+
+  const handleRefresh = () => {
+    refetchStats();
+    refetchCases();
+  };
+
+  if (statsError || casesError) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Sales Dashboard</h1>
+            <p className="text-gray-600">Performance overview and key metrics</p>
+          </div>
+          <Button onClick={handleRefresh} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="flex">
+            <AlertTriangle className="h-5 w-5 text-red-400" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Error loading dashboard data</h3>
+              <p className="mt-1 text-sm text-red-700">
+                {statsError || casesError}. Please try refreshing the page.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const dashboardStats = [
+    { 
+      label: 'Active Cases', 
+      value: statsLoading ? '...' : stats.activeCases.toString(), 
+      icon: FileText, 
+      color: 'blue', 
+      type: 'active-cases', 
+      details: `Home Loans: ${cases.filter(c => c.customer.loanType.includes('Home')).length}, Personal Loans: ${cases.filter(c => c.customer.loanType.includes('Personal')).length}, Car Loans: ${cases.filter(c => c.customer.loanType.includes('Car')).length}, Business Loans: ${cases.filter(c => c.customer.loanType.includes('Business')).length}` 
+    },
+    { 
+      label: 'Pending Documents', 
+      value: statsLoading ? '...' : stats.pendingDocuments.toString(), 
+      icon: Clock, 
+      color: 'yellow', 
+      type: 'pending-documents', 
+      details: 'GST Returns: 4, Bank Statements: 3, Property Docs: 2, Others: 3' 
+    },
+    { 
+      label: 'Completed Today', 
+      value: statsLoading ? '...' : stats.completedToday.toString(), 
+      icon: CheckCircle, 
+      color: 'green', 
+      type: 'completed-today', 
+      details: 'Recent completions will appear here' 
+    },
+    { 
+      label: 'Overdue Tasks', 
+      value: statsLoading ? '...' : stats.overdueTasks.toString(), 
+      icon: AlertTriangle, 
+      color: 'red', 
+      type: 'overdue-tasks', 
+      details: 'Tasks requiring immediate attention' 
+    }
   ];
 
   const performanceMetrics = [
@@ -119,40 +195,57 @@ export function SalespersonDashboard({
     }
   ];
 
-  const recentActivities = [
-    {
-      id: '1',
-      type: 'document_received',
-      customer: 'Ramesh Gupta',
-      action: 'uploaded GST returns',
-      time: '2 hours ago',
-      status: 'success'
-    },
-    {
-      id: '2',
-      type: 'case_approved',
-      customer: 'Pradeep Kumar',
-      action: 'loan approved - ₹25L',
-      time: '5 hours ago',
-      status: 'success'
-    },
-    {
-      id: '3',
-      type: 'follow_up',
-      customer: 'Neha Singh',
-      action: 'follow-up call scheduled',
-      time: '1 day ago',
-      status: 'pending'
-    },
-    {
-      id: '4',
-      type: 'document_pending',
-      customer: 'Amit Verma',
-      action: 'bank statements pending',
-      time: '2 days ago',
-      status: 'warning'
+  // Generate recent activities from cases data
+  const recentActivities = cases.slice(0, 4).map((case_, index) => {
+    const activityTypes = ['document_received', 'case_updated', 'follow_up', 'document_pending'];
+    const statuses = ['success', 'pending', 'warning'];
+    
+    return {
+      id: `activity-${index + 1}`,
+      type: activityTypes[index % activityTypes.length],
+      customer: case_.customer.name,
+      action: getActivityAction(case_, activityTypes[index % activityTypes.length]),
+      time: getTimeAgo(case_.updatedAt),
+      status: statuses[index % statuses.length]
+    };
+  });
+
+  const getActivityAction = (case_: any, type: string) => {
+    switch (type) {
+      case 'document_received':
+        return 'uploaded required documents';
+      case 'case_updated':
+        return `case status updated to ${case_.status}`;
+      case 'follow_up':
+        return 'follow-up call scheduled';
+      case 'document_pending':
+        return 'pending document upload';
+      default:
+        return 'case activity';
     }
-  ];
+  };
+
+  const getTimeAgo = (dateString: string) => {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return 'Less than 1 hour ago';
+    if (diffInHours < 24) return `${diffInHours} hours ago`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+  };
+
+  const getNextAction = (status: string) => {
+    switch (status) {
+      case 'new': return 'Initial document collection';
+      case 'in-progress': return 'Follow up on pending documents';
+      case 'review': return 'Awaiting credit approval';
+      case 'approved': return 'Loan disbursement';
+      case 'rejected': return 'Customer notification sent';
+      default: return 'Review case status';
+    }
+  };
 
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -190,11 +283,15 @@ export function SalespersonDashboard({
           <p className="text-gray-600">Performance overview and key metrics</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={onNavigateToWorkload}>
+          <Button variant="outline" onClick={handleRefresh} disabled={statsLoading || casesLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${(statsLoading || casesLoading) ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/workload')}>
             <Calendar className="h-4 w-4 mr-2" />
             Workload Planner
           </Button>
-          <Button variant="outline" onClick={onNavigateToCases}>
+          <Button variant="outline" onClick={() => navigate('/cases')}>
             <FileText className="h-4 w-4 mr-2" />
             View All Cases
           </Button>
@@ -207,7 +304,7 @@ export function SalespersonDashboard({
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => {
+        {dashboardStats.map((stat, index) => {
           const Icon = stat.icon;
           const colorClasses = {
             blue: 'text-blue-600 bg-blue-100',
@@ -219,19 +316,23 @@ export function SalespersonDashboard({
           return (
             <Card 
               key={index} 
-              className="hover:shadow-lg transition-shadow cursor-pointer" 
-              onClick={() => handleStatClick(stat.type)}
-              onDoubleClick={() => handleStatDoubleClick(stat.type)}
-              title={`Double-click to view details: ${stat.details}`}
+              className="hover:shadow-lg transition-shadow cursor-pointer"
             >
               <CardContent className="flex items-center">
-                <div className={`p-3 rounded-lg ${colorClasses[stat.color as keyof typeof colorClasses]}`}>
-                  <Icon className="h-6 w-6" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                  <p className="text-sm text-gray-600">{stat.label}</p>
-                  <p className="text-xs text-gray-500 mt-1">Double-click for details</p>
+                <div
+                  className="flex items-center w-full cursor-pointer"
+                  onClick={() => handleStatClick(stat.type)}
+                  onDoubleClick={() => handleStatDoubleClick(stat.type)}
+                  title={`Double-click to view details: ${stat.details}`}
+                >
+                  <div className={`p-3 rounded-lg ${colorClasses[stat.color as keyof typeof colorClasses]}`}>
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                    <p className="text-sm text-gray-600">{stat.label}</p>
+                    <p className="text-xs text-gray-500 mt-1">Double-click for details</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -357,42 +458,54 @@ export function SalespersonDashboard({
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            <div 
-              className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg cursor-pointer hover:bg-red-100 transition-colors"
-              onClick={() => onNavigateToCase('case-001')}
-              onDoubleClick={() => onNavigateToCase('case-001')}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                handleCustomerDoubleClick('Ramesh & Sunita Gupta', '+91-9876543210');
-              }}
-            >
-              <div className="flex items-center space-x-3">
-                <AlertTriangle className="h-5 w-5 text-red-600" />
-                <div>
-                  <p className="font-medium text-red-900">Follow up: Ramesh & Sunita Gupta</p>
-                  <p className="text-sm text-red-700">GST documents still pending - Home Loan ₹50L</p>
-                  <p className="text-xs text-red-600">Click or double-click to view case</p>
-                  <p className="text-xs text-red-600">Click to review • Right-click for WhatsApp</p>
+            {cases.filter(c => c.priority === 'high').slice(0, 2).map((case_, index) => (
+              <div 
+                key={case_.id}
+                className={`flex items-center justify-between p-4 ${
+                  index === 0 ? 'bg-red-50 border-red-200 hover:bg-red-100' : 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100'
+                } border rounded-lg cursor-pointer transition-colors`}
+                onClick={() => onNavigateToCase(case_.id)}
+                onDoubleClick={() => onNavigateToCase(case_.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  handleCustomerDoubleClick(case_.customer.name, case_.customer.phone);
+                }}
+              >
+                <div className="flex items-center space-x-3">
+                  {index === 0 ? (
+                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                  ) : (
+                    <Clock className="h-5 w-5 text-yellow-600" />
+                  )}
+                  <div>
+                    <p className={`font-medium ${index === 0 ? 'text-red-900' : 'text-yellow-900'}`}>
+                      {index === 0 ? 'Follow up:' : 'Schedule call:'} {case_.customer.name}
+                    </p>
+                    <p className={`text-sm ${index === 0 ? 'text-red-700' : 'text-yellow-700'}`}>
+                      {case_.customer.loanType} - {getNextAction(case_.status)} - ₹{(case_.customer.loanAmount / 100000).toFixed(0)}L
+                    </p>
+                    <p className={`text-xs ${index === 0 ? 'text-red-600' : 'text-yellow-600'}`}>
+                      {index === 0 ? 'Click or double-click to view case' : 'Double-click to schedule'}
+                    </p>
+                    <p className="text-xs text-blue-500">Right-click for WhatsApp chat</p>
+                  </div>
                 </div>
+                <Badge 
+                  variant={index === 0 ? "error" : "warning"} 
+                  size="sm"
+                >
+                  {index === 0 ? 'High Priority' : 'Today'}
+                </Badge>
               </div>
-              <Badge variant="error" size="sm">High Priority</Badge>
-            </div>
+            ))}
             
-            <div 
-              className="flex items-center justify-between p-4 bg-yellow-50 border border-yellow-200 rounded-lg cursor-pointer hover:bg-yellow-100 transition-colors"
-              onDoubleClick={() => onNavigateToWorkload()}
-            >
-              <div className="flex items-center space-x-3">
-                <Clock className="h-5 w-5 text-yellow-600" />
-                <div>
-                  <p className="font-medium text-yellow-900">Schedule call: Neha Singh</p>
-                  <p className="text-sm text-yellow-700">Car loan application - initial document collection</p>
-                  <p className="text-xs text-yellow-600">Double-click to schedule</p>
-                  <p className="text-xs text-blue-500">Click for WhatsApp chat • Double-click for case</p>
-                </div>
+            {cases.filter(c => c.priority === 'high').length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <Clock className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                <p>No high priority tasks for today</p>
+                <p className="text-sm">All cases are on track!</p>
               </div>
-              <Badge variant="warning" size="sm">Today</Badge>
-            </div>
+            )}
           </div>
         </CardContent>
       </Card>

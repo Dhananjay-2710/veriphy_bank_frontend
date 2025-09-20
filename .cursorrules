@@ -1,0 +1,405 @@
+# VERIPHY BANK FRONTEND - SUPABASE INTEGRATION CURSOR RULE
+
+## Project Overview
+This is a React TypeScript banking application with comprehensive Supabase integration. The project follows a specific architecture pattern for dynamic page creation and database integration.
+
+## Architecture Patterns
+
+### 1. Supabase Integration Pattern
+- **Database Service**: `src/services/supabase-database.ts` - Main database service class
+- **Schema Mapping**: `src/services/supabase-schema-mapping.ts` - Maps frontend types to Supabase schema
+- **Auth Context**: `src/contexts/AuthContext.tsx` - Authentication and user management
+- **Custom Hooks**: `src/hooks/useDashboardData.ts` - Data fetching hooks for real-time updates
+
+### 2. Component Structure
+- **Layout**: `src/components/Layout/` - Dashboard layout with sidebar and header
+- **UI Components**: `src/components/ui/` - Reusable UI components (Button, Card, Badge)
+- **Page Components**: `src/components/[Category]/` - Feature-specific components
+- **Types**: `src/types/index.ts` - TypeScript interfaces
+
+### 3. Supabase Schema Tables
+The application uses these main Supabase tables:
+- `users` - User management
+- `cases` - Loan applications/cases
+- `customers` - Customer information
+- `documents` - Document management
+- `tasks` - Task management
+- `logs` - Audit logs
+- `notifications` - System notifications
+- `organizations` - Multi-tenant support
+- `departments` - Department management
+- `products` - Loan products
+
+## DYNAMIC PAGE INTEGRATION RULE
+
+When the user says "create [PAGE_NAME] page with Supabase integration", follow this exact process:
+
+### Step 1: Analyze Page Requirements
+1. Determine the page category (Dashboard, Admin, Case, Document, etc.)
+2. Identify required Supabase tables and operations (CRUD)
+3. Define data fetching patterns and real-time subscriptions
+4. Plan UI layout and component structure
+
+### Step 2: Create Database Service Methods
+Add methods to `src/services/supabase-database.ts` following this pattern:
+
+```typescript
+// [PAGE_NAME] specific methods
+static async get[PAGE_NAME]Data(filters?: { [filter_types]: [filter_values] }) {
+  console.log('Fetching [PAGE_NAME] data with filters:', filters);
+  
+  let query = supabase
+    .from(SUPABASE_TABLES.[TABLE_NAME])
+    .select(`
+      id,
+      [required_fields],
+      [related_tables]!inner(
+        id,
+        [related_fields]
+      )
+    `)
+    .order('created_at', { ascending: false });
+
+  // Apply filters
+  if (filters?.[filter_field]) {
+    query = query.eq('[filter_field]', filters.[filter_field]);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Error fetching [PAGE_NAME] data:', error);
+    return [];
+  }
+
+  return data?.map(item => ({
+    // Map database fields to frontend interface
+    id: item.id,
+    [mapped_field]: item.[db_field],
+    // Transform related data
+    [related_field]: Array.isArray(item.[related_table]) ? item.[related_table][0] : item.[related_table],
+  })) || [];
+}
+
+static async create[PAGE_NAME]Item(itemData: [ITEM_INTERFACE]) {
+  console.log('Creating [PAGE_NAME] item:', itemData);
+  
+  const { data, error } = await supabase
+    .from(SUPABASE_TABLES.[TABLE_NAME])
+    .insert({
+      ...itemData,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .select();
+
+  if (error) {
+    console.error('Error creating [PAGE_NAME] item:', error);
+    throw new Error(`Failed to create [PAGE_NAME] item: ${error.message}`);
+  }
+
+  return data?.[0];
+}
+
+static async update[PAGE_NAME]Item(itemId: string, updates: Partial<[ITEM_INTERFACE]>) {
+  console.log('Updating [PAGE_NAME] item:', itemId, updates);
+  
+  const { data, error } = await supabase
+    .from(SUPABASE_TABLES.[TABLE_NAME])
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', itemId)
+    .select();
+
+  if (error) {
+    console.error('Error updating [PAGE_NAME] item:', error);
+    throw new Error(`Failed to update [PAGE_NAME] item: ${error.message}`);
+  }
+
+  return data?.[0];
+}
+
+static async delete[PAGE_NAME]Item(itemId: string) {
+  console.log('Deleting [PAGE_NAME] item:', itemId);
+  
+  const { error } = await supabase
+    .from(SUPABASE_TABLES.[TABLE_NAME])
+    .delete()
+    .eq('id', itemId);
+
+  if (error) {
+    console.error('Error deleting [PAGE_NAME] item:', error);
+    throw new Error(`Failed to delete [PAGE_NAME] item: ${error.message}`);
+  }
+}
+
+// Real-time subscription for [PAGE_NAME]
+static subscribeTo[PAGE_NAME]Updates(callback: (payload: any) => void) {
+  return supabase
+    .channel('[PAGE_NAME]-updates')
+    .on('postgres_changes', 
+      { event: '*', schema: 'public', table: SUPABASE_TABLES.[TABLE_NAME] },
+      callback
+    )
+    .subscribe();
+}
+```
+
+### Step 3: Create Custom Hook
+Create a hook in `src/hooks/useDashboardData.ts`:
+
+```typescript
+export function use[PAGE_NAME]Data(filters?: { [filter_types]: [filter_values] }) {
+  const [data, setData] = useState<[ITEM_INTERFACE][]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await SupabaseDatabaseService.get[PAGE_NAME]Data(filters);
+      setData(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch data');
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
+
+  const refetch = useCallback(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Set up real-time subscription
+  useEffect(() => {
+    const subscription = SupabaseDatabaseService.subscribeTo[PAGE_NAME]Updates((payload) => {
+      console.log('[PAGE_NAME] real-time update:', payload);
+      fetchData(); // Refetch on any change
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchData]);
+
+  return { data, loading, error, refetch };
+}
+```
+
+### Step 4: Create TypeScript Interface
+Add interface to `src/types/index.ts`:
+
+```typescript
+export interface [ITEM_INTERFACE] {
+  id: string;
+  [field_name]: [field_type];
+  [related_field]?: [RELATED_INTERFACE];
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### Step 5: Create React Component
+Create the main page component following this pattern:
+
+```typescript
+import React, { useState } from 'react';
+import { 
+  [REQUIRED_ICONS] 
+} from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
+import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
+import { useAuth } from '../../contexts/AuthContext';
+import { use[PAGE_NAME]Data } from '../../hooks/useDashboardData';
+
+interface [PAGE_NAME]PageProps {
+  // Navigation props
+  onNavigateTo[RELATED_PAGE]?: () => void;
+  // Action props
+  on[ACTION_NAME]?: (itemId: string) => void;
+}
+
+export function [PAGE_NAME]Page({ 
+  onNavigateTo[RELATED_PAGE],
+  on[ACTION_NAME]
+}: [PAGE_NAME]PageProps) {
+  const [selectedFilters, setSelectedFilters] = useState<{[filter_types]: [filter_values]}>({});
+  const { user } = useAuth();
+  
+  // Get real data from Supabase
+  const { data, loading, error, refetch } = use[PAGE_NAME]Data(selectedFilters);
+
+  // Handle actions
+  const handleAction = async (itemId: string) => {
+    try {
+      await SupabaseDatabaseService.[ACTION_METHOD](itemId);
+      refetch(); // Refresh data
+    } catch (error) {
+      console.error('Action failed:', error);
+    }
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading [PAGE_NAME] data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 mb-4">
+            <AlertTriangle className="h-12 w-12 mx-auto mb-2" />
+            <p className="text-lg font-semibold">Error Loading [PAGE_NAME]</p>
+            <p className="text-sm text-gray-600 mt-2">{error}</p>
+          </div>
+          <Button onClick={refetch}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">[PAGE_TITLE]</h1>
+          <p className="text-gray-600">[PAGE_DESCRIPTION]</p>
+        </div>
+        <div className="flex space-x-3">
+          <Button variant="outline" onClick={refetch}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          {/* Add action buttons */}
+        </div>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Filters</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Filter controls */}
+        </CardContent>
+      </Card>
+
+      {/* Data Display */}
+      <div className="grid grid-cols-1 gap-6">
+        {data.map((item) => (
+          <Card key={item.id} className="hover:shadow-lg transition-shadow">
+            <CardContent className="p-6">
+              {/* Item content */}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Empty state */}
+      {data.length === 0 && (
+        <Card>
+          <CardContent className="text-center py-12">
+            <p className="text-gray-500">No [ITEMS] found</p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+```
+
+### Step 6: Update App Router
+Add the new page to the main App component routing:
+
+```typescript
+// In App.tsx or main routing component
+import { [PAGE_NAME]Page } from './components/[Category]/[PAGE_NAME]Page';
+
+// Add route handling
+const handleNavigateTo[PAGE_NAME] = () => {
+  setCurrentPage('[PAGE_NAME]');
+};
+
+// Add to navigation menu if needed
+```
+
+## Implementation Guidelines
+
+### Database Service Rules
+1. **Always use console.log** for debugging database operations
+2. **Handle errors gracefully** with try-catch and user-friendly messages
+3. **Use proper TypeScript types** for all parameters and return values
+4. **Include real-time subscriptions** for dynamic updates
+5. **Follow the existing naming conventions** (camelCase for methods, UPPER_CASE for constants)
+
+### Component Rules
+1. **Always include loading and error states**
+2. **Use the existing UI components** (Card, Button, Badge)
+3. **Implement proper TypeScript interfaces**
+4. **Follow the existing styling patterns** (Tailwind CSS classes)
+5. **Include real-time data updates** using custom hooks
+
+### Hook Rules
+1. **Use useState for local state management**
+2. **Use useEffect for side effects and subscriptions**
+3. **Use useCallback for memoized functions**
+4. **Always include loading, error, and refetch states**
+5. **Set up real-time subscriptions** for live data updates
+
+### Type Safety Rules
+1. **Define interfaces for all data structures**
+2. **Use proper TypeScript generics where applicable**
+3. **Include optional fields with `?` operator**
+4. **Use union types for status/enum values**
+5. **Export interfaces from types/index.ts**
+
+## Example Usage
+
+When user says: "Create CustomerManagement page with Supabase integration"
+
+The system will:
+1. Create `getCustomerManagementData()` method in database service
+2. Create `useCustomerManagementData()` hook
+3. Create `CustomerManagement` interface in types
+4. Create `CustomerManagementPage` component
+5. Update routing and navigation
+
+All with full CRUD operations, real-time updates, proper error handling, and consistent UI patterns.
+
+## Key Features to Always Include
+
+1. **Real-time data synchronization** with Supabase subscriptions
+2. **Comprehensive error handling** with user-friendly messages
+3. **Loading states** for better UX
+4. **Filtering and search capabilities**
+5. **Responsive design** using Tailwind CSS
+6. **Type safety** with TypeScript interfaces
+7. **Audit logging** for all operations
+8. **Proper authentication** checks using AuthContext
+
+## Database Schema Mapping
+
+Always use the SUPABASE_TABLES constants and mapping functions from `supabase-schema-mapping.ts` to ensure consistency across the application.
+
+Remember: This is a banking application, so always prioritize data security, audit trails, and compliance requirements in all implementations.

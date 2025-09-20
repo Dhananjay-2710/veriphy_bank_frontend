@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ArrowLeft, Users, Plus, Edit, Trash2, Search, Filter, UserCheck, UserX, Shield, Mail, Phone, Eye } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { useTeamMembers } from '../../hooks/useDashboardData';
+import { useAuth } from '../../contexts/AuthContextFixed';
+import { UserProfile } from './UserProfile';
+import { SupabaseDatabaseService } from '../../services/supabase-database';
 
 interface UserManagementProps {
   onBack: () => void;
@@ -12,9 +16,21 @@ export function UserManagement({ onBack }: UserManagementProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
   const [showCreateUser, setShowCreateUser] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<string | null>(null);
+  const [showUserProfile, setShowUserProfile] = useState(false);
+  const [profileUser, setProfileUser] = useState<any>(null);
+  const [newUser, setNewUser] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    role: 'salesperson'
+  });
+  const { user } = useAuth();
 
-  const allUsers = [
+  // Get real team members data from database
+  const { teamMembers, loading: usersLoading, error: usersError, refetch: refetchUsers } = useTeamMembers((user as any)?.organization_id);
+
+  // Mock users data (fallback)
+  const mockUsers = [
     {
       id: '1',
       name: 'Priya Sharma',
@@ -89,6 +105,27 @@ export function UserManagement({ onBack }: UserManagementProps) {
     }
   ];
 
+  // Transform team members data to match expected format
+  const transformedTeamMembers = teamMembers.map(member => ({
+    id: member.id,
+    name: member.name,
+    email: member.email || '',
+    role: member.role,
+    status: (member as any).status || 'active',
+    lastLogin: new Date().toISOString(),
+    casesAssigned: (member as any).cases || 0,
+    performance: (member as any).efficiency || '85%',
+    joinDate: new Date((member as any).created_at || new Date()).toISOString().split('T')[0],
+    phone: (member as any).phone || '+91-0000000000'
+  }));
+
+  // Use dynamic team members if available, otherwise fallback to mock
+  const allUsers = transformedTeamMembers.length > 0 ? transformedTeamMembers : mockUsers;
+  
+  // Debug: Log data source
+  console.log('UserManagement - Using dynamic data:', transformedTeamMembers.length > 0);
+  console.log('UserManagement - Team members from DB:', transformedTeamMembers);
+
   const userStats = [
     { label: 'Total Users', value: allUsers.length, color: 'blue' },
     { label: 'Active Users', value: allUsers.filter(u => u.status === 'active').length, color: 'green' },
@@ -132,6 +169,170 @@ export function UserManagement({ onBack }: UserManagementProps) {
     }
   };
 
+  const handleUserClick = (userData: any) => {
+    setProfileUser(userData);
+    setShowUserProfile(true);
+  };
+
+  const handleCloseProfile = () => {
+    setShowUserProfile(false);
+    setProfileUser(null);
+  };
+
+  const handleEditUser = async (userId: string, updatedData: any) => {
+    try {
+      console.log('Editing user:', userId, updatedData);
+      await SupabaseDatabaseService.updateUser(userId, updatedData);
+      
+      // Show success message
+      alert('User updated successfully!');
+      
+      // Refresh the user list
+      refetchUsers();
+      
+      handleCloseProfile();
+    } catch (error) {
+      console.error('Error updating user:', error);
+      alert('Failed to update user. Please try again.');
+    }
+  };
+
+  const handleSuspendUser = async (userId: string) => {
+    try {
+      console.log('Suspending user:', userId);
+      await SupabaseDatabaseService.suspendUser(userId);
+      
+      // Show success message
+      alert('User suspended successfully!');
+      
+      // Refresh the user list
+      refetchUsers();
+      
+      handleCloseProfile();
+    } catch (error) {
+      console.error('Error suspending user:', error);
+      alert('Failed to suspend user. Please try again.');
+    }
+  };
+
+  const handleActivateUser = async (userId: string) => {
+    try {
+      console.log('Activating user:', userId);
+      await SupabaseDatabaseService.activateUser(userId);
+      
+      // Show success message
+      alert('User activated successfully!');
+      
+      // Refresh the user list
+      refetchUsers();
+      
+      handleCloseProfile();
+    } catch (error) {
+      console.error('Error activating user:', error);
+      alert('Failed to activate user. Please try again.');
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      const confirmDelete = window.confirm('Are you sure you want to delete this user? This action cannot be undone.');
+      if (!confirmDelete) return;
+
+      console.log('Deleting user:', userId);
+      await SupabaseDatabaseService.deleteUser(userId);
+      
+      // Show success message
+      alert('User deleted successfully!');
+      
+      // Refresh the user list
+      refetchUsers();
+      
+      handleCloseProfile();
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert('Failed to delete user. Please try again.');
+    }
+  };
+
+  const handleCreateUser = async () => {
+    try {
+      if (!newUser.name || !newUser.email) {
+        alert('Please fill in all required fields (Name and Email)');
+        return;
+      }
+
+      console.log('Creating new user:', newUser);
+      
+      await SupabaseDatabaseService.createUser({
+        full_name: newUser.name,
+        email: newUser.email,
+        mobile: newUser.phone,
+        role: newUser.role,
+        organization_id: (user as any)?.organization_id || 1
+      });
+      
+      // Show success message
+      alert('User created successfully!');
+      
+      // Reset form
+      setNewUser({
+        name: '',
+        email: '',
+        phone: '',
+        role: 'salesperson'
+      });
+      
+      // Close modal
+      setShowCreateUser(false);
+      
+      // Refresh the user list
+      refetchUsers();
+    } catch (error) {
+      console.error('Error creating user:', error);
+      alert('Failed to create user. Please try again.');
+    }
+  };
+
+  if (usersLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="outline" size="sm" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading users...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (usersError) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="outline" size="sm" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">Error loading users: {usersError}</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -145,10 +346,16 @@ export function UserManagement({ onBack }: UserManagementProps) {
             <p className="text-gray-600">Manage system users and permissions</p>
           </div>
         </div>
-        <Button onClick={() => setShowCreateUser(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add New User
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => refetchUsers()}>
+            <Users className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button onClick={() => setShowCreateUser(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add New User
+          </Button>
+        </div>
       </div>
 
       {/* User Stats */}
@@ -219,7 +426,8 @@ export function UserManagement({ onBack }: UserManagementProps) {
             {filteredUsers.map((user) => (
               <div 
                 key={user.id}
-                className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+                className="border border-gray-200 rounded-lg p-6 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group"
+                onClick={() => handleUserClick(user)}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-start space-x-4">
@@ -256,30 +464,77 @@ export function UserManagement({ onBack }: UserManagementProps) {
 
                 <div className="flex items-center justify-between">
                   <div className="flex space-x-2">
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUserClick(user);
+                      }}
+                    >
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
                     </Button>
+                    <Button 
+                      variant="error" 
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteUser(user.id);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
                     {user.status === 'active' ? (
-                      <Button variant="warning" size="sm">
+                      <Button 
+                        variant="warning" 
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSuspendUser(user.id);
+                        }}
+                      >
                         <UserX className="h-4 w-4 mr-1" />
                         Suspend
                       </Button>
                     ) : (
-                      <Button variant="success" size="sm">
+                      <Button 
+                        variant="success" 
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleActivateUser(user.id);
+                        }}
+                      >
                         <UserCheck className="h-4 w-4 mr-1" />
                         Activate
                       </Button>
                     )}
                   </div>
                   <div className="flex space-x-2">
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log('View permissions for user:', user.id);
+                      }}
+                    >
                       <Shield className="h-4 w-4 mr-1" />
                       Permissions
                     </Button>
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUserClick(user);
+                      }}
+                      className="group-hover:bg-blue-50 group-hover:border-blue-300"
+                    >
                       <Eye className="h-4 w-4 mr-1" />
-                      View Activity
+                      View Profile
                     </Button>
                   </div>
                 </div>
@@ -296,17 +551,21 @@ export function UserManagement({ onBack }: UserManagementProps) {
             <h3 className="text-lg font-medium text-gray-900 mb-4">Create New User</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
                 <input
                   type="text"
+                  value={newUser.name}
+                  onChange={(e) => setNewUser({...newUser, name: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter full name"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                 <input
                   type="email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({...newUser, email: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter email address"
                 />
@@ -315,13 +574,19 @@ export function UserManagement({ onBack }: UserManagementProps) {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                 <input
                   type="tel"
+                  value={newUser.phone}
+                  onChange={(e) => setNewUser({...newUser, phone: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter phone number"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <select 
+                  value={newUser.role}
+                  onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
                   <option value="salesperson">Salesperson</option>
                   <option value="manager">Manager</option>
                   <option value="credit-ops">Credit Operations</option>
@@ -333,12 +598,24 @@ export function UserManagement({ onBack }: UserManagementProps) {
               <Button variant="outline" onClick={() => setShowCreateUser(false)}>
                 Cancel
               </Button>
-              <Button onClick={() => setShowCreateUser(false)}>
+              <Button onClick={handleCreateUser}>
                 Create User
               </Button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* User Profile Modal */}
+      {showUserProfile && profileUser && (
+        <UserProfile
+          user={profileUser}
+          onClose={handleCloseProfile}
+          onEdit={handleEditUser}
+          onSuspend={handleSuspendUser}
+          onActivate={handleActivateUser}
+          onDelete={handleDeleteUser}
+        />
       )}
     </div>
   );

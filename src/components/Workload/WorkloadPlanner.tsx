@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
-import { Calendar, Clock, User, Phone, ArrowLeft, Plus } from 'lucide-react';
+import { useState } from 'react';
+import { Calendar, Clock, User, Phone, ArrowLeft, Plus, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { useAuth } from '../../contexts/AuthContextFixed';
+import { useWorkloadTasks } from '../../hooks/useDashboardData';
 
 interface WorkloadPlannerProps {
   onBack: () => void;
@@ -10,45 +12,8 @@ interface WorkloadPlannerProps {
 
 export function WorkloadPlanner({ onBack }: WorkloadPlannerProps) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-
-  const tasks = [
-    {
-      id: '1',
-      time: '09:00',
-      customer: 'Ramesh Gupta',
-      phone: '+91-9876543210',
-      task: 'Follow up on GST documents',
-      priority: 'high',
-      type: 'follow-up'
-    },
-    {
-      id: '2',
-      time: '10:30',
-      customer: 'Amit Verma',
-      phone: '+91-9876543211',
-      task: 'Initial document collection',
-      priority: 'medium',
-      type: 'collection'
-    },
-    {
-      id: '3',
-      time: '14:00',
-      customer: 'Neha Singh',
-      phone: '+91-9876543212',
-      task: 'Document verification review',
-      priority: 'low',
-      type: 'review'
-    },
-    {
-      id: '4',
-      time: '16:00',
-      customer: 'Pradeep Kumar',
-      phone: '+91-9876543213',
-      task: 'Loan approval discussion',
-      priority: 'high',
-      type: 'discussion'
-    }
-  ];
+  const { user } = useAuth();
+  const { tasks, loading, error, refetch } = useWorkloadTasks(user?.id || '', selectedDate);
 
   const getPriorityBadge = (priority: string) => {
     switch (priority) {
@@ -78,6 +43,44 @@ export function WorkloadPlanner({ onBack }: WorkloadPlannerProps) {
     }
   };
 
+  const handleRefresh = () => {
+    refetch();
+  };
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button variant="outline" onClick={onBack}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Workload Planner</h1>
+              <p className="text-gray-600">Error loading tasks</p>
+            </div>
+          </div>
+          <Button onClick={handleRefresh} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="flex">
+            <AlertTriangle className="h-5 w-5 text-red-400" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Error loading tasks</h3>
+              <p className="mt-1 text-sm text-red-700">
+                {error}. Please try refreshing the page.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -91,10 +94,16 @@ export function WorkloadPlanner({ onBack }: WorkloadPlannerProps) {
             <p className="text-gray-600">Schedule and manage your daily tasks</p>
           </div>
         </div>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Schedule Task
-        </Button>
+        <div className="flex space-x-3">
+          <Button variant="outline" onClick={handleRefresh} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            Schedule Task
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -148,8 +157,14 @@ export function WorkloadPlanner({ onBack }: WorkloadPlannerProps) {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {tasks.map((task) => (
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+                  <span className="ml-2 text-gray-500">Loading tasks...</span>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {tasks.map((task) => (
                   <div 
                     key={task.id}
                     className={`border-l-4 pl-4 py-3 rounded-r-lg bg-white border border-gray-200 hover:shadow-md transition-shadow ${getTypeColor(task.type)}`}
@@ -185,7 +200,8 @@ export function WorkloadPlanner({ onBack }: WorkloadPlannerProps) {
                     </div>
                   </div>
                 ))}
-              </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -3,8 +3,10 @@ import { ArrowLeft, Search, Filter, MessageCircle, Phone, Clock } from 'lucide-r
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { useCases, useWhatsAppMessages } from '../../hooks/useDashboardData';
+import { useAuth } from '../../contexts/AuthContextFixed';
 import { WhatsAppCommunicator } from '../Case/WhatsAppCommunicator';
-import { mockCase } from '../../data/mockData';
+import { SupabaseDatabaseService } from '../../services/supabase-database';
 
 interface CommunicatorPageProps {
   onBack: () => void;
@@ -13,54 +15,29 @@ interface CommunicatorPageProps {
 export function CommunicatorPage({ onBack }: CommunicatorPageProps) {
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const { user } = useAuth();
 
-  // Mock customer list with recent conversations
-  const customers = [
-    {
-      id: 'cust1',
-      name: 'Ramesh & Sunita Gupta',
-      phone: '+91-9876543210',
-      lastMessage: 'We are still working on getting the GST documents ready.',
-      lastMessageTime: '15:00',
-      unreadCount: 2,
-      status: 'online',
-      caseId: 'case-001',
-      loanType: 'Home Loan'
-    },
-    {
-      id: 'cust2',
-      name: 'Amit Verma',
-      phone: '+91-9876543211',
-      lastMessage: 'Thank you for the quick response!',
-      lastMessageTime: '14:30',
-      unreadCount: 0,
-      status: 'offline',
-      caseId: 'case-002',
-      loanType: 'Personal Loan'
-    },
-    {
-      id: 'cust3',
-      name: 'Neha Singh',
-      phone: '+91-9876543212',
-      lastMessage: 'When can I expect the loan approval?',
-      lastMessageTime: '12:45',
-      unreadCount: 1,
-      status: 'online',
-      caseId: 'case-003',
-      loanType: 'Car Loan'
-    },
-    {
-      id: 'cust4',
-      name: 'Pradeep Kumar',
-      phone: '+91-9876543213',
-      lastMessage: 'I have uploaded all the required documents.',
-      lastMessageTime: '11:20',
-      unreadCount: 0,
-      status: 'offline',
-      caseId: 'case-004',
-      loanType: 'Business Loan'
-    }
-  ];
+  // Get real cases data from database
+  const { cases, loading: casesLoading, error: casesError } = useCases({
+    assignedTo: user?.id
+  });
+
+  // Transform cases to customer format for the UI
+  const customers = cases.map(case_ => ({
+    id: case_.id,
+    name: case_.customer.name,
+    phone: case_.customer.phone,
+    lastMessage: 'Click to view conversation',
+    lastMessageTime: new Date(case_.updatedAt).toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false 
+    }),
+    unreadCount: 0,
+    status: 'online' as const,
+    caseId: case_.id,
+    loanType: case_.customer.loanType || 'Loan'
+  }));
 
   const filteredCustomers = customers.filter(customer =>
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -69,6 +46,18 @@ export function CommunicatorPage({ onBack }: CommunicatorPageProps) {
 
   const selectedCustomerData = customers.find(c => c.id === selectedCustomer);
 
+  // Get WhatsApp messages for selected customer
+  const { data: whatsappMessages, loading: messagesLoading, error: messagesError, refetch: refetchMessages } = useWhatsAppMessages(selectedCustomer || '');
+
+  // Transform WhatsApp messages to the expected format
+  const transformedMessages = whatsappMessages.map(message => ({
+    id: message.id,
+    timestamp: message.timestamp,
+    type: message.type,
+    content: message.content,
+    sender: message.sender
+  }));
+
   const getStatusIndicator = (status: string) => {
     return status === 'online' ? (
       <div className="w-3 h-3 bg-green-500 rounded-full"></div>
@@ -76,6 +65,83 @@ export function CommunicatorPage({ onBack }: CommunicatorPageProps) {
       <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
     );
   };
+
+  const handleSendMessage = async (message: string) => {
+    if (!selectedCustomer || !selectedCustomerData) return;
+
+    try {
+      await SupabaseDatabaseService.sendWhatsAppMessage(selectedCustomer, {
+        content: message,
+        type: 'text',
+        sender: 'agent',
+        customerPhone: selectedCustomerData.phone
+      });
+      
+      // Refresh messages
+      refetchMessages();
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
+  };
+
+  const handleSendDocument = async (file: File) => {
+    if (!selectedCustomer || !selectedCustomerData) return;
+
+    try {
+      // In a real implementation, you would upload the file to Supabase Storage first
+      // For now, we'll simulate sending a document message
+      await SupabaseDatabaseService.sendWhatsAppDocument(selectedCustomer, {
+        documentId: 'temp-doc-id', // This would be the actual document ID from storage
+        customerPhone: selectedCustomerData.phone,
+        message: `Document: ${file.name}`
+      });
+      
+      // Refresh messages
+      refetchMessages();
+    } catch (error) {
+      console.error('Error sending document:', error);
+    }
+  };
+
+  if (casesLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="outline" size="sm" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+          <h1 className="text-2xl font-bold text-gray-900">Communicator</h1>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading conversations...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (casesError) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="outline" size="sm" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+          <h1 className="text-2xl font-bold text-gray-900">Communicator</h1>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">Error loading conversations: {casesError}</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (selectedCustomer && selectedCustomerData) {
     return (
@@ -93,11 +159,11 @@ export function CommunicatorPage({ onBack }: CommunicatorPageProps) {
 
         <Card className="h-[600px]">
           <WhatsAppCommunicator 
-            messages={mockCase.whatsappMessages}
+            messages={transformedMessages}
             customerName={selectedCustomerData.name}
             customerPhone={selectedCustomerData.phone}
-            onSendMessage={(message) => console.log('Sending message:', message)}
-            onSendDocument={(file) => console.log('Sending document:', file.name)}
+            onSendMessage={handleSendMessage}
+            onSendDocument={handleSendDocument}
           />
         </Card>
       </div>

@@ -21,13 +21,29 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { useAuth } from '../../contexts/AuthContextFixed';
+import { 
+  useAdminDashboardStats, 
+  useDepartmentPerformance, 
+  useSystemAlerts, 
+  useRecentActivities,
+  useRealtimeAdminDashboard,
+  useCases, 
+  useTeamMembers 
+} from '../../hooks/useDashboardData';
 
 interface AdminDashboardProps {
   onNavigateToUserManagement: () => void;
   onNavigateToSystemSettings: () => void;
   onNavigateToAuditLogs: () => void;
   onNavigateToAnalytics: () => void;
+  onNavigateToSystemHealth: () => void;
   onNavigateToCase: (caseId: string) => void;
+  onNavigateToComplianceManagement: () => void;
+  onNavigateToFeatureFlags?: () => void;
+  onNavigateToSystemIntegrations?: () => void;
+  onNavigateToSystemSettingsNew?: () => void;
+  onNavigateToOrganizationSettings?: () => void;
 }
 
 export function AdminDashboard({ 
@@ -35,9 +51,32 @@ export function AdminDashboard({
   onNavigateToSystemSettings,
   onNavigateToAuditLogs,
   onNavigateToAnalytics,
-  onNavigateToCase
+  onNavigateToSystemHealth,
+  onNavigateToCase,
+  onNavigateToComplianceManagement,
+  onNavigateToFeatureFlags,
+  onNavigateToSystemIntegrations,
+  onNavigateToSystemSettingsNew,
+  onNavigateToOrganizationSettings
 }: AdminDashboardProps) {
   const [selectedTimeframe, setSelectedTimeframe] = useState('today');
+  const { user } = useAuth();
+  
+  // Get real data from Supabase using admin-specific hooks
+  const { stats: adminStats, loading: adminStatsLoading, error: adminStatsError, refetch: refetchAdminStats } = useAdminDashboardStats();
+  const { performance: departmentPerformance, loading: deptLoading, error: deptError, refetch: refetchDept } = useDepartmentPerformance();
+  const { alerts: systemAlerts, loading: alertsLoading, error: alertsError, refetch: refetchAlerts } = useSystemAlerts();
+  const { activities: recentActivities, loading: activitiesLoading, error: activitiesError, refetch: refetchActivities } = useRecentActivities();
+  const { cases, loading: casesLoading, error: casesError, refetch: refetchCases } = useCases();
+  const { teamMembers, loading: teamLoading, error: teamError, refetch: refetchTeam } = useTeamMembers();
+
+  // Set up real-time subscriptions for admin dashboard
+  useRealtimeAdminDashboard({
+    refetchStats: refetchAdminStats,
+    refetchDept: refetchDept,
+    refetchAlerts: refetchAlerts,
+    refetchActivities: refetchActivities
+  });
 
   const handleStatClick = (statType: string) => {
     switch (statType) {
@@ -45,7 +84,7 @@ export function AdminDashboard({
         onNavigateToUserManagement();
         break;
       case 'system-health':
-        onNavigateToSystemSettings();
+        onNavigateToSystemHealth();
         break;
       case 'security-alerts':
         onNavigateToAuditLogs();
@@ -79,19 +118,20 @@ export function AdminDashboard({
     onNavigateToCase('case-001');
   };
 
+  // Use real data from Supabase, with fallbacks for missing data
   const systemStats = [
     { 
       label: 'Total Users', 
-      value: '47', 
+      value: adminStats?.totalUsers?.toString() || '0', 
       change: '+3 this week', 
       icon: Users, 
       color: 'blue',
       type: 'total-users',
-      details: 'Salespeople: 25, Managers: 8, Credit Ops: 12, Admins: 2'
+      details: `Salespeople: ${teamMembers?.filter(m => m.role === 'salesperson').length || 0}, Managers: ${teamMembers?.filter(m => m.role === 'manager').length || 0}, Credit Ops: ${teamMembers?.filter(m => m.role === 'credit-ops').length || 0}, Admins: ${teamMembers?.filter(m => m.role === 'admin').length || 0}`
     },
     { 
       label: 'System Health', 
-      value: '99.8%', 
+      value: `${adminStats?.systemHealth || 99.8}%`, 
       change: 'All systems operational', 
       icon: Activity, 
       color: 'green',
@@ -100,34 +140,34 @@ export function AdminDashboard({
     },
     { 
       label: 'Security Alerts', 
-      value: '2', 
+      value: adminStats?.securityAlerts?.toString() || '0', 
       change: '1 resolved today', 
       icon: Shield, 
       color: 'yellow',
       type: 'security-alerts',
-      details: 'Failed Login Attempts: 1, Suspicious Activity: 1, All Critical Systems Secure'
+      details: `Failed Login Attempts: ${systemAlerts?.filter(a => a.type === 'security').length || 0}, Suspicious Activity: ${systemAlerts?.filter(a => a.severity === 'high').length || 0}, All Critical Systems Secure`
     },
     { 
       label: 'Total Cases', 
-      value: '1,247', 
+      value: adminStats?.totalCases?.toString() || cases?.length?.toString() || '0', 
       change: '+89 this month', 
       icon: FileText, 
       color: 'purple',
       type: 'total-cases',
-      details: 'Active: 234, Approved: 892, Rejected: 87, Under Review: 34'
+      details: `Active: ${adminStats?.activeCases || cases?.filter(c => c.status === 'in-progress').length || 0}, Approved: ${cases?.filter(c => c.status === 'approved').length || 0}, Rejected: ${cases?.filter(c => c.status === 'rejected').length || 0}, Under Review: ${cases?.filter(c => c.status === 'review').length || 0}`
     },
     { 
       label: 'Revenue (MTD)', 
-      value: '₹45.2Cr', 
+      value: `₹${((adminStats?.revenue || 0) / 10000000).toFixed(1)}Cr`, 
       change: '+12% vs last month', 
       icon: DollarSign, 
       color: 'green',
       type: 'revenue',
-      details: 'Home Loans: ₹28.5Cr, Business: ₹12.1Cr, Personal: ₹3.2Cr, Car: ₹1.4Cr'
+      details: `Total Processed: ₹${((adminStats?.revenue || 0) / 10000000).toFixed(1)}Cr, Active Pipeline: ₹${(((adminStats?.revenue || 0) * 0.3) / 10000000).toFixed(1)}Cr`
     },
     { 
       label: 'Compliance Score', 
-      value: '98.5%', 
+      value: `${adminStats?.complianceScore || 98.5}%`, 
       change: '+0.3% this week', 
       icon: CheckCircle, 
       color: 'green',
@@ -136,7 +176,8 @@ export function AdminDashboard({
     }
   ];
 
-  const departmentPerformance = [
+  // Use dynamic department performance data from Supabase
+  const departmentPerformanceData = departmentPerformance.length > 0 ? departmentPerformance : [
     {
       department: 'Sales Team',
       members: 25,
@@ -166,7 +207,8 @@ export function AdminDashboard({
     }
   ];
 
-  const systemAlerts = [
+  // Use dynamic system alerts data from Supabase
+  const systemAlertsData = systemAlerts.length > 0 ? systemAlerts : [
     {
       id: 'alert-1',
       type: 'security',
@@ -196,7 +238,8 @@ export function AdminDashboard({
     }
   ];
 
-  const recentActivities = [
+  // Use dynamic recent activities data from Supabase
+  const recentActivitiesData = recentActivities.length > 0 ? recentActivities : [
     {
       id: 'activity-1',
       user: 'Priya Sharma',
@@ -274,6 +317,48 @@ export function AdminDashboard({
     }
   };
 
+  // Show loading state
+  if (adminStatsLoading || deptLoading || alertsLoading || activitiesLoading || casesLoading || teamLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading admin dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (adminStatsError || deptError || alertsError || activitiesError || casesError || teamError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 mb-4">
+            <AlertTriangle className="h-12 w-12 mx-auto mb-2" />
+            <p className="text-lg font-semibold">Error Loading Admin Dashboard</p>
+            <p className="text-sm text-gray-600 mt-2">
+              {adminStatsError || deptError || alertsError || activitiesError || casesError || teamError}
+            </p>
+          </div>
+          <div className="space-x-2">
+            <Button onClick={() => { 
+              refetchAdminStats(); 
+              refetchDept(); 
+              refetchAlerts(); 
+              refetchActivities(); 
+              refetchCases(); 
+              refetchTeam(); 
+            }}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -282,14 +367,41 @@ export function AdminDashboard({
           <p className="text-gray-600">Complete oversight of VERIPHY banking operations</p>
         </div>
         <div className="flex space-x-3">
+          <Button variant="outline" onClick={() => { 
+            refetchAdminStats(); 
+            refetchDept(); 
+            refetchAlerts(); 
+            refetchActivities(); 
+            refetchCases(); 
+            refetchTeam(); 
+          }}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
           <Button variant="outline" onClick={onNavigateToAuditLogs}>
             <Shield className="h-4 w-4 mr-2" />
             Audit Logs
+          </Button>
+          <Button variant="outline" onClick={onNavigateToComplianceManagement}>
+            <Shield className="h-4 w-4 mr-2" />
+            Compliance Management
           </Button>
           <Button variant="outline" onClick={onNavigateToSystemSettings}>
             <Settings className="h-4 w-4 mr-2" />
             System Settings
           </Button>
+          {onNavigateToFeatureFlags && (
+            <Button variant="outline" onClick={onNavigateToFeatureFlags}>
+              <Settings className="h-4 w-4 mr-2" />
+              Feature Flags
+            </Button>
+          )}
+          {onNavigateToSystemIntegrations && (
+            <Button variant="outline" onClick={onNavigateToSystemIntegrations}>
+              <Settings className="h-4 w-4 mr-2" />
+              Integrations
+            </Button>
+          )}
           <Button onClick={onNavigateToAnalytics}>
             <BarChart3 className="h-4 w-4 mr-2" />
             Analytics
@@ -313,19 +425,24 @@ export function AdminDashboard({
             <Card 
               key={index} 
               className="hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => handleStatClick(stat.type)}
-              title={`Click to view details: ${stat.details}`}
             >
-              <CardContent className="flex items-center">
-                <div className={`p-3 rounded-lg ${colorClasses[stat.color as keyof typeof colorClasses]}`}>
-                  <Icon className="h-6 w-6" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                  <p className="text-sm text-gray-600">{stat.label}</p>
-                  <p className="text-xs text-green-600 mt-1">{stat.change}</p>
-                </div>
-              </CardContent>
+              <div
+                onClick={() => handleStatClick(stat.type)}
+                title={`Click to view details: ${stat.details}`}
+                className="w-full h-full"
+                style={{ cursor: 'pointer' }}
+              >
+                <CardContent className="flex items-center">
+                  <div className={`p-3 rounded-lg ${colorClasses[stat.color as keyof typeof colorClasses]}`}>
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                    <p className="text-sm text-gray-600">{stat.label}</p>
+                    <p className="text-xs text-green-600 mt-1">{stat.change}</p>
+                  </div>
+                </CardContent>
+              </div>
             </Card>
           );
         })}
@@ -356,15 +473,13 @@ export function AdminDashboard({
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {departmentPerformance.map((dept, index) => (
+            {departmentPerformanceData.map((dept, index) => (
               <div 
                 key={index}
                 className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer"
-                onDoubleClick={() => handleActivityDoubleClick(activity)}
-                title="Double-click to view related customer conversation"
                 onClick={() => onNavigateToUserManagement()}
                 onDoubleClick={() => handleDepartmentDoubleClick(dept.department)}
-                title="Click to view department details"
+                title="Double-click to view all customer conversations"
               >
                 <div className="flex items-center justify-between mb-4">
                   <div>
@@ -416,7 +531,7 @@ export function AdminDashboard({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {systemAlerts.map((alert) => (
+              {systemAlertsData.map((alert) => (
                 <div 
                   key={alert.id}
                   className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer"
@@ -459,7 +574,7 @@ export function AdminDashboard({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentActivities.map((activity) => (
+              {recentActivitiesData.map((activity) => (
                 <div 
                   key={activity.id}
                   className="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
@@ -490,7 +605,7 @@ export function AdminDashboard({
           <CardTitle>Quick Admin Actions</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <Button 
               variant="outline" 
               className="h-20 flex-col"
@@ -507,6 +622,36 @@ export function AdminDashboard({
               <Settings className="h-6 w-6 mb-2" />
               <span className="text-sm">System Settings</span>
             </Button>
+            {onNavigateToFeatureFlags && (
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col"
+                onClick={onNavigateToFeatureFlags}
+              >
+                <Settings className="h-6 w-6 mb-2" />
+                <span className="text-sm">Feature Flags</span>
+              </Button>
+            )}
+            {onNavigateToSystemIntegrations && (
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col"
+                onClick={onNavigateToSystemIntegrations}
+              >
+                <Settings className="h-6 w-6 mb-2" />
+                <span className="text-sm">Integrations</span>
+              </Button>
+            )}
+            {onNavigateToOrganizationSettings && (
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col"
+                onClick={onNavigateToOrganizationSettings}
+              >
+                <Settings className="h-6 w-6 mb-2" />
+                <span className="text-sm">Org Settings</span>
+              </Button>
+            )}
             <Button 
               variant="outline" 
               className="h-20 flex-col"
@@ -522,6 +667,14 @@ export function AdminDashboard({
             >
               <BarChart3 className="h-6 w-6 mb-2" />
               <span className="text-sm">Analytics</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              className="h-20 flex-col"
+              onClick={onNavigateToSystemHealth}
+            >
+              <Activity className="h-6 w-6 mb-2" />
+              <span className="text-sm">System Health</span>
             </Button>
           </div>
         </CardContent>

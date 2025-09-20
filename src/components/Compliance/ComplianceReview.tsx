@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Shield, AlertTriangle, CheckCircle, XCircle, Eye, FileText, Clock, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Shield, AlertTriangle, CheckCircle, XCircle, Eye, FileText, Clock, User, RefreshCw } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { SupabaseDatabaseService } from '../../services/supabase-database';
+import { useComplianceIssues } from '../../hooks/useDashboardData';
 
 interface ComplianceReviewProps {
   onBack: () => void;
@@ -11,8 +13,18 @@ interface ComplianceReviewProps {
 
 export function ComplianceReview({ onBack, onNavigateToCase }: ComplianceReviewProps) {
   const [selectedFilter, setSelectedFilter] = useState('all');
+  
+  // Use real compliance issues data from hook
+  const { data: complianceIssuesData, loading: issuesLoading, error: issuesError, refetch: refetchIssues } = useComplianceIssues({
+    status: selectedFilter !== 'all' ? selectedFilter : undefined
+  });
+  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [processingAction, setProcessingAction] = useState<string | null>(null);
 
-  const complianceIssues = [
+  // Use mock data as fallback if no real data
+  const complianceIssues = complianceIssuesData.length > 0 ? complianceIssuesData : [
     {
       id: 'comp-001',
       caseId: 'case-001',
@@ -78,6 +90,54 @@ export function ComplianceReview({ onBack, onNavigateToCase }: ComplianceReviewP
       dueDate: '2025-01-10T10:00:00Z'
     }
   ];
+
+  const handleResolveIssue = async (issueId: string) => {
+    try {
+      setProcessingAction(issueId);
+      console.log('Resolving compliance issue:', issueId);
+      
+      await SupabaseDatabaseService.resolveComplianceIssue(issueId, {
+        resolvedBy: 'current_user_id', // This should come from auth context
+        resolvedAt: new Date().toISOString(),
+        resolutionNotes: 'Issue resolved via compliance review'
+      });
+      
+      // Refresh the issues list
+      refetchIssues();
+      
+      // Show success message
+      alert('Compliance issue resolved successfully!');
+    } catch (err) {
+      console.error('Error resolving compliance issue:', err);
+      alert('Failed to resolve issue. Please try again.');
+    } finally {
+      setProcessingAction(null);
+    }
+  };
+
+  const handleEscalateIssue = async (issueId: string) => {
+    try {
+      setProcessingAction(issueId);
+      console.log('Escalating compliance issue:', issueId);
+      
+      await SupabaseDatabaseService.escalateComplianceIssue(issueId, {
+        escalatedBy: 'current_user_id', // This should come from auth context
+        escalatedAt: new Date().toISOString(),
+        escalationReason: 'Escalated via compliance review'
+      });
+      
+      // Refresh the issues list
+      refetchIssues();
+      
+      // Show success message
+      alert('Compliance issue escalated successfully!');
+    } catch (err) {
+      console.error('Error escalating compliance issue:', err);
+      alert('Failed to escalate issue. Please try again.');
+    } finally {
+      setProcessingAction(null);
+    }
+  };
 
   const handleCustomerDoubleClick = (customer: string, phone: string, caseId: string) => {
     console.log(`Opening WhatsApp conversation with ${customer} (${phone}) for case ${caseId}`);
@@ -152,10 +212,32 @@ export function ComplianceReview({ onBack, onNavigateToCase }: ComplianceReviewP
           </div>
         </div>
         <div className="flex items-center space-x-2">
+          <Button variant="outline" size="sm" onClick={refetchIssues} disabled={issuesLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${issuesLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           <Shield className="h-5 w-5 text-blue-600" />
           <span className="text-sm text-gray-600">AML & KYC Monitoring Active</span>
         </div>
       </div>
+
+      {/* Error Message */}
+      {(error || issuesError) && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="flex">
+            <AlertTriangle className="h-5 w-5 text-red-400 mr-3" />
+            <div className="text-sm text-red-700">{error || issuesError}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {issuesLoading && (
+        <div className="flex items-center justify-center py-8">
+          <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+          <span>Loading compliance issues...</span>
+        </div>
+      )}
 
       {/* Compliance Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -187,7 +269,10 @@ export function ComplianceReview({ onBack, onNavigateToCase }: ComplianceReviewP
             {['all', 'open', 'in_progress', 'escalated', 'resolved'].map((filter) => (
               <button
                 key={filter}
-                onClick={() => setSelectedFilter(filter)}
+                onClick={() => {
+                  setSelectedFilter(filter);
+                  refetchIssues();
+                }}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   selectedFilter === filter
                     ? 'bg-blue-100 text-blue-700'
@@ -266,20 +351,35 @@ export function ComplianceReview({ onBack, onNavigateToCase }: ComplianceReviewP
                   <div className="flex space-x-2">
                     {issue.status === 'open' && (
                       <>
-                        <Button variant="success" size="sm">
+                        <Button 
+                          variant="success" 
+                          size="sm"
+                          onClick={() => handleResolveIssue(issue.id)}
+                          disabled={processingAction === issue.id}
+                        >
                           <CheckCircle className="h-4 w-4 mr-1" />
-                          Resolve
+                          {processingAction === issue.id ? 'Processing...' : 'Resolve'}
                         </Button>
-                        <Button variant="warning" size="sm">
+                        <Button 
+                          variant="warning" 
+                          size="sm"
+                          onClick={() => handleEscalateIssue(issue.id)}
+                          disabled={processingAction === issue.id}
+                        >
                           <AlertTriangle className="h-4 w-4 mr-1" />
-                          Escalate
+                          {processingAction === issue.id ? 'Processing...' : 'Escalate'}
                         </Button>
                       </>
                     )}
                     {issue.status === 'in_progress' && (
-                      <Button variant="success" size="sm">
+                      <Button 
+                        variant="success" 
+                        size="sm"
+                        onClick={() => handleResolveIssue(issue.id)}
+                        disabled={processingAction === issue.id}
+                      >
                         <CheckCircle className="h-4 w-4 mr-1" />
-                        Mark Resolved
+                        {processingAction === issue.id ? 'Processing...' : 'Mark Resolved'}
                       </Button>
                     )}
                   </div>

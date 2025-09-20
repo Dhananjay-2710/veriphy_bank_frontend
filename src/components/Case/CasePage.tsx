@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ArrowLeft, User, Phone, Briefcase, Home, MapPin, Calendar } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, User, Phone, Briefcase, Home, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
@@ -8,7 +8,7 @@ import { WhatsAppTimeline } from './WhatsAppTimeline';
 import { ComplianceLog } from './ComplianceLog';
 import { WhatsAppCommunicator } from './WhatsAppCommunicator';
 import { DocumentManager } from '../Documents/DocumentManager';
-import { mockCase } from '../../data/mockData';
+import { useCase, useDocuments, useWhatsAppMessages, useComplianceLogs } from '../../hooks/useDashboardData';
 
 interface CasePageProps {
   caseId: string;
@@ -17,8 +17,10 @@ interface CasePageProps {
 
 export function CasePage({ caseId, onBack }: CasePageProps) {
   const [activeTab, setActiveTab] = useState('overview');
-  const [chatMessages, setChatMessages] = useState(mockCase.whatsappMessages);
-  const case_ = mockCase; // In real app, fetch by caseId
+  const { case: case_, loading: caseLoading, error: caseError, refetch: refetchCase } = useCase(caseId);
+  const { documents: _documents, loading: docsLoading, error: _docsError, refetch: refetchDocs } = useDocuments(caseId);
+  const { data: chatMessages, loading: messagesLoading, error: _messagesError, refetch: refetchMessages } = useWhatsAppMessages(caseId);
+  const { logs: _complianceLog, loading: logsLoading, error: _logsError, refetch: refetchLogs } = useComplianceLogs(caseId);
 
   const tabs = [
     { id: 'overview', label: 'Overview' },
@@ -58,38 +60,82 @@ export function CasePage({ caseId, onBack }: CasePageProps) {
   };
 
   const handleSendMessage = (message: string) => {
-    const newMessage = {
-      id: `msg-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      type: 'text' as const,
-      content: message,
-      sender: 'agent' as const
-    };
-    setChatMessages(prev => [...prev, newMessage]);
+    // In real implementation, this would send to the database
+    console.log('Message sent:', message);
     
-    // Simulate customer typing and response
+    // Simulate customer response
     setTimeout(() => {
-      const customerResponse = {
-        id: `msg-${Date.now() + 1}`,
-        timestamp: new Date().toISOString(),
-        type: 'text' as const,
-        content: "Thank you for the message. I'll get back to you shortly.",
-        sender: 'customer' as const
-      };
-      setChatMessages(prev => [...prev, customerResponse]);
+      console.log('Customer response received');
     }, 2000);
   };
 
   const handleSendDocument = (file: File) => {
-    const newMessage = {
-      id: `msg-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      type: 'document' as const,
-      content: `Document request sent: ${file.name}`,
-      sender: 'agent' as const
-    };
-    setChatMessages(prev => [...prev, newMessage]);
+    // In real implementation, this would update the database
+    console.log('Document sent:', file.name);
   };
+
+  const handleRefresh = () => {
+    refetchCase();
+    refetchDocs();
+    refetchMessages();
+    refetchLogs();
+  };
+
+  if (caseError) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button variant="outline" onClick={onBack}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Case Details</h1>
+              <p className="text-gray-600">Error loading case information</p>
+            </div>
+          </div>
+          <Button onClick={handleRefresh} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="flex">
+            <AlertTriangle className="h-5 w-5 text-red-400" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Error loading case</h3>
+              <p className="mt-1 text-sm text-red-700">
+                {caseError}. Please try refreshing the page.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (caseLoading || !case_) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button variant="outline" onClick={onBack}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Case Details</h1>
+              <p className="text-gray-600">Loading case information...</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -106,6 +152,10 @@ export function CasePage({ caseId, onBack }: CasePageProps) {
           </div>
         </div>
         <div className="flex items-center space-x-3">
+          <Button variant="outline" onClick={handleRefresh} disabled={caseLoading || docsLoading || messagesLoading || logsLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${(caseLoading || docsLoading || messagesLoading || logsLoading) ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           {getStatusBadge(case_.status)}
           {getRiskBadge(case_.customer.riskProfile)}
         </div>
@@ -180,7 +230,8 @@ export function CasePage({ caseId, onBack }: CasePageProps) {
         {activeTab === 'documents' && <DocumentChecklist documents={case_.documents} />}
         {activeTab === 'document-manager' && (
           <DocumentManager 
-            onBack={() => setActiveView('overview')}
+            caseId={caseId}
+            onBack={() => setActiveTab('overview')}
             onSendMessage={handleSendMessage}
           />
         )}

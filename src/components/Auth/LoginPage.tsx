@@ -1,61 +1,85 @@
 import React, { useState } from 'react';
 import { Shield, Lock, User, UserPlus } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContextFixed';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { RegistrationPage } from './RegistrationPage';
+import { useNavigate } from 'react-router-dom';
 
 interface RegistrationData {
   firstName: string;
   lastName: string;
   email: string;
-  whatsapp: string;
-  company: string;
+  phone: string;
   role: string;
-  employeeId: string;
 }
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [showRegistration, setShowRegistration] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const navigate = useNavigate();
+
   const { login } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const redirectByRole = (role?: string | null) => {
+    console.log('User role:', role);
+    // Just navigate to root - App.tsx will handle role-based rendering
+    navigate('/');
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = login(email, password);
-    if (!success) {
-      setError('Invalid credentials. Please try again.');
+    setLoading(true);
+    setError('');
+
+    try {
+      const profile = await login(email.trim().toLowerCase(), password); 
+      console.log("Profile after login:", profile);
+      console.log("Role after login:", profile.role);
+      redirectByRole(profile.role); 
+    } catch (err: any) {
+      console.error('LoginPage error:', err);
+      setError(err?.message || 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
     }
+
+    // try {
+    //   const user = await login(email.trim().toLowerCase(), password);
+    //   console.log("user after login:", user);
+    //   const role = (user as unknown as { role?: string | null })?.role ?? null;
+    //   redirectByRole(role);
+    // } catch (err: any) {
+    //   console.error('LoginPage error:', err);
+    //   setError(err?.message || 'Something went wrong. Please try again.');
+    // } finally {
+    //   setLoading(false);
+    // }
   };
 
   const handleRegistrationComplete = (data: RegistrationData) => {
     console.log('Registration completed with data:', data);
     setRegistrationSuccess(true);
     setShowRegistration(false);
-    // In a real implementation, you might want to auto-login the user
-    // or show a success message and redirect to login
   };
 
   if (showRegistration) {
-    return <RegistrationPage 
-      onBackToLogin={() => setShowRegistration(false)}
-      onRegistrationComplete={handleRegistrationComplete}
-    />;
+    return (
+      <RegistrationPage
+        onBackToLogin={() => setShowRegistration(false)}
+        onRegistrationComplete={handleRegistrationComplete}
+      />
+    );
   }
-
-  const demoAccounts = [
-    { role: 'Salesperson', email: 'priya.sharma@happybank.in', password: 'demo123' },
-    { role: 'Sales Manager', email: 'rajesh.kumar@happybank.in', password: 'demo123' },
-    { role: 'Credit Operations', email: 'anita.patel@happybank.in', password: 'demo123' },
-    { role: 'System Administrator', email: 'suresh.krishnamurthy@happybank.in', password: 'demo123' }
-  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full space-y-8">
+        {/* Header */}
         <div className="text-center">
           <div className="flex justify-center">
             <div className="bg-blue-600 p-3 rounded-full">
@@ -67,12 +91,14 @@ export function LoginPage() {
           <p className="text-sm text-gray-500 mt-1">Secure Document Workflow Platform</p>
         </div>
 
+        {/* Login Card */}
         <Card>
           <CardHeader>
             <CardTitle className="text-center">Sign In</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Email */}
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
                   Email Address
@@ -91,6 +117,7 @@ export function LoginPage() {
                 </div>
               </div>
 
+              {/* Password */}
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                   Password
@@ -109,22 +136,26 @@ export function LoginPage() {
                 </div>
               </div>
 
+              {/* Error */}
               {error && (
                 <div className="text-red-600 text-sm text-center bg-red-50 p-2 rounded-md">
                   {error}
                 </div>
               )}
 
+              {/* Registration success */}
               {registrationSuccess && (
                 <div className="text-green-600 text-sm text-center bg-green-50 p-2 rounded-md">
                   Registration successful! You can now login with your credentials.
                 </div>
               )}
 
-              <Button type="submit" className="w-full" size="lg">
-                Sign In
+              {/* Submit button */}
+              <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                {loading ? 'Signing in...' : 'Sign In'}
               </Button>
 
+              {/* Registration link */}
               <div className="text-center">
                 <button
                   type="button"
@@ -139,21 +170,7 @@ export function LoginPage() {
           </CardContent>
         </Card>
 
-        <Card padding="sm">
-          <div className="text-center">
-            <p className="text-sm font-medium text-gray-700 mb-3">Demo Accounts</p>
-            <div className="space-y-2">
-              {demoAccounts.map((account, index) => (
-                <div key={index} className="text-xs bg-gray-50 p-2 rounded">
-                  <p className="font-medium text-gray-800">{account.role}</p>
-                  <p className="text-gray-600">{account.email}</p>
-                  <p className="text-gray-500">Password: {account.password}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-
+        {/* Footer */}
         <div className="text-center text-xs text-gray-500">
           <p>🔒 Bank-grade security • End-to-end encryption</p>
           <p className="mt-1">© 2025 Happy Bank of India. All rights reserved.</p>

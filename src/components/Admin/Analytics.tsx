@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { ArrowLeft, BarChart3, TrendingUp, DollarSign, Users, FileText, Clock, Download, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, BarChart3, TrendingUp, DollarSign, Users, FileText, Clock, Download, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { SupabaseDatabaseService } from '../../services/supabase-database';
 
 interface AnalyticsProps {
   onBack: () => void;
@@ -11,8 +12,53 @@ interface AnalyticsProps {
 export function Analytics({ onBack }: AnalyticsProps) {
   const [selectedPeriod, setSelectedPeriod] = useState('month');
   const [selectedMetric, setSelectedMetric] = useState('revenue');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [analyticsData, setAnalyticsData] = useState({
+    performanceMetrics: [],
+    departmentAnalytics: [],
+    topPerformers: []
+  });
 
-  const performanceMetrics = [
+  // Load analytics data on component mount and when period changes
+  useEffect(() => {
+    loadAnalyticsData();
+  }, [selectedPeriod]);
+
+  const loadAnalyticsData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('Loading analytics data for period:', selectedPeriod);
+      
+      // Fetch real analytics data from Supabase
+      const [performanceData, departmentData, performersData] = await Promise.all([
+        SupabaseDatabaseService.getPerformanceMetrics(selectedPeriod),
+        SupabaseDatabaseService.getDepartmentAnalytics(selectedPeriod),
+        SupabaseDatabaseService.getTopPerformers(selectedPeriod)
+      ]);
+      
+      setAnalyticsData({
+        performanceMetrics: performanceData,
+        departmentAnalytics: departmentData,
+        topPerformers: performersData
+      });
+    } catch (err) {
+      console.error('Error loading analytics data:', err);
+      setError('Failed to load analytics data');
+      // Fallback to mock data
+      setAnalyticsData({
+        performanceMetrics: getMockPerformanceMetrics(),
+        departmentAnalytics: getMockDepartmentAnalytics(),
+        topPerformers: getMockTopPerformers()
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getMockPerformanceMetrics = () => [
     {
       label: 'Total Revenue',
       value: '₹45.2Cr',
@@ -67,7 +113,7 @@ export function Analytics({ onBack }: AnalyticsProps) {
     }
   ];
 
-  const departmentAnalytics = [
+  const getMockDepartmentAnalytics = () => [
     {
       department: 'Sales Team',
       metrics: {
@@ -92,12 +138,17 @@ export function Analytics({ onBack }: AnalyticsProps) {
     }
   ];
 
-  const topPerformers = [
+  const getMockTopPerformers = () => [
     { name: 'Priya Sharma', role: 'Salesperson', cases: 18, revenue: '₹2.4Cr', efficiency: '94%' },
     { name: 'Anita Patel', role: 'Credit Ops', cases: 23, revenue: '₹3.1Cr', efficiency: '98%' },
     { name: 'Vikram Joshi', role: 'Salesperson', cases: 15, revenue: '₹1.8Cr', efficiency: '91%' },
     { name: 'Rajesh Kumar', role: 'Manager', cases: 0, revenue: '₹45.2Cr', efficiency: '97%' }
   ];
+
+  const performanceMetrics = analyticsData.performanceMetrics.length > 0 ? analyticsData.performanceMetrics : getMockPerformanceMetrics();
+
+  const departmentAnalytics = analyticsData.departmentAnalytics.length > 0 ? analyticsData.departmentAnalytics : getMockDepartmentAnalytics();
+  const topPerformers = analyticsData.topPerformers.length > 0 ? analyticsData.topPerformers : getMockTopPerformers();
 
   const getTrendIcon = (trend: string) => {
     return trend === 'up' ? '↗️' : trend === 'down' ? '↘️' : '→';
@@ -132,12 +183,30 @@ export function Analytics({ onBack }: AnalyticsProps) {
             <Download className="h-4 w-4 mr-2" />
             Export Report
           </Button>
-          <Button variant="outline">
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button variant="outline" onClick={loadAnalyticsData} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="flex">
+            <AlertTriangle className="h-5 w-5 text-red-400 mr-3" />
+            <div className="text-sm text-red-700">{error}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center py-8">
+          <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+          <span>Loading analytics data...</span>
+        </div>
+      )}
 
       {/* Performance Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

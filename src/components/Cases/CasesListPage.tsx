@@ -3,6 +3,8 @@ import { ArrowLeft, Search, Filter, FileText, Clock, AlertTriangle, Eye, Phone, 
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { useCases } from '../../hooks/useDashboardData';
+import { useAuth } from '../../contexts/AuthContextFixed';
 
 interface CasesListPageProps {
   onBack: () => void;
@@ -13,6 +15,13 @@ export function CasesListPage({ onBack, onNavigateToCase }: CasesListPageProps) 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [sortBy, setSortBy] = useState('priority');
+  const { user } = useAuth();
+  
+  // Fetch cases from Supabase
+  const { cases, loading: casesLoading, error: casesError, refetch } = useCases({
+    assignedTo: user?.id,
+    status: filterStatus === 'all' ? undefined : filterStatus
+  });
 
   const handleCustomerDoubleClick = (customerName: string, phone: string, caseId: string) => {
     // Navigate to WhatsApp conversation for this customer
@@ -20,104 +29,53 @@ export function CasesListPage({ onBack, onNavigateToCase }: CasesListPageProps) 
     onNavigateToCase(caseId);
   };
 
-  const allCases = [
-    {
-      id: 'case-001',
-      caseNumber: 'HBI-HL-2025-001',
-      customer: 'Ramesh & Sunita Gupta',
-      phone: '+91-9876543210',
-      loanType: 'Home Loan',
-      amount: '₹50L',
-      status: 'in-progress',
-      priority: 'high',
-      lastActivity: '2 hours ago',
-      documentsComplete: 85,
-      assignedTo: 'You',
-      createdDate: '2025-01-09',
-      nextAction: 'Follow up on GST documents',
-      riskProfile: 'medium'
-    },
-    {
-      id: 'case-002',
-      caseNumber: 'HBI-PL-2025-002',
-      customer: 'Amit Verma',
-      phone: '+91-9876543211',
-      loanType: 'Personal Loan',
-      amount: '₹5L',
-      status: 'review',
-      priority: 'medium',
-      lastActivity: '1 day ago',
-      documentsComplete: 100,
-      assignedTo: 'You',
-      createdDate: '2025-01-08',
-      nextAction: 'Awaiting credit approval',
-      riskProfile: 'low'
-    },
-    {
-      id: 'case-003',
-      caseNumber: 'HBI-CL-2025-003',
-      customer: 'Neha Singh',
-      phone: '+91-9876543212',
-      loanType: 'Car Loan',
-      amount: '₹8L',
-      status: 'new',
-      priority: 'low',
-      lastActivity: '3 days ago',
-      documentsComplete: 60,
-      assignedTo: 'You',
-      createdDate: '2025-01-06',
-      nextAction: 'Initial document collection',
-      riskProfile: 'low'
-    },
-    {
-      id: 'case-004',
-      caseNumber: 'HBI-BL-2025-004',
-      customer: 'Pradeep Kumar',
-      phone: '+91-9876543213',
-      loanType: 'Business Loan',
-      amount: '₹25L',
-      status: 'approved',
-      priority: 'high',
-      lastActivity: '5 hours ago',
-      documentsComplete: 100,
-      assignedTo: 'You',
-      createdDate: '2025-01-05',
-      nextAction: 'Loan disbursement',
-      riskProfile: 'high'
-    },
-    {
-      id: 'case-005',
-      caseNumber: 'HBI-HL-2025-005',
-      customer: 'Kavya Menon',
-      phone: '+91-9876543214',
-      loanType: 'Home Loan',
-      amount: '₹35L',
-      status: 'rejected',
-      priority: 'medium',
-      lastActivity: '2 days ago',
-      documentsComplete: 95,
-      assignedTo: 'You',
-      createdDate: '2025-01-04',
-      nextAction: 'Customer notification sent',
-      riskProfile: 'high'
-    },
-    {
-      id: 'case-006',
-      caseNumber: 'HBI-PL-2025-006',
-      customer: 'Rohit Sharma',
-      phone: '+91-9876543215',
-      loanType: 'Personal Loan',
-      amount: '₹3L',
-      status: 'in-progress',
-      priority: 'low',
-      lastActivity: '4 hours ago',
-      documentsComplete: 75,
-      assignedTo: 'You',
-      createdDate: '2025-01-07',
-      nextAction: 'Bank statement verification',
-      riskProfile: 'low'
+  // Helper functions
+  const getTimeAgo = (dateString: string) => {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return 'Less than 1 hour ago';
+    if (diffInHours < 24) return `${diffInHours} hours ago`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+  };
+
+  const calculateDocumentCompleteness = (documents: any[]) => {
+    if (!documents || documents.length === 0) return 0;
+    const requiredDocs = documents.filter(doc => doc.required);
+    const completedDocs = requiredDocs.filter(doc => doc.status === 'verified' || doc.status === 'received');
+    return requiredDocs.length > 0 ? Math.round((completedDocs.length / requiredDocs.length) * 100) : 0;
+  };
+
+  const getNextAction = (status: string) => {
+    switch (status) {
+      case 'new': return 'Initial document collection';
+      case 'in-progress': return 'Follow up on pending documents';
+      case 'review': return 'Awaiting credit approval';
+      case 'approved': return 'Loan disbursement';
+      case 'rejected': return 'Customer notification sent';
+      default: return 'Review case status';
     }
-  ];
+  };
+
+  // Transform Supabase cases to match the expected format
+  const allCases = cases.map(case_ => ({
+    id: case_.id,
+    caseNumber: case_.caseNumber,
+    customer: case_.customer.name,
+    phone: case_.customer.phone,
+    loanType: case_.customer.loanType,
+    amount: `₹${(case_.customer.loanAmount / 100000).toFixed(0)}L`,
+    status: case_.status,
+    priority: case_.priority,
+    lastActivity: getTimeAgo(case_.updatedAt),
+    documentsComplete: calculateDocumentCompleteness(case_.documents),
+    assignedTo: 'You',
+    createdDate: case_.createdAt.split('T')[0],
+    nextAction: getNextAction(case_.status),
+    riskProfile: case_.customer.riskProfile
+  }));
 
   const filteredCases = allCases.filter(case_ => {
     const matchesSearch = case_.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -195,6 +153,62 @@ export function CasesListPage({ onBack, onNavigateToCase }: CasesListPageProps) 
     rejected: allCases.filter(c => c.status === 'rejected').length
   };
 
+  // Show loading state
+  if (casesLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button variant="outline" onClick={onBack}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">My Cases</h1>
+              <p className="text-gray-600">Loading your assigned loan applications...</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span className="ml-2 text-gray-600">Loading cases...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (casesError) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button variant="outline" onClick={onBack}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">My Cases</h1>
+              <p className="text-gray-600">Error loading your assigned loan applications</p>
+            </div>
+          </div>
+          <Button variant="outline" onClick={refetch}>
+            Retry
+          </Button>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="flex">
+            <AlertTriangle className="h-5 w-5 text-red-400" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Error loading cases</h3>
+              <p className="mt-1 text-sm text-red-700">{casesError}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -208,8 +222,13 @@ export function CasesListPage({ onBack, onNavigateToCase }: CasesListPageProps) 
             <p className="text-gray-600">Detailed view of all your assigned loan applications</p>
           </div>
         </div>
-        <div className="text-sm text-gray-600">
-          {filteredCases.length} of {allCases.length} cases
+        <div className="flex items-center space-x-3">
+          <Button variant="outline" onClick={refetch} disabled={casesLoading}>
+            Refresh
+          </Button>
+          <div className="text-sm text-gray-600">
+            {filteredCases.length} of {allCases.length} cases
+          </div>
         </div>
       </div>
 
