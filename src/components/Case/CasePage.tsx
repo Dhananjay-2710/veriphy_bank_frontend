@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, User, Phone, Briefcase, Home, RefreshCw, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, User, Phone, Briefcase, Home, RefreshCw, AlertTriangle, Workflow, History, Plus } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
@@ -8,7 +8,9 @@ import { WhatsAppTimeline } from './WhatsAppTimeline';
 import { ComplianceLog } from './ComplianceLog';
 import { WhatsAppCommunicator } from './WhatsAppCommunicator';
 import { DocumentManager } from '../Documents/DocumentManager';
-import { useCase, useDocuments, useWhatsAppMessages, useComplianceLogs } from '../../hooks/useDashboardData';
+import { useCase, useDocuments, useWhatsAppMessages, useComplianceLogs, useCaseStatusHistory, useCaseWorkflowStages } from '../../hooks/useDashboardData';
+import { useAuth } from '../../contexts/AuthContextFixed';
+import { SupabaseDatabaseService } from '../../services/supabase-database';
 
 interface CasePageProps {
   caseId: string;
@@ -17,15 +19,26 @@ interface CasePageProps {
 
 export function CasePage({ caseId, onBack }: CasePageProps) {
   const [activeTab, setActiveTab] = useState('overview');
+  const [newStatus, setNewStatus] = useState('');
+  const [statusReason, setStatusReason] = useState('');
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const { user } = useAuth();
+  
   const { case: case_, loading: caseLoading, error: caseError, refetch: refetchCase } = useCase(caseId);
   const { documents: _documents, loading: docsLoading, error: _docsError, refetch: refetchDocs } = useDocuments(caseId);
   const { data: chatMessages, loading: messagesLoading, error: _messagesError, refetch: refetchMessages } = useWhatsAppMessages(caseId);
   const { logs: _complianceLog, loading: logsLoading, error: _logsError, refetch: refetchLogs } = useComplianceLogs(caseId);
+  
+  // Workflow data
+  const { history: statusHistory, refetch: refetchHistory } = useCaseStatusHistory(caseId);
+  const { stages: workflowStages, refetch: refetchStages } = useCaseWorkflowStages(caseId);
 
   const tabs = [
     { id: 'overview', label: 'Overview' },
     { id: 'documents', label: 'Documents' },
     { id: 'document-manager', label: 'Document Manager' },
+    { id: 'workflow', label: 'Workflow', icon: Workflow },
+    { id: 'status-history', label: 'Status History', icon: History },
     { id: 'whatsapp', label: 'WhatsApp Timeline' },
     { id: 'communicator', label: 'Chat with Customer' },
     { id: 'compliance', label: 'Compliance Log' }
@@ -74,11 +87,62 @@ export function CasePage({ caseId, onBack }: CasePageProps) {
     console.log('Document sent:', file.name);
   };
 
+  // Workflow handlers
+  const handleStatusChange = async () => {
+    if (!newStatus || !user) return;
+    
+    try {
+      await SupabaseDatabaseService.createCaseStatusHistory({
+        case_id: caseId,
+        status: newStatus,
+        previous_status: case_?.status,
+        changed_by: user.id,
+        reason: statusReason
+      });
+      
+      // Update case status
+      await SupabaseDatabaseService.updateLoanApplication(caseId, { status: newStatus });
+      
+      setNewStatus('');
+      setStatusReason('');
+      setShowStatusModal(false);
+      refetchCase();
+      refetchHistory();
+    } catch (error) {
+      console.error('Failed to update status:', error);
+    }
+  };
+
+  const handleWorkflowStageUpdate = async (stageId: string, updates: any) => {
+    try {
+      await SupabaseDatabaseService.updateCaseWorkflowStage(stageId, updates);
+      refetchStages();
+    } catch (error) {
+      console.error('Failed to update workflow stage:', error);
+    }
+  };
+
+  const handleCreateWorkflowStage = async (stageName: string, stageOrder: number) => {
+    try {
+      await SupabaseDatabaseService.createCaseWorkflowStage({
+        case_id: caseId,
+        stage_name: stageName,
+        stage_order: stageOrder,
+        assigned_to: user?.id
+      });
+      refetchStages();
+    } catch (error) {
+      console.error('Failed to create workflow stage:', error);
+    }
+  };
+
   const handleRefresh = () => {
     refetchCase();
     refetchDocs();
     refetchMessages();
     refetchLogs();
+    refetchHistory();
+    refetchStages();
   };
 
   if (caseError) {
@@ -193,7 +257,7 @@ export function CasePage({ caseId, onBack }: CasePageProps) {
               <Home className="h-5 w-5 text-gray-400" />
               <div>
                 <p className="text-sm text-gray-500">Loan Amount</p>
-                <p className="font-medium">₹{(case_.customer.loanAmount / 100000).toFixed(0)}L</p>
+                <p className="font-medium">₹{((case_.loanAmount || 0) / 100000).toFixed(0)}L</p>
               </div>
             </div>
           </div>
@@ -203,19 +267,23 @@ export function CasePage({ caseId, onBack }: CasePageProps) {
       {/* Tab Navigation */}
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === tab.id
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 ${
+                  activeTab === tab.id
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                {Icon && <Icon className="h-4 w-4" />}
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </nav>
       </div>
 
@@ -248,7 +316,201 @@ export function CasePage({ caseId, onBack }: CasePageProps) {
           </div>
         )}
         {activeTab === 'compliance' && <ComplianceLog logs={case_.complianceLog} />}
+        
+        {/* Workflow Tab */}
+        {activeTab === 'workflow' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Workflow Stages</h3>
+              <div className="flex space-x-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleCreateWorkflowStage('New Stage', workflowStages.length + 1)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Stage
+                </Button>
+                <Button variant="outline" onClick={refetchStages}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 gap-4">
+              {workflowStages.map((stage) => (
+                <Card key={stage.id} className="hover:shadow-lg transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <h4 className="font-semibold">{stage.stage_name}</h4>
+                          <Badge variant={
+                            stage.completed_at 
+                              ? 'success' 
+                              : stage.is_active 
+                                ? 'info' 
+                                : 'default'
+                          }>
+                            {stage.completed_at ? 'Completed' : stage.is_active ? 'Active' : 'Pending'}
+                          </Badge>
+                          <span className="text-sm text-gray-500">Order: {stage.stage_order}</span>
+                        </div>
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <p><strong>Started:</strong> {new Date(stage.started_at).toLocaleString()}</p>
+                          {stage.completed_at && (
+                            <p><strong>Completed:</strong> {new Date(stage.completed_at).toLocaleString()}</p>
+                          )}
+                          {stage.assigned_to && (
+                            <p><strong>Assigned to:</strong> {stage.user?.name || stage.assigned_to}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleWorkflowStageUpdate(stage.id, { 
+                            is_active: !stage.is_active,
+                            completed_at: stage.is_active ? new Date().toISOString() : null
+                          })}
+                        >
+                          {stage.is_active ? 'Complete' : 'Reactivate'}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            
+            {workflowStages.length === 0 && (
+              <Card>
+                <CardContent className="text-center py-12">
+                  <Workflow className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500">No workflow stages found</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+        
+        {/* Status History Tab */}
+        {activeTab === 'status-history' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Status History</h3>
+              <div className="flex space-x-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowStatusModal(true)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Change Status
+                </Button>
+                <Button variant="outline" onClick={refetchHistory}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 gap-4">
+              {statusHistory.map((item) => (
+                <Card key={item.id} className="hover:shadow-lg transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2">
+                          {getStatusBadge(item.status)}
+                          {item.previous_status && (
+                            <span className="text-sm text-gray-500">
+                              from {item.previous_status}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <p><strong>Changed by:</strong> {item.user?.name || item.changed_by}</p>
+                          <p><strong>Date:</strong> {new Date(item.changed_at).toLocaleString()}</p>
+                          {item.reason && <p><strong>Reason:</strong> {item.reason}</p>}
+                          {item.notes && <p><strong>Notes:</strong> {item.notes}</p>}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            
+            {statusHistory.length === 0 && (
+              <Card>
+                <CardContent className="text-center py-12">
+                  <History className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500">No status history found</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
       </div>
+      
+      {/* Status Change Modal */}
+      {showStatusModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <CardTitle>Change Case Status</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  New Status
+                </label>
+                <select
+                  value={newStatus}
+                  onChange={(e) => setNewStatus(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Status</option>
+                  <option value="new">New</option>
+                  <option value="in-progress">In Progress</option>
+                  <option value="review">Review</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Reason (Optional)
+                </label>
+                <textarea
+                  value={statusReason}
+                  onChange={(e) => setStatusReason(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="Enter reason for status change..."
+                />
+              </div>
+              <div className="flex space-x-3 pt-4">
+                <Button 
+                  onClick={handleStatusChange}
+                  disabled={!newStatus}
+                  className="flex-1"
+                >
+                  Update Status
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowStatusModal(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

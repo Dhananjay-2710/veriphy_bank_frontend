@@ -8,15 +8,28 @@ export interface User {
 
 export interface Customer {
   id: string;
+  userId: string;
   name: string;
   phone: string;
+  email: string;
+  panNumber: string;
+  aadhaarNumber: string;
+  dateOfBirth: string;
+  gender: string;
+  maritalStatus: 'single' | 'married' | 'divorced' | 'widowed';
+  employment: 'salaried' | 'self-employed' | 'retired' | 'unemployed';
+  riskProfile: 'low' | 'medium' | 'high' | 'urgent';
+  kycStatus: 'pending' | 'in-progress' | 'verified' | 'rejected' | 'expired';
   age: number;
-  maritalStatus: 'single' | 'married';
-  employment: 'salaried' | 'self-employed' | 'retired';
-  loanType: string;
-  loanAmount: number;
-  riskProfile: 'low' | 'medium' | 'high';
+  metadata?: any;
   createdAt: string;
+  updatedAt: string;
+  user?: {
+    id: string;
+    full_name: string;
+    email: string;
+    role: string;
+  };
 }
 
 export interface Document {
@@ -69,6 +82,8 @@ export interface Case {
   createdAt: string;
   updatedAt: string;
   priority: 'low' | 'medium' | 'high';
+  loanAmount?: number;
+  loanType?: string;
 }
 
 export interface KPI {
@@ -178,6 +193,67 @@ export interface File {
   metadata?: any;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Folder {
+  id: string;
+  name: string;
+  description?: string;
+  parentFolderId?: string;
+  organizationId: string;
+  createdBy: string;
+  isActive: boolean;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DocumentAgainstProduct {
+  id: string;
+  productId: string;
+  documentTypeId: string;
+  isRequired: boolean;
+  priority: 'high' | 'medium' | 'low';
+  validityPeriod?: number; // in days
+  isActive: boolean;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+  product?: Product;
+  documentType?: DocumentType;
+}
+
+export interface DocAgainstSubProduct {
+  id: string;
+  subProductId: string;
+  documentTypeId: string;
+  isRequired: boolean;
+  priority: 'high' | 'medium' | 'low';
+  validityPeriod?: number; // in days
+  isActive: boolean;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+  subProduct?: SubProduct;
+  documentType?: DocumentType;
+}
+
+export interface FileSignature {
+  id: string;
+  fileId: string;
+  userId: string;
+  signatureType: 'digital' | 'electronic' | 'wet_signature';
+  signatureData: string; // Base64 encoded signature or hash
+  signatureMethod: 'biometric' | 'pin' | 'password' | 'certificate' | 'other';
+  isVerified: boolean;
+  verifiedAt?: string;
+  verifiedBy?: string;
+  expiresAt?: string;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+  file?: File;
+  user?: User;
 }
 
 // =============================================================================
@@ -629,4 +705,479 @@ export interface OrganizationSetting {
   isEncrypted: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+// =============================================================================
+// CORE BUSINESS TABLE INTERFACES
+// =============================================================================
+
+export interface EmploymentType {
+  id: string;
+  name: string;
+  code: string;
+  description: string;
+  isActive: boolean;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskType {
+  id: string;
+  name: string;
+  code: string;
+  description: string;
+  category: string;
+  isActive: boolean;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskSlaPolicy {
+  id: string;
+  name: string;
+  description: string;
+  taskTypeId: string;
+  departmentId?: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  slaHours: number;
+  escalationHours?: number;
+  isActive: boolean;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Department {
+  id: string;
+  name: string;
+  code: string;
+  description: string;
+  departmentType: 'sales' | 'credit_ops' | 'compliance' | 'admin' | 'support';
+  parentDepartmentId?: string;
+  managerId?: string;
+  isActive: boolean;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// =============================================================================
+// WORKFLOW & CASE MANAGEMENT INTERFACES
+// =============================================================================
+
+export interface CaseStatusHistory {
+  id: string;
+  case_id: string;
+  status: string;
+  previous_status?: string;
+  changed_by: string;
+  changed_at: string;
+  reason?: string;
+  notes?: string;
+  metadata?: any;
+  created_at: string;
+  updated_at: string;
+  case?: Case;
+  user?: User;
+}
+
+export interface CaseWorkflowStage {
+  id: string;
+  case_id: string;
+  stage_name: string;
+  stage_order: number;
+  is_active: boolean;
+  started_at: string;
+  completed_at?: string;
+  assigned_to?: string;
+  stage_data?: any;
+  created_at: string;
+  updated_at: string;
+  case?: Case;
+  user?: User;
+}
+
+export interface AssignCaseSetting {
+  id: string;
+  setting_name: string;
+  setting_value: string;
+  description?: string;
+  is_active: boolean;
+  priority: number;
+  conditions?: any;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssignPermission {
+  id: string;
+  role_id: string;
+  permission_id: string;
+  can_assign: boolean;
+  can_reassign: boolean;
+  can_approve: boolean;
+  can_reject: boolean;
+  conditions?: any;
+  created_at: string;
+  updated_at: string;
+  role?: Role;
+  permission?: Permission;
+}
+
+// =============================================================================
+// BACKGROUND PROCESSING INTERFACES
+// =============================================================================
+
+export interface Job {
+  id: string;
+  organizationId: string;
+  jobType: 'email' | 'sms' | 'whatsapp' | 'document_processing' | 'report_generation' | 'data_sync' | 'webhook' | 'cleanup' | 'other';
+  jobName: string;
+  payload: any;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  attempts: number;
+  maxAttempts: number;
+  availableAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  failedAt?: string;
+  errorMessage?: string;
+  errorDetails?: any;
+  batchId?: string;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JobBatch {
+  id: string;
+  organizationId: string;
+  batchName: string;
+  totalJobs: number;
+  pendingJobs: number;
+  processedJobs: number;
+  failedJobs: number;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  progress: number; // 0-100
+  startedAt?: string;
+  completedAt?: string;
+  cancelledAt?: string;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FailedJob {
+  id: string;
+  jobId: string;
+  organizationId: string;
+  jobType: string;
+  jobName: string;
+  payload: any;
+  errorMessage: string;
+  errorDetails?: any;
+  stackTrace?: string;
+  failedAt: string;
+  retryCount: number;
+  maxRetries: number;
+  isResolved: boolean;
+  resolvedAt?: string;
+  resolvedBy?: string;
+  resolution?: string;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ThirdPartyApiLog {
+  id: string;
+  organizationId: string;
+  integrationId?: string;
+  apiName: string;
+  endpoint: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  requestPayload?: any;
+  responsePayload?: any;
+  statusCode?: number;
+  responseTime?: number; // in milliseconds
+  status: 'pending' | 'success' | 'failed' | 'timeout';
+  errorMessage?: string;
+  retryCount: number;
+  isSuccess: boolean;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Webhook {
+  id: string;
+  organizationId: string;
+  webhookName: string;
+  webhookUrl: string;
+  eventType: 'case_created' | 'case_updated' | 'document_uploaded' | 'task_completed' | 'user_created' | 'custom';
+  status: 'active' | 'inactive' | 'error';
+  isActive: boolean;
+  secret?: string;
+  headers?: any;
+  retryCount: number;
+  maxRetries: number;
+  timeout: number; // in seconds
+  lastTriggeredAt?: string;
+  lastSuccessAt?: string;
+  lastFailureAt?: string;
+  failureCount: number;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// =============================================================================
+// AUTHENTICATION & SYSTEM INTERFACES
+// =============================================================================
+
+export interface AuthAccount {
+  id: string;
+  userId: string;
+  provider: string;
+  providerAccountId?: string;
+  email?: string;
+  passwordHash?: string;
+  salt?: string;
+  emailVerified: boolean;
+  emailVerifiedAt?: string;
+  phoneVerified: boolean;
+  phoneVerifiedAt?: string;
+  twoFactorEnabled: boolean;
+  twoFactorSecret?: string;
+  backupCodes: string[];
+  failedLoginAttempts: number;
+  lockedUntil?: string;
+  lastLoginAt?: string;
+  lastLoginIp?: string;
+  lastLoginUserAgent?: string;
+  isActive: boolean;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Session {
+  id: string;
+  userId: string;
+  sessionToken: string;
+  refreshToken?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  deviceInfo?: any;
+  locationInfo?: any;
+  loginAt: string;
+  lastActivityAt: string;
+  expiresAt: string;
+  logoutAt?: string;
+  isActive: boolean;
+  isRemembered: boolean;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserRole {
+  id: string;
+  userId: string;
+  roleId: string;
+  organizationId?: string;
+  departmentId?: string;
+  assignedBy?: string;
+  assignedAt: string;
+  revokedAt?: string;
+  revokedBy?: string;
+  isActive: boolean;
+  isPrimary: boolean;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+  role?: Role;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    role: 'salesperson' | 'manager' | 'credit-ops' | 'admin';
+    avatar?: string;
+  };
+}
+
+export interface PasswordResetToken {
+  id: string;
+  userId: string;
+  token: string;
+  tokenHash: string;
+  expiresAt: string;
+  usedAt?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  isUsed: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PersonalAccessToken {
+  id: string;
+  userId: string;
+  name: string;
+  tokenHash: string;
+  tokenPreview: string;
+  scopes: string[];
+  lastUsedAt?: string;
+  lastUsedIp?: string;
+  lastUsedUserAgent?: string;
+  expiresAt?: string;
+  revokedAt?: string;
+  revokedBy?: string;
+  isActive: boolean;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AuthAuditLog {
+  id: string;
+  userId?: string;
+  sessionId?: string;
+  eventType: string;
+  eventDescription?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  deviceInfo?: any;
+  locationInfo?: any;
+  success: boolean;
+  failureReason?: string;
+  metadata?: any;
+  createdAt: string;
+}
+
+export interface ApiRateLimit {
+  id: string;
+  userId?: string;
+  tokenId?: string;
+  endpoint: string;
+  requestsCount: number;
+  windowStart: string;
+  windowDuration: string;
+  maxRequests: number;
+  isBlocked: boolean;
+  blockedUntil?: string;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// =============================================================================
+// CACHING & PERFORMANCE INTERFACES
+// =============================================================================
+
+export interface CacheEntry {
+  id: string;
+  organizationId: string;
+  cacheKey: string;
+  cacheValue: any;
+  cacheType: 'general' | 'query' | 'session' | 'api_response';
+  tags: string[];
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+  accessedAt: string;
+  accessCount: number;
+  sizeBytes: number;
+  isCompressed: boolean;
+  compressionType?: string;
+  metadata?: any;
+}
+
+export interface CacheLock {
+  id: string;
+  organizationId: string;
+  lockKey: string;
+  lockType: 'exclusive' | 'shared' | 'read' | 'write';
+  lockedBy: string;
+  lockedAt: string;
+  expiresAt: string;
+  acquiredCount: number;
+  metadata?: any;
+}
+
+export interface Migration {
+  id: string;
+  migrationName: string;
+  migrationVersion: string;
+  migrationType: 'schema' | 'data' | 'function' | 'trigger' | 'index';
+  description?: string;
+  sqlContent: string;
+  checksum: string;
+  appliedAt: string;
+  appliedBy: string;
+  executionTimeMs: number;
+  status: 'success' | 'failed' | 'rolled_back';
+  errorMessage?: string;
+  rollbackSql?: string;
+  rollbackAppliedAt?: string;
+  rollbackAppliedBy?: string;
+  dependencies: string[];
+  metadata?: any;
+}
+
+export interface CacheStatistics {
+  id: string;
+  organizationId: string;
+  cacheType: string;
+  date: string;
+  totalRequests: number;
+  cacheHits: number;
+  cacheMisses: number;
+  totalSizeBytes: number;
+  averageResponseTimeMs: number;
+  peakMemoryUsageBytes: number;
+  evictionCount: number;
+  errorCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CacheInvalidationLog {
+  id: string;
+  organizationId: string;
+  cacheKey: string;
+  invalidationType: 'manual' | 'automatic' | 'expired' | 'tag_based' | 'pattern_based';
+  invalidationReason?: string;
+  invalidatedBy: string;
+  invalidatedAt: string;
+  affectedTags: string[];
+  cacheSizeBefore: number;
+  cacheSizeAfter: number;
+  metadata?: any;
+}
+
+export interface CacheHitRatio {
+  cacheType: string;
+  hitRatio: number;
+  totalRequests: number;
+  cacheHits: number;
+  cacheMisses: number;
+}
+
+export interface CacheOptions {
+  cacheType?: 'general' | 'query' | 'session' | 'api_response';
+  tags?: string[];
+  ttlSeconds?: number;
+  isCompressed?: boolean;
+  compressionType?: string;
+  metadata?: any;
+}
+
+export interface CacheLockOptions {
+  lockType?: 'exclusive' | 'shared' | 'read' | 'write';
+  ttlSeconds?: number;
+  metadata?: any;
 }

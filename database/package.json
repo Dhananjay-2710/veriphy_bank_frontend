@@ -1,0 +1,23 @@
+{
+  "name": "veriphy-bank-database-setup",
+  "version": "1.0.0",
+  "description": "Database setup scripts for Veriphy Bank Frontend",
+  "main": "populate_all_tables.js",
+  "scripts": {
+    "setup": "node populate_all_tables.js",
+    "setup-sql": "echo 'Run the complete_database_setup.sql file in your Supabase SQL Editor'",
+    "help": "echo 'Available commands: npm run setup (Node.js) or run complete_database_setup.sql (SQL Editor)'"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.0",
+    "dotenv": "^16.3.1"
+  },
+  "keywords": [
+    "supabase",
+    "database",
+    "setup",
+    "veriphy-bank"
+  ],
+  "author": "Veriphy Bank Team",
+  "license": "MIT"
+}

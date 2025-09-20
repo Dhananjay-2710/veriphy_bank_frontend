@@ -33,98 +33,38 @@ export function DocumentManager({ caseId, onBack, onSendMessage }: DocumentManag
   // Get real documents data from database
   const { documents, loading: documentsLoading, error: documentsError, refetch } = useDocuments(caseId || '');
 
-  // Mock documents with enhanced data (fallback)
-  const mockDocuments: Document[] = [
-    {
-      id: 'doc1',
-      name: 'Aadhaar Card',
-      type: 'identity',
-      category: 'identity',
-      status: 'verified',
-      required: true,
-      priority: 'high',
-      uploadedAt: '2025-01-09T10:30:00Z',
-      verifiedAt: '2025-01-09T11:15:00Z',
-      reviewedBy: 'Priya Sharma',
-      fileSize: 2.1,
-      fileType: 'PDF'
-    },
-    {
-      id: 'doc2',
-      name: 'PAN Card',
-      type: 'identity',
-      category: 'identity',
-      status: 'verified',
-      required: true,
-      priority: 'high',
-      uploadedAt: '2025-01-09T10:45:00Z',
-      verifiedAt: '2025-01-09T11:20:00Z',
-      reviewedBy: 'Priya Sharma',
-      fileSize: 1.8,
-      fileType: 'PDF'
-    },
-    {
-      id: 'doc3',
-      name: 'Bank Statements (6 months)',
-      type: 'financial',
-      category: 'financial',
-      status: 'received',
-      required: true,
-      priority: 'high',
-      uploadedAt: '2025-01-09T11:00:00Z',
-      fileSize: 8.5,
-      fileType: 'PDF'
-    },
-    {
-      id: 'doc4',
-      name: 'GST Returns',
-      type: 'business',
-      category: 'business',
-      status: 'rejected',
-      required: true,
-      priority: 'high',
-      uploadedAt: '2025-01-09T09:30:00Z',
-      reviewedAt: '2025-01-09T14:15:00Z',
-      reviewedBy: 'Rajesh Kumar',
-      rejectionReason: 'Documents are not clear. Please upload high-resolution scans.',
-      fileSize: 3.2,
-      fileType: 'JPG'
-    },
-    {
-      id: 'doc5',
-      name: 'ITR (Last 3 years)',
-      type: 'business',
-      category: 'business',
-      status: 'received',
-      required: true,
-      priority: 'high',
-      uploadedAt: '2025-01-09T14:30:00Z',
-      fileSize: 12.3,
-      fileType: 'PDF'
-    },
-    {
-      id: 'doc6',
-      name: 'Property Documents',
-      type: 'property',
-      category: 'property',
-      status: 'pending',
-      required: true,
-      priority: 'high'
-    },
-    {
-      id: 'doc7',
-      name: 'Employment Certificate',
-      type: 'employment',
-      category: 'employment',
-      status: 'received',
-      required: false,
-      priority: 'medium',
-      uploadedAt: '2025-01-09T13:15:00Z',
-      fileSize: 1.2,
-      fileType: 'PDF'
-    }
-  ];
+  // Loading state
+  if (documentsLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading documents...</p>
+        </div>
+      </div>
+    );
+  }
 
+  // Error state
+  if (documentsError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 mb-4">
+            <AlertTriangle className="h-12 w-12 mx-auto mb-2" />
+            <p className="text-lg font-semibold">Error Loading Documents</p>
+            <p className="text-sm text-gray-600 mt-2">{documentsError}</p>
+          </div>
+          <Button onClick={refetch}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Calculate categories from real documents data
   const categories = [
     { id: 'all', label: 'All Documents', count: documents.length },
     { id: 'identity', label: 'Identity', count: documents.filter(d => d.category === 'identity').length },
@@ -471,6 +411,10 @@ export function DocumentManager({ caseId, onBack, onSendMessage }: DocumentManag
           <Button variant="outline" onClick={() => setShowUploadModal(true)}>
             <Upload className="h-4 w-4 mr-2" />
             Upload Document
+          </Button>
+          <Button variant="outline" onClick={refetch} disabled={documentsLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${documentsLoading ? 'animate-spin' : ''}`} />
+            Refresh
           </Button>
           <Button variant="outline">
             <MessageCircle className="h-4 w-4 mr-2" />

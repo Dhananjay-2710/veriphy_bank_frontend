@@ -24,6 +24,11 @@ export const SUPABASE_TABLES = {
   NOTIFICATIONS: 'notifications',
   LOGS: 'logs',
   
+  // Document Management Tables
+  DOCUMENT_AGAINST_PRODUCT: 'document_against_product',
+  DOC_AGAINST_SUB_PRODUCT: 'doc_against_sub_product',
+  FILE_SIGNATURES: 'file_signatures',
+  
   // Phase 2: Core Business Logic Tables
   LOAN_APPLICATIONS: 'loan_applications',
   LOAN_PRODUCTS: 'loan_products',
@@ -37,6 +42,10 @@ export const SUPABASE_TABLES = {
   TASK_COMMENTS: 'task_comments',
   TASK_ATTACHMENTS: 'task_attachments',
   
+  // Core Business Tables
+  EMPLOYMENT_TYPES: 'employment_types',
+  TASK_SLA_POLICIES: 'task_sla_policies',
+  
   // Phase 4: Workload Planning Tables
   WORKLOAD_SCHEDULES: 'workload_schedules',
   WORKLOAD_ASSIGNMENTS: 'workload_assignments',
@@ -44,6 +53,12 @@ export const SUPABASE_TABLES = {
   // Phase 5: Approval Queue System Tables
   APPROVAL_QUEUES: 'approval_queues',
   APPROVAL_QUEUE_ITEMS: 'approval_queue_items',
+  
+  // Workflow & Case Management Tables
+  CASE_STATUS_HISTORY: 'case_status_history',
+  CASE_WORKFLOW_STAGE: 'case_workflow_stage',
+  ASSIGN_CASE_SETTING: 'assign_case_setting',
+  ASSIGN_PERMISSION: 'assign_permission',
   
   // Phase 6: Compliance Management Tables
   COMPLIANCE_ISSUE_TYPES: 'compliance_issue_types',
@@ -59,6 +74,29 @@ export const SUPABASE_TABLES = {
   SYSTEM_INTEGRATIONS: 'system_integrations',
   SYSTEM_SETTINGS: 'system_settings',
   ORGANIZATION_SETTINGS: 'organization_settings',
+  
+  // Background Processing Tables
+  JOBS: 'jobs',
+  JOB_BATCHES: 'job_batches',
+  FAILED_JOBS: 'failed_jobs',
+  THIRD_PARTY_API_LOG: 'third_party_api_log',
+  WEBHOOKS: 'webhooks',
+  
+  // Authentication & System Tables
+  AUTH_ACCOUNTS: 'auth_accounts',
+  SESSIONS: 'sessions',
+  USER_ROLES: 'user_roles',
+  PASSWORD_RESET_TOKENS: 'password_reset_tokens',
+  PERSONAL_ACCESS_TOKENS: 'personal_access_tokens',
+  AUTH_AUDIT_LOG: 'auth_audit_log',
+  API_RATE_LIMITS: 'api_rate_limits',
+  
+  // Caching & Performance Tables
+  CACHE: 'cache',
+  CACHE_LOCKS: 'cache_locks',
+  MIGRATIONS: 'migrations',
+  CACHE_STATISTICS: 'cache_statistics',
+  CACHE_INVALIDATION_LOGS: 'cache_invalidation_logs',
   
   // Tables that don't exist in Supabase but we need
   // We'll create these or use alternatives
@@ -258,6 +296,81 @@ export function mapFileData(fileData: any) {
     metadata: fileData.metadata,
     createdAt: fileData.created_at,
     updatedAt: fileData.updated_at,
+  };
+}
+
+export function mapFolderData(folderData: any) {
+  return {
+    id: folderData.id,
+    name: folderData.name,
+    description: folderData.description,
+    parentFolderId: folderData.parent_folder_id,
+    organizationId: folderData.organization_id,
+    createdBy: folderData.created_by,
+    isActive: folderData.is_active || true,
+    metadata: folderData.metadata,
+    createdAt: folderData.created_at,
+    updatedAt: folderData.updated_at,
+  };
+}
+
+export function mapDocumentAgainstProductData(data: any) {
+  return {
+    id: data.id,
+    productId: data.product_id,
+    documentTypeId: data.document_type_id,
+    isRequired: data.is_required || false,
+    priority: data.priority || 'medium',
+    validityPeriod: data.validity_period,
+    isActive: data.is_active || true,
+    metadata: data.metadata,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+    product: data.products ? mapProductData(data.products) : undefined,
+    documentType: data.document_types ? mapDocumentTypeData(data.document_types) : undefined,
+  };
+}
+
+export function mapDocAgainstSubProductData(data: any) {
+  return {
+    id: data.id,
+    subProductId: data.sub_product_id,
+    documentTypeId: data.document_type_id,
+    isRequired: data.is_required || false,
+    priority: data.priority || 'medium',
+    validityPeriod: data.validity_period,
+    isActive: data.is_active || true,
+    metadata: data.metadata,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+    subProduct: data.sub_products ? mapSubProductData(data.sub_products) : undefined,
+    documentType: data.document_types ? mapDocumentTypeData(data.document_types) : undefined,
+  };
+}
+
+export function mapFileSignatureData(data: any) {
+  return {
+    id: data.id,
+    fileId: data.file_id,
+    userId: data.user_id,
+    signatureType: data.signature_type || 'electronic',
+    signatureData: data.signature_data,
+    signatureMethod: data.signature_method || 'password',
+    isVerified: data.is_verified || false,
+    verifiedAt: data.verified_at,
+    verifiedBy: data.verified_by,
+    expiresAt: data.expires_at,
+    metadata: data.metadata,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+    file: data.files ? mapFileData(data.files) : undefined,
+    user: data.users ? {
+      id: data.users.id,
+      name: data.users.full_name || data.users.name,
+      email: data.users.email,
+      role: data.users.role as 'salesperson' | 'manager' | 'credit-ops' | 'admin',
+      avatar: data.users.avatar
+    } : undefined,
   };
 }
 
@@ -922,5 +1035,581 @@ export function mapUserSessionData(userSessionData: any) {
     metadata: userSessionData.metadata,
     createdAt: userSessionData.created_at,
     updatedAt: userSessionData.updated_at,
+  };
+}
+
+// =============================================================================
+// CORE BUSINESS TABLE MAPPING FUNCTIONS
+// =============================================================================
+
+export function mapEmploymentTypeData(employmentTypeData: any) {
+  return {
+    id: employmentTypeData.id,
+    name: employmentTypeData.name,
+    code: employmentTypeData.code,
+    description: employmentTypeData.description,
+    isActive: employmentTypeData.is_active || true,
+    metadata: employmentTypeData.metadata,
+    createdAt: employmentTypeData.created_at,
+    updatedAt: employmentTypeData.updated_at,
+  };
+}
+
+export function mapTaskTypeData(taskTypeData: any) {
+  return {
+    id: taskTypeData.id,
+    name: taskTypeData.name,
+    code: taskTypeData.code,
+    description: taskTypeData.description,
+    category: taskTypeData.category,
+    isActive: taskTypeData.is_active || true,
+    metadata: taskTypeData.metadata,
+    createdAt: taskTypeData.created_at,
+    updatedAt: taskTypeData.updated_at,
+  };
+}
+
+export function mapTaskSlaPolicyData(taskSlaPolicyData: any) {
+  return {
+    id: taskSlaPolicyData.id,
+    name: taskSlaPolicyData.name,
+    description: taskSlaPolicyData.description,
+    taskTypeId: taskSlaPolicyData.task_type_id,
+    departmentId: taskSlaPolicyData.department_id,
+    priority: taskSlaPolicyData.priority,
+    slaHours: taskSlaPolicyData.sla_hours,
+    escalationHours: taskSlaPolicyData.escalation_hours,
+    isActive: taskSlaPolicyData.is_active || true,
+    metadata: taskSlaPolicyData.metadata,
+    createdAt: taskSlaPolicyData.created_at,
+    updatedAt: taskSlaPolicyData.updated_at,
+  };
+}
+
+export function mapDepartmentData(departmentData: any) {
+  return {
+    id: departmentData.id,
+    name: departmentData.name,
+    code: departmentData.code,
+    description: departmentData.description,
+    departmentType: departmentData.department_type,
+    parentDepartmentId: departmentData.parent_department_id,
+    managerId: departmentData.manager_id,
+    isActive: departmentData.is_active || true,
+    metadata: departmentData.metadata,
+    createdAt: departmentData.created_at,
+    updatedAt: departmentData.updated_at,
+  };
+}
+
+// =============================================================================
+// WORKFLOW & CASE MANAGEMENT MAPPING FUNCTIONS
+// =============================================================================
+
+export function mapCaseStatusHistoryData(historyData: any) {
+  return {
+    id: historyData.id,
+    case_id: historyData.case_id,
+    status: historyData.status,
+    previous_status: historyData.previous_status,
+    changed_by: historyData.changed_by,
+    changed_at: historyData.changed_at,
+    reason: historyData.reason,
+    notes: historyData.notes,
+    metadata: historyData.metadata,
+    created_at: historyData.created_at,
+    updated_at: historyData.updated_at,
+    case: historyData.cases ? {
+      id: historyData.cases.id,
+      caseNumber: historyData.cases.case_number || historyData.cases.application_number,
+      customer: {
+        id: historyData.cases.customer_id,
+        userId: historyData.cases.customer_id,
+        name: 'Customer',
+        phone: '',
+        email: '',
+        panNumber: '',
+        aadhaarNumber: '',
+        dateOfBirth: '',
+        gender: '',
+        maritalStatus: 'single' as const,
+        employment: 'salaried' as const,
+        riskProfile: 'medium' as const,
+        kycStatus: 'pending' as const,
+        age: 0,
+        createdAt: historyData.cases.created_at,
+        updatedAt: historyData.cases.updated_at
+      },
+      assignedTo: historyData.cases.assigned_sales_agent || '',
+      status: historyData.cases.status,
+      documents: [],
+      whatsappMessages: [],
+      complianceLog: [],
+      createdAt: historyData.cases.created_at,
+      updatedAt: historyData.cases.updated_at,
+      priority: historyData.cases.priority || 'medium' as const,
+      loanAmount: historyData.cases.requested_amount,
+      loanType: historyData.cases.purpose
+    } : undefined,
+    user: historyData.users ? {
+      id: historyData.users.id,
+      name: historyData.users.full_name || historyData.users.name,
+      email: historyData.users.email,
+      role: historyData.users.role as 'salesperson' | 'manager' | 'credit-ops' | 'admin',
+      avatar: historyData.users.avatar
+    } : undefined,
+  };
+}
+
+export function mapCaseWorkflowStageData(stageData: any) {
+  return {
+    id: stageData.id,
+    case_id: stageData.case_id,
+    stage_name: stageData.stage_name,
+    stage_order: stageData.stage_order,
+    is_active: stageData.is_active || false,
+    started_at: stageData.started_at,
+    completed_at: stageData.completed_at,
+    assigned_to: stageData.assigned_to,
+    stage_data: stageData.stage_data,
+    created_at: stageData.created_at,
+    updated_at: stageData.updated_at,
+    case: stageData.cases ? {
+      id: stageData.cases.id,
+      caseNumber: stageData.cases.case_number || stageData.cases.application_number,
+      customer: {
+        id: stageData.cases.customer_id,
+        userId: stageData.cases.customer_id,
+        name: 'Customer',
+        phone: '',
+        email: '',
+        panNumber: '',
+        aadhaarNumber: '',
+        dateOfBirth: '',
+        gender: '',
+        maritalStatus: 'single' as const,
+        employment: 'salaried' as const,
+        riskProfile: 'medium' as const,
+        kycStatus: 'pending' as const,
+        age: 0,
+        createdAt: stageData.cases.created_at,
+        updatedAt: stageData.cases.updated_at
+      },
+      assignedTo: stageData.cases.assigned_sales_agent || '',
+      status: stageData.cases.status,
+      documents: [],
+      whatsappMessages: [],
+      complianceLog: [],
+      createdAt: stageData.cases.created_at,
+      updatedAt: stageData.cases.updated_at,
+      priority: stageData.cases.priority || 'medium' as const,
+      loanAmount: stageData.cases.requested_amount,
+      loanType: stageData.cases.purpose
+    } : undefined,
+    user: stageData.users ? {
+      id: stageData.users.id,
+      name: stageData.users.full_name || stageData.users.name,
+      email: stageData.users.email,
+      role: stageData.users.role as 'salesperson' | 'manager' | 'credit-ops' | 'admin',
+      avatar: stageData.users.avatar
+    } : undefined,
+  };
+}
+
+export function mapAssignCaseSettingData(settingData: any) {
+  return {
+    id: settingData.id,
+    setting_name: settingData.setting_name,
+    setting_value: settingData.setting_value,
+    description: settingData.description,
+    is_active: settingData.is_active || true,
+    priority: settingData.priority || 0,
+    conditions: settingData.conditions,
+    created_at: settingData.created_at,
+    updated_at: settingData.updated_at,
+  };
+}
+
+export function mapAssignPermissionData(permissionData: any) {
+  return {
+    id: permissionData.id,
+    role_id: permissionData.role_id,
+    permission_id: permissionData.permission_id,
+    can_assign: permissionData.can_assign || false,
+    can_reassign: permissionData.can_reassign || false,
+    can_approve: permissionData.can_approve || false,
+    can_reject: permissionData.can_reject || false,
+    conditions: permissionData.conditions,
+    created_at: permissionData.created_at,
+    updated_at: permissionData.updated_at,
+    role: permissionData.roles ? mapRoleData(permissionData.roles) : undefined,
+    permission: permissionData.permissions ? mapPermissionData(permissionData.permissions) : undefined,
+  };
+}
+
+// =============================================================================
+// BACKGROUND PROCESSING MAPPING FUNCTIONS
+// =============================================================================
+
+export function mapJobData(jobData: any) {
+  return {
+    id: jobData.id,
+    organizationId: jobData.organization_id,
+    jobType: jobData.job_type,
+    jobName: jobData.job_name,
+    payload: jobData.payload,
+    status: jobData.status,
+    priority: jobData.priority || 'normal',
+    attempts: jobData.attempts || 0,
+    maxAttempts: jobData.max_attempts || 3,
+    availableAt: jobData.available_at,
+    startedAt: jobData.started_at,
+    completedAt: jobData.completed_at,
+    failedAt: jobData.failed_at,
+    errorMessage: jobData.error_message,
+    errorDetails: jobData.error_details,
+    batchId: jobData.batch_id,
+    metadata: jobData.metadata,
+    createdAt: jobData.created_at,
+    updatedAt: jobData.updated_at,
+  };
+}
+
+export function mapJobBatchData(batchData: any) {
+  return {
+    id: batchData.id,
+    organizationId: batchData.organization_id,
+    batchName: batchData.batch_name,
+    totalJobs: batchData.total_jobs,
+    pendingJobs: batchData.pending_jobs,
+    processedJobs: batchData.processed_jobs,
+    failedJobs: batchData.failed_jobs,
+    status: batchData.status,
+    progress: batchData.progress || 0,
+    startedAt: batchData.started_at,
+    completedAt: batchData.completed_at,
+    cancelledAt: batchData.cancelled_at,
+    metadata: batchData.metadata,
+    createdAt: batchData.created_at,
+    updatedAt: batchData.updated_at,
+  };
+}
+
+export function mapFailedJobData(failedJobData: any) {
+  return {
+    id: failedJobData.id,
+    jobId: failedJobData.job_id,
+    organizationId: failedJobData.organization_id,
+    jobType: failedJobData.job_type,
+    jobName: failedJobData.job_name,
+    payload: failedJobData.payload,
+    errorMessage: failedJobData.error_message,
+    errorDetails: failedJobData.error_details,
+    stackTrace: failedJobData.stack_trace,
+    failedAt: failedJobData.failed_at,
+    retryCount: failedJobData.retry_count || 0,
+    maxRetries: failedJobData.max_retries || 3,
+    isResolved: failedJobData.is_resolved || false,
+    resolvedAt: failedJobData.resolved_at,
+    resolvedBy: failedJobData.resolved_by,
+    resolution: failedJobData.resolution,
+    metadata: failedJobData.metadata,
+    createdAt: failedJobData.created_at,
+    updatedAt: failedJobData.updated_at,
+  };
+}
+
+export function mapThirdPartyApiLogData(apiLogData: any) {
+  return {
+    id: apiLogData.id,
+    organizationId: apiLogData.organization_id,
+    integrationId: apiLogData.integration_id,
+    apiName: apiLogData.api_name,
+    endpoint: apiLogData.endpoint,
+    method: apiLogData.method,
+    requestPayload: apiLogData.request_payload,
+    responsePayload: apiLogData.response_payload,
+    statusCode: apiLogData.status_code,
+    responseTime: apiLogData.response_time,
+    status: apiLogData.status,
+    errorMessage: apiLogData.error_message,
+    retryCount: apiLogData.retry_count || 0,
+    isSuccess: apiLogData.is_success || false,
+    metadata: apiLogData.metadata,
+    createdAt: apiLogData.created_at,
+    updatedAt: apiLogData.updated_at,
+  };
+}
+
+export function mapWebhookData(webhookData: any) {
+  return {
+    id: webhookData.id,
+    organizationId: webhookData.organization_id,
+    webhookName: webhookData.webhook_name,
+    webhookUrl: webhookData.webhook_url,
+    eventType: webhookData.event_type,
+    status: webhookData.status,
+    isActive: webhookData.is_active || true,
+    secret: webhookData.secret,
+    headers: webhookData.headers,
+    retryCount: webhookData.retry_count || 0,
+    maxRetries: webhookData.max_retries || 3,
+    timeout: webhookData.timeout || 30,
+    lastTriggeredAt: webhookData.last_triggered_at,
+    lastSuccessAt: webhookData.last_success_at,
+    lastFailureAt: webhookData.last_failure_at,
+    failureCount: webhookData.failure_count || 0,
+    metadata: webhookData.metadata,
+    createdAt: webhookData.created_at,
+    updatedAt: webhookData.updated_at,
+  };
+}
+
+// =============================================================================
+// AUTHENTICATION & SYSTEM MAPPING FUNCTIONS
+// =============================================================================
+
+export function mapAuthAccountData(authAccountData: any) {
+  return {
+    id: authAccountData.id,
+    userId: authAccountData.user_id,
+    provider: authAccountData.provider || 'email',
+    providerAccountId: authAccountData.provider_account_id,
+    email: authAccountData.email,
+    passwordHash: authAccountData.password_hash,
+    salt: authAccountData.salt,
+    emailVerified: authAccountData.email_verified || false,
+    emailVerifiedAt: authAccountData.email_verified_at,
+    phoneVerified: authAccountData.phone_verified || false,
+    phoneVerifiedAt: authAccountData.phone_verified_at,
+    twoFactorEnabled: authAccountData.two_factor_enabled || false,
+    twoFactorSecret: authAccountData.two_factor_secret,
+    backupCodes: authAccountData.backup_codes || [],
+    failedLoginAttempts: authAccountData.failed_login_attempts || 0,
+    lockedUntil: authAccountData.locked_until,
+    lastLoginAt: authAccountData.last_login_at,
+    lastLoginIp: authAccountData.last_login_ip,
+    lastLoginUserAgent: authAccountData.last_login_user_agent,
+    isActive: authAccountData.is_active || true,
+    metadata: authAccountData.metadata || {},
+    createdAt: authAccountData.created_at,
+    updatedAt: authAccountData.updated_at,
+  };
+}
+
+export function mapSessionData(sessionData: any) {
+  return {
+    id: sessionData.id,
+    userId: sessionData.user_id,
+    sessionToken: sessionData.session_token,
+    refreshToken: sessionData.refresh_token,
+    ipAddress: sessionData.ip_address,
+    userAgent: sessionData.user_agent,
+    deviceInfo: sessionData.device_info || {},
+    locationInfo: sessionData.location_info || {},
+    loginAt: sessionData.login_at,
+    lastActivityAt: sessionData.last_activity_at,
+    expiresAt: sessionData.expires_at,
+    logoutAt: sessionData.logout_at,
+    isActive: sessionData.is_active || true,
+    isRemembered: sessionData.is_remembered || false,
+    metadata: sessionData.metadata || {},
+    createdAt: sessionData.created_at,
+    updatedAt: sessionData.updated_at,
+  };
+}
+
+export function mapUserRoleData(userRoleData: any) {
+  return {
+    id: userRoleData.id,
+    userId: userRoleData.user_id,
+    roleId: userRoleData.role_id,
+    organizationId: userRoleData.organization_id,
+    departmentId: userRoleData.department_id,
+    assignedBy: userRoleData.assigned_by,
+    assignedAt: userRoleData.assigned_at,
+    revokedAt: userRoleData.revoked_at,
+    revokedBy: userRoleData.revoked_by,
+    isActive: userRoleData.is_active || true,
+    isPrimary: userRoleData.is_primary || false,
+    metadata: userRoleData.metadata || {},
+    createdAt: userRoleData.created_at,
+    updatedAt: userRoleData.updated_at,
+    role: userRoleData.roles ? mapRoleData(userRoleData.roles) : undefined,
+    user: userRoleData.users ? {
+      id: userRoleData.users.id,
+      name: userRoleData.users.full_name || userRoleData.users.name,
+      email: userRoleData.users.email,
+      role: userRoleData.users.role as 'salesperson' | 'manager' | 'credit-ops' | 'admin',
+      avatar: userRoleData.users.avatar
+    } : undefined,
+  };
+}
+
+export function mapPasswordResetTokenData(tokenData: any) {
+  return {
+    id: tokenData.id,
+    userId: tokenData.user_id,
+    token: tokenData.token,
+    tokenHash: tokenData.token_hash,
+    expiresAt: tokenData.expires_at,
+    usedAt: tokenData.used_at,
+    ipAddress: tokenData.ip_address,
+    userAgent: tokenData.user_agent,
+    isUsed: tokenData.is_used || false,
+    createdAt: tokenData.created_at,
+    updatedAt: tokenData.updated_at,
+  };
+}
+
+export function mapPersonalAccessTokenData(tokenData: any) {
+  return {
+    id: tokenData.id,
+    userId: tokenData.user_id,
+    name: tokenData.name,
+    tokenHash: tokenData.token_hash,
+    tokenPreview: tokenData.token_preview,
+    scopes: tokenData.scopes || [],
+    lastUsedAt: tokenData.last_used_at,
+    lastUsedIp: tokenData.last_used_ip,
+    lastUsedUserAgent: tokenData.last_used_user_agent,
+    expiresAt: tokenData.expires_at,
+    revokedAt: tokenData.revoked_at,
+    revokedBy: tokenData.revoked_by,
+    isActive: tokenData.is_active || true,
+    metadata: tokenData.metadata || {},
+    createdAt: tokenData.created_at,
+    updatedAt: tokenData.updated_at,
+  };
+}
+
+export function mapAuthAuditLogData(auditLogData: any) {
+  return {
+    id: auditLogData.id,
+    userId: auditLogData.user_id,
+    sessionId: auditLogData.session_id,
+    eventType: auditLogData.event_type,
+    eventDescription: auditLogData.event_description,
+    ipAddress: auditLogData.ip_address,
+    userAgent: auditLogData.user_agent,
+    deviceInfo: auditLogData.device_info || {},
+    locationInfo: auditLogData.location_info || {},
+    success: auditLogData.success,
+    failureReason: auditLogData.failure_reason,
+    metadata: auditLogData.metadata || {},
+    createdAt: auditLogData.created_at,
+  };
+}
+
+export function mapApiRateLimitData(rateLimitData: any) {
+  return {
+    id: rateLimitData.id,
+    userId: rateLimitData.user_id,
+    tokenId: rateLimitData.token_id,
+    endpoint: rateLimitData.endpoint,
+    requestsCount: rateLimitData.requests_count || 0,
+    windowStart: rateLimitData.window_start,
+    windowDuration: rateLimitData.window_duration,
+    maxRequests: rateLimitData.max_requests || 1000,
+    isBlocked: rateLimitData.is_blocked || false,
+    blockedUntil: rateLimitData.blocked_until,
+    metadata: rateLimitData.metadata || {},
+    createdAt: rateLimitData.created_at,
+    updatedAt: rateLimitData.updated_at,
+  };
+}
+
+// =============================================================================
+// CACHING & PERFORMANCE MAPPING FUNCTIONS
+// =============================================================================
+
+export function mapCacheData(cacheData: any) {
+  return {
+    id: cacheData.id,
+    organizationId: cacheData.organization_id,
+    cacheKey: cacheData.cache_key,
+    cacheValue: cacheData.cache_value,
+    cacheType: cacheData.cache_type || 'general',
+    tags: cacheData.tags || [],
+    expiresAt: cacheData.expires_at,
+    createdAt: cacheData.created_at,
+    updatedAt: cacheData.updated_at,
+    accessedAt: cacheData.accessed_at,
+    accessCount: cacheData.access_count || 0,
+    sizeBytes: cacheData.size_bytes || 0,
+    isCompressed: cacheData.is_compressed || false,
+    compressionType: cacheData.compression_type,
+    metadata: cacheData.metadata || {},
+  };
+}
+
+export function mapCacheLockData(lockData: any) {
+  return {
+    id: lockData.id,
+    organizationId: lockData.organization_id,
+    lockKey: lockData.lock_key,
+    lockType: lockData.lock_type || 'exclusive',
+    lockedBy: lockData.locked_by,
+    lockedAt: lockData.locked_at,
+    expiresAt: lockData.expires_at,
+    acquiredCount: lockData.acquired_count || 1,
+    metadata: lockData.metadata || {},
+  };
+}
+
+export function mapMigrationData(migrationData: any) {
+  return {
+    id: migrationData.id,
+    migrationName: migrationData.migration_name,
+    migrationVersion: migrationData.migration_version,
+    migrationType: migrationData.migration_type || 'schema',
+    description: migrationData.description,
+    sqlContent: migrationData.sql_content,
+    checksum: migrationData.checksum,
+    appliedAt: migrationData.applied_at,
+    appliedBy: migrationData.applied_by,
+    executionTimeMs: migrationData.execution_time_ms || 0,
+    status: migrationData.status || 'success',
+    errorMessage: migrationData.error_message,
+    rollbackSql: migrationData.rollback_sql,
+    rollbackAppliedAt: migrationData.rollback_applied_at,
+    rollbackAppliedBy: migrationData.rollback_applied_by,
+    dependencies: migrationData.dependencies || [],
+    metadata: migrationData.metadata || {},
+  };
+}
+
+export function mapCacheStatisticsData(statsData: any) {
+  return {
+    id: statsData.id,
+    organizationId: statsData.organization_id,
+    cacheType: statsData.cache_type,
+    date: statsData.date,
+    totalRequests: statsData.total_requests || 0,
+    cacheHits: statsData.cache_hits || 0,
+    cacheMisses: statsData.cache_misses || 0,
+    totalSizeBytes: statsData.total_size_bytes || 0,
+    averageResponseTimeMs: parseFloat(statsData.average_response_time_ms) || 0,
+    peakMemoryUsageBytes: statsData.peak_memory_usage_bytes || 0,
+    evictionCount: statsData.eviction_count || 0,
+    errorCount: statsData.error_count || 0,
+    createdAt: statsData.created_at,
+    updatedAt: statsData.updated_at,
+  };
+}
+
+export function mapCacheInvalidationLogData(logData: any) {
+  return {
+    id: logData.id,
+    organizationId: logData.organization_id,
+    cacheKey: logData.cache_key,
+    invalidationType: logData.invalidation_type,
+    invalidationReason: logData.invalidation_reason,
+    invalidatedBy: logData.invalidated_by,
+    invalidatedAt: logData.invalidated_at,
+    affectedTags: logData.affected_tags || [],
+    cacheSizeBefore: logData.cache_size_before || 0,
+    cacheSizeAfter: logData.cache_size_after || 0,
+    metadata: logData.metadata || {},
   };
 }

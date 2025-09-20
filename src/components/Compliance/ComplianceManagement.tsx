@@ -17,6 +17,8 @@ import { ComplianceIssuesPage } from './ComplianceIssuesPage';
 import { ComplianceReportsPage } from './ComplianceReportsPage';
 import { ReportTemplatesPage } from './ReportTemplatesPage';
 import { ComplianceReports } from './ComplianceReports';
+import { useAuth } from '../../contexts/AuthContextFixed';
+import { useComplianceIssues, useComplianceMetrics, useComplianceAlerts } from '../../hooks/useDashboardData';
 
 interface ComplianceManagementProps {
   onBack: () => void;
@@ -25,51 +27,76 @@ interface ComplianceManagementProps {
 type ComplianceView = 'overview' | 'issue-types' | 'issues' | 'reports' | 'templates';
 
 export function ComplianceManagement({ onBack }: ComplianceManagementProps) {
+  const { user } = useAuth();
   const [currentView, setCurrentView] = useState<ComplianceView>('overview');
   const [selectedIssueType, setSelectedIssueType] = useState<string | null>(null);
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
 
+  // Get real compliance data from Supabase
+  const { data: complianceIssuesData, loading: issuesLoading, error: issuesError, refetch: refetchIssues } = useComplianceIssues();
+  const { data: complianceMetricsData, loading: metricsLoading, error: metricsError, refetch: refetchMetrics } = useComplianceMetrics('month');
+  const { data: complianceAlertsData, loading: alertsLoading, error: alertsError, refetch: refetchAlerts } = useComplianceAlerts('month');
+
+  // Calculate compliance stats from real data
   const complianceStats = {
-    totalIssues: 24,
-    openIssues: 8,
-    resolvedIssues: 16,
-    criticalIssues: 3,
-    totalReports: 12,
-    activeTemplates: 6,
-    complianceScore: 98.5
+    totalIssues: complianceIssuesData.length,
+    openIssues: complianceIssuesData.filter(issue => issue.status === 'open').length,
+    resolvedIssues: complianceIssuesData.filter(issue => issue.status === 'resolved').length,
+    criticalIssues: complianceIssuesData.filter(issue => issue.severity === 'high').length,
+    totalReports: 12, // This would come from a reports hook
+    activeTemplates: 6, // This would come from a templates hook
+    complianceScore: 98.5 // This would be calculated from metrics
   };
 
-  const recentIssues = [
-    {
-      id: '1',
-      title: 'Missing KYC Documentation',
-      severity: 'high',
-      status: 'open',
-      caseId: 'CASE001',
-      reportedAt: '2024-01-15',
-      assignedTo: 'John Doe'
-    },
-    {
-      id: '2',
-      title: 'AML Screening Alert',
-      severity: 'critical',
-      status: 'in_progress',
-      caseId: 'CASE002',
-      reportedAt: '2024-01-14',
-      assignedTo: 'Jane Smith'
-    },
-    {
-      id: '3',
-      title: 'Document Verification Failed',
-      severity: 'medium',
-      status: 'resolved',
-      caseId: 'CASE003',
-      reportedAt: '2024-01-13',
-      assignedTo: 'Mike Johnson'
-    }
-  ];
+  const handleRefresh = () => {
+    refetchIssues();
+    refetchMetrics();
+    refetchAlerts();
+  };
+
+  // Loading state
+  if (issuesLoading || metricsLoading || alertsLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading compliance data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (issuesError || metricsError || alertsError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 mb-4">
+            <AlertTriangle className="h-12 w-12 mx-auto mb-2" />
+            <p className="text-lg font-semibold">Error Loading Compliance Data</p>
+            <p className="text-sm text-gray-600 mt-2">{issuesError || metricsError || alertsError}</p>
+          </div>
+          <Button onClick={handleRefresh}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Transform real compliance issues data
+  const recentIssues = complianceIssuesData.slice(0, 5).map(issue => ({
+    id: issue.id,
+    title: issue.title || issue.description || 'Compliance Issue',
+    severity: issue.severity || 'medium',
+    status: issue.status || 'open',
+    caseId: issue.caseId || 'N/A',
+    reportedAt: new Date(issue.createdAt || new Date()).toISOString().split('T')[0],
+    assignedTo: issue.assignedTo || 'Unassigned'
+  }));
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -160,8 +187,8 @@ export function ComplianceManagement({ onBack }: ComplianceManagementProps) {
                   <Plus className="h-4 w-4 mr-2" />
                   Report Issue
                 </Button>
-                <Button variant="outline">
-                  <RefreshCw className="h-4 w-4 mr-2" />
+                <Button variant="outline" onClick={handleRefresh} disabled={issuesLoading || metricsLoading || alertsLoading}>
+                  <RefreshCw className={`h-4 w-4 mr-2 ${(issuesLoading || metricsLoading || alertsLoading) ? 'animate-spin' : ''}`} />
                   Refresh
                 </Button>
               </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Users, Plus, Edit, Trash2, Search, Filter, UserCheck, UserX, Shield, Mail, Phone, Eye } from 'lucide-react';
+import { ArrowLeft, Users, Plus, Edit, Trash2, Search, Filter, UserCheck, UserX, Shield, Mail, Phone, Eye, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -29,117 +29,65 @@ export function UserManagement({ onBack }: UserManagementProps) {
   // Get real team members data from database
   const { teamMembers, loading: usersLoading, error: usersError, refetch: refetchUsers } = useTeamMembers((user as any)?.organization_id);
 
-  // Mock users data (fallback)
-  const mockUsers = [
-    {
-      id: '1',
-      name: 'Priya Sharma',
-      email: 'priya.sharma@happybank.in',
-      role: 'salesperson',
-      status: 'active',
-      lastLogin: '2025-01-09T15:30:00Z',
-      casesAssigned: 8,
-      performance: '94%',
-      joinDate: '2024-03-15',
-      phone: '+91-9876543220'
-    },
-    {
-      id: '2',
-      name: 'Rajesh Kumar',
-      email: 'rajesh.kumar@happybank.in',
-      role: 'manager',
-      status: 'active',
-      lastLogin: '2025-01-09T14:45:00Z',
-      casesAssigned: 0,
-      performance: '97%',
-      joinDate: '2023-08-10',
-      phone: '+91-9876543221'
-    },
-    {
-      id: '3',
-      name: 'Anita Patel',
-      email: 'anita.patel@happybank.in',
-      role: 'credit-ops',
-      status: 'active',
-      lastLogin: '2025-01-09T16:00:00Z',
-      casesAssigned: 23,
-      performance: '98%',
-      joinDate: '2023-11-20',
-      phone: '+91-9876543222'
-    },
-    {
-      id: '4',
-      name: 'Dr. Suresh Krishnamurthy',
-      email: 'suresh.krishnamurthy@happybank.in',
-      role: 'admin',
-      status: 'active',
-      lastLogin: '2025-01-09T16:15:00Z',
-      casesAssigned: 0,
-      performance: '100%',
-      joinDate: '2022-01-05',
-      phone: '+91-9876543223'
-    },
-    {
-      id: '5',
-      name: 'Vikram Joshi',
-      email: 'vikram.joshi@happybank.in',
-      role: 'salesperson',
-      status: 'active',
-      lastLogin: '2025-01-09T13:20:00Z',
-      casesAssigned: 6,
-      performance: '91%',
-      joinDate: '2024-01-12',
-      phone: '+91-9876543224'
-    },
-    {
-      id: '6',
-      name: 'Meera Nair',
-      email: 'meera.nair@happybank.in',
-      role: 'salesperson',
-      status: 'inactive',
-      lastLogin: '2025-01-07T18:30:00Z',
-      casesAssigned: 10,
-      performance: '87%',
-      joinDate: '2024-05-08',
-      phone: '+91-9876543225'
-    }
-  ];
-
-  // Transform team members data to match expected format
-  const transformedTeamMembers = teamMembers.map(member => ({
+  // Transform real team members data
+  const users = teamMembers.map((member: any) => ({
     id: member.id,
-    name: member.name,
-    email: member.email || '',
-    role: member.role,
-    status: (member as any).status || 'active',
-    lastLogin: new Date().toISOString(),
-    casesAssigned: (member as any).cases || 0,
-    performance: (member as any).efficiency || '85%',
-    joinDate: new Date((member as any).created_at || new Date()).toISOString().split('T')[0],
-    phone: (member as any).phone || '+91-0000000000'
+    name: member.full_name || member.name,
+    email: member.email,
+    role: member.role || 'user',
+    status: member.status || 'active',
+    lastLogin: member.last_login_at || new Date().toISOString(),
+    casesAssigned: 0, // This would need to be calculated from cases
+    performance: '95%', // This would need to be calculated
+    joinDate: new Date(member.created_at || new Date()).toISOString().split('T')[0],
+    phone: member.mobile || 'N/A'
   }));
 
-  // Use dynamic team members if available, otherwise fallback to mock
-  const allUsers = transformedTeamMembers.length > 0 ? transformedTeamMembers : mockUsers;
-  
-  // Debug: Log data source
-  console.log('UserManagement - Using dynamic data:', transformedTeamMembers.length > 0);
-  console.log('UserManagement - Team members from DB:', transformedTeamMembers);
-
   const userStats = [
-    { label: 'Total Users', value: allUsers.length, color: 'blue' },
-    { label: 'Active Users', value: allUsers.filter(u => u.status === 'active').length, color: 'green' },
-    { label: 'Salespeople', value: allUsers.filter(u => u.role === 'salesperson').length, color: 'purple' },
-    { label: 'Managers', value: allUsers.filter(u => u.role === 'manager').length, color: 'orange' }
+    { label: 'Total Users', value: users.length, color: 'blue' },
+    { label: 'Active Users', value: users.filter(u => u.status === 'active').length, color: 'green' },
+    { label: 'Salespeople', value: users.filter(u => u.role === 'salesperson').length, color: 'purple' },
+    { label: 'Managers', value: users.filter(u => u.role === 'manager').length, color: 'orange' }
   ];
 
-  const filteredUsers = allUsers.filter(user => {
+  const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.phone.includes(searchTerm);
     const matchesRole = selectedRole === 'all' || user.role === selectedRole;
     return matchesSearch && matchesRole;
   });
+
+  // Loading state
+  if (usersLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading users...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (usersError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 mb-4">
+            <AlertTriangle className="h-12 w-12 mx-auto mb-2" />
+            <p className="text-lg font-semibold">Error Loading Users</p>
+            <p className="text-sm text-gray-600 mt-2">{usersError}</p>
+          </div>
+          <Button onClick={refetchUsers}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const getRoleBadge = (role: string) => {
     switch (role) {
@@ -432,7 +380,7 @@ export function UserManagement({ onBack }: UserManagementProps) {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-start space-x-4">
                     <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-                      {user.name.split(' ').map(n => n[0]).join('')}
+                      {user.name.split(' ').map((n: string) => n[0]).join('')}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center space-x-3 mb-2">

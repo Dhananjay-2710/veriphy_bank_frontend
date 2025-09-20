@@ -11,6 +11,10 @@ import {
   mapSubProductData,
   mapDocumentTypeData,
   mapFileData,
+  mapFolderData,
+  mapDocumentAgainstProductData,
+  mapDocAgainstSubProductData,
+  mapFileSignatureData,
   mapWorkflowStageData,
   mapWorkflowTransitionData,
   mapWorkflowHistoryData,
@@ -30,7 +34,27 @@ import {
   mapWorkloadScheduleData,
   mapWorkloadAssignmentData,
   mapApprovalQueueData,
-  mapApprovalQueueItemData
+  mapApprovalQueueItemData,
+  mapCaseStatusHistoryData,
+  mapCaseWorkflowStageData,
+  mapAssignCaseSettingData,
+  mapAssignPermissionData,
+  mapJobData,
+  mapJobBatchData,
+  mapFailedJobData,
+  mapThirdPartyApiLogData,
+  mapWebhookData,
+  mapAuthAccountData,
+  mapSessionData,
+  mapUserRoleData,
+  mapPasswordResetTokenData,
+  mapPersonalAccessTokenData,
+  mapAuthAuditLogData,
+  mapCacheData,
+  mapCacheLockData,
+  mapMigrationData,
+  mapCacheStatisticsData,
+  mapCacheInvalidationLogData
 } from './supabase-schema-mapping';
 
 // =============================================================================
@@ -311,20 +335,28 @@ export class SupabaseDatabaseService {
         caseNumber: case_.case_number || `CASE-${case_.id}`,
         customer: {
           id: customer?.id || '',
+          userId: customer?.id || '',
           name: customer?.full_name || 'Unknown Customer',
           phone: customer?.mobile || '',
           email: customer?.email || '',
+          panNumber: customer?.metadata?.pan_number || '',
+          aadhaarNumber: customer?.metadata?.aadhaar_number || '',
+          dateOfBirth: customer?.dob || '',
+          gender: customer?.metadata?.gender || '',
           age: customer?.dob ? Math.floor((Date.now() - new Date(customer.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 0,
           maritalStatus: customer?.metadata?.marital_status || 'single',
           employment: customer?.metadata?.employment_type || 'salaried',
-          loanType: product?.name || 'Personal Loan',
-          loanAmount: case_.metadata?.requested_amount || 0,
           riskProfile: customer?.metadata?.risk_profile || 'low',
+          kycStatus: customer?.kyc_status || 'pending',
+          metadata: customer?.metadata || {},
           createdAt: case_.created_at,
+          updatedAt: case_.updated_at,
         },
         assignedTo: case_.assigned_to || '',
         status: mapCaseToLoanApplication(case_).status as "new" | "in-progress" | "review" | "approved" | "rejected",
         priority: mapCaseToLoanApplication(case_).priority as "low" | "medium" | "high",
+        loanAmount: case_.metadata?.requested_amount || 0,
+        loanType: product?.name || 'Personal Loan',
         createdAt: case_.created_at,
         updatedAt: case_.updated_at,
         documents: [], // Will be fetched separately
@@ -389,20 +421,28 @@ export class SupabaseDatabaseService {
       caseNumber: data.case_number,
       customer: {
         id: customer?.id || '',
+        userId: customer?.id || '',
         name: customer?.full_name || '',
         phone: customer?.mobile || '',
         email: customer?.email || '',
+        panNumber: customer?.metadata?.pan_number || '',
+        aadhaarNumber: customer?.metadata?.aadhaar_number || '',
+        dateOfBirth: customer?.dob || '',
+        gender: customer?.metadata?.gender || '',
         age: customer?.dob ? Math.floor((Date.now() - new Date(customer.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 0,
         maritalStatus: customer?.metadata?.marital_status || 'single',
         employment: customer?.metadata?.employment_type || 'salaried',
-        loanType: product?.name || '',
-        loanAmount: data.metadata?.requested_amount || 0,
         riskProfile: customer?.metadata?.risk_profile || 'low',
+        kycStatus: customer?.kyc_status || 'pending',
+        metadata: customer?.metadata || {},
         createdAt: data.created_at,
+        updatedAt: data.updated_at,
       },
       assignedTo: data.assigned_to || '',
       status: mapCaseToLoanApplication(data).status as "new" | "in-progress" | "review" | "approved" | "rejected",
       priority: mapCaseToLoanApplication(data).priority as "low" | "medium" | "high",
+      loanAmount: data.metadata?.requested_amount || 0,
+      loanType: product?.name || 'Personal Loan',
       createdAt: data.created_at,
       updatedAt: data.updated_at,
       documents: [], // Will be fetched separately
@@ -2714,6 +2754,631 @@ export class SupabaseDatabaseService {
   }
 
   // =============================================================================
+  // DOCUMENT MANAGEMENT METHODS
+  // =============================================================================
+
+  // Folder Management
+  static async getFolders(filters?: { 
+    organizationId?: string; 
+    parentFolderId?: string | null; 
+    isActive?: boolean;
+    createdBy?: string;
+  }) {
+    console.log('Fetching folders with filters:', filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.FOLDERS)
+      .select(`
+        id,
+        name,
+        description,
+        parent_folder_id,
+        organization_id,
+        created_by,
+        is_active,
+        metadata,
+        created_at,
+        updated_at
+      `)
+      .order('created_at', { ascending: false });
+
+    if (filters?.organizationId) {
+      query = query.eq('organization_id', filters.organizationId);
+    }
+    if (filters?.parentFolderId !== undefined) {
+      query = query.eq('parent_folder_id', filters.parentFolderId);
+    }
+    if (filters?.isActive !== undefined) {
+      query = query.eq('is_active', filters.isActive);
+    }
+    if (filters?.createdBy) {
+      query = query.eq('created_by', filters.createdBy);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching folders:', error);
+      return [];
+    }
+
+    return data?.map(mapFolderData) || [];
+  }
+
+  static async createFolder(folderData: {
+    name: string;
+    description?: string;
+    parentFolderId?: string;
+    organizationId: string;
+    createdBy: string;
+    metadata?: any;
+  }) {
+    console.log('Creating folder:', folderData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.FOLDERS)
+      .insert({
+        name: folderData.name,
+        description: folderData.description,
+        parent_folder_id: folderData.parentFolderId,
+        organization_id: folderData.organizationId,
+        created_by: folderData.createdBy,
+        is_active: true,
+        metadata: folderData.metadata,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating folder:', error);
+      throw new Error(`Failed to create folder: ${error.message}`);
+    }
+
+    return mapFolderData(data?.[0]);
+  }
+
+  static async updateFolder(folderId: string, updates: Partial<{
+    name?: string;
+    description?: string;
+    parentFolderId?: string;
+    isActive?: boolean;
+    metadata?: any;
+  }>) {
+    console.log('Updating folder:', folderId, updates);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.FOLDERS)
+      .update({
+        ...updates,
+        parent_folder_id: updates.parentFolderId,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', folderId)
+      .select();
+
+    if (error) {
+      console.error('Error updating folder:', error);
+      throw new Error(`Failed to update folder: ${error.message}`);
+    }
+
+    return mapFolderData(data?.[0]);
+  }
+
+  static async deleteFolder(folderId: string) {
+    console.log('Deleting folder:', folderId);
+    
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.FOLDERS)
+      .delete()
+      .eq('id', folderId);
+
+    if (error) {
+      console.error('Error deleting folder:', error);
+      throw new Error(`Failed to delete folder: ${error.message}`);
+    }
+  }
+
+  // Document Against Product Management
+  static async getDocumentAgainstProduct(filters?: { 
+    productId?: string; 
+    documentTypeId?: string; 
+    isRequired?: boolean;
+    isActive?: boolean;
+  }) {
+    console.log('Fetching document against product with filters:', filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.DOCUMENT_AGAINST_PRODUCT)
+      .select(`
+        id,
+        product_id,
+        document_type_id,
+        is_required,
+        priority,
+        validity_period,
+        is_active,
+        metadata,
+        created_at,
+        updated_at,
+        products!inner(
+          id,
+          name,
+          code,
+          description,
+          category,
+          interest_rate,
+          min_amount,
+          max_amount,
+          min_tenure,
+          max_tenure,
+          is_active,
+          metadata,
+          created_at,
+          updated_at
+        ),
+        document_types!inner(
+          id,
+          name,
+          category,
+          description,
+          is_required,
+          priority,
+          validity_period,
+          is_active,
+          metadata,
+          created_at,
+          updated_at
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (filters?.productId) {
+      query = query.eq('product_id', filters.productId);
+    }
+    if (filters?.documentTypeId) {
+      query = query.eq('document_type_id', filters.documentTypeId);
+    }
+    if (filters?.isRequired !== undefined) {
+      query = query.eq('is_required', filters.isRequired);
+    }
+    if (filters?.isActive !== undefined) {
+      query = query.eq('is_active', filters.isActive);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching document against product:', error);
+      return [];
+    }
+
+    return data?.map(mapDocumentAgainstProductData) || [];
+  }
+
+  static async createDocumentAgainstProduct(data: {
+    productId: string;
+    documentTypeId: string;
+    isRequired: boolean;
+    priority: 'high' | 'medium' | 'low';
+    validityPeriod?: number;
+    metadata?: any;
+  }) {
+    console.log('Creating document against product:', data);
+    
+    const { data: result, error } = await supabase
+      .from(SUPABASE_TABLES.DOCUMENT_AGAINST_PRODUCT)
+      .insert({
+        product_id: data.productId,
+        document_type_id: data.documentTypeId,
+        is_required: data.isRequired,
+        priority: data.priority,
+        validity_period: data.validityPeriod,
+        is_active: true,
+        metadata: data.metadata,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating document against product:', error);
+      throw new Error(`Failed to create document against product: ${error.message}`);
+    }
+
+    return mapDocumentAgainstProductData(result?.[0]);
+  }
+
+  static async updateDocumentAgainstProduct(id: string, updates: Partial<{
+    isRequired?: boolean;
+    priority?: 'high' | 'medium' | 'low';
+    validityPeriod?: number;
+    isActive?: boolean;
+    metadata?: any;
+  }>) {
+    console.log('Updating document against product:', id, updates);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.DOCUMENT_AGAINST_PRODUCT)
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select();
+
+    if (error) {
+      console.error('Error updating document against product:', error);
+      throw new Error(`Failed to update document against product: ${error.message}`);
+    }
+
+    return mapDocumentAgainstProductData(data?.[0]);
+  }
+
+  static async deleteDocumentAgainstProduct(id: string) {
+    console.log('Deleting document against product:', id);
+    
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.DOCUMENT_AGAINST_PRODUCT)
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting document against product:', error);
+      throw new Error(`Failed to delete document against product: ${error.message}`);
+    }
+  }
+
+  // Document Against Sub Product Management
+  static async getDocAgainstSubProduct(filters?: { 
+    subProductId?: string; 
+    documentTypeId?: string; 
+    isRequired?: boolean;
+    isActive?: boolean;
+  }) {
+    console.log('Fetching document against sub product with filters:', filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.DOC_AGAINST_SUB_PRODUCT)
+      .select(`
+        id,
+        sub_product_id,
+        document_type_id,
+        is_required,
+        priority,
+        validity_period,
+        is_active,
+        metadata,
+        created_at,
+        updated_at,
+        sub_products!inner(
+          id,
+          product_id,
+          name,
+          code,
+          description,
+          interest_rate,
+          min_amount,
+          max_amount,
+          min_tenure,
+          max_tenure,
+          is_active,
+          metadata,
+          created_at,
+          updated_at
+        ),
+        document_types!inner(
+          id,
+          name,
+          category,
+          description,
+          is_required,
+          priority,
+          validity_period,
+          is_active,
+          metadata,
+          created_at,
+          updated_at
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (filters?.subProductId) {
+      query = query.eq('sub_product_id', filters.subProductId);
+    }
+    if (filters?.documentTypeId) {
+      query = query.eq('document_type_id', filters.documentTypeId);
+    }
+    if (filters?.isRequired !== undefined) {
+      query = query.eq('is_required', filters.isRequired);
+    }
+    if (filters?.isActive !== undefined) {
+      query = query.eq('is_active', filters.isActive);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching document against sub product:', error);
+      return [];
+    }
+
+    return data?.map(mapDocAgainstSubProductData) || [];
+  }
+
+  static async createDocAgainstSubProduct(data: {
+    subProductId: string;
+    documentTypeId: string;
+    isRequired: boolean;
+    priority: 'high' | 'medium' | 'low';
+    validityPeriod?: number;
+    metadata?: any;
+  }) {
+    console.log('Creating document against sub product:', data);
+    
+    const { data: result, error } = await supabase
+      .from(SUPABASE_TABLES.DOC_AGAINST_SUB_PRODUCT)
+      .insert({
+        sub_product_id: data.subProductId,
+        document_type_id: data.documentTypeId,
+        is_required: data.isRequired,
+        priority: data.priority,
+        validity_period: data.validityPeriod,
+        is_active: true,
+        metadata: data.metadata,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating document against sub product:', error);
+      throw new Error(`Failed to create document against sub product: ${error.message}`);
+    }
+
+    return mapDocAgainstSubProductData(result?.[0]);
+  }
+
+  static async updateDocAgainstSubProduct(id: string, updates: Partial<{
+    isRequired?: boolean;
+    priority?: 'high' | 'medium' | 'low';
+    validityPeriod?: number;
+    isActive?: boolean;
+    metadata?: any;
+  }>) {
+    console.log('Updating document against sub product:', id, updates);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.DOC_AGAINST_SUB_PRODUCT)
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select();
+
+    if (error) {
+      console.error('Error updating document against sub product:', error);
+      throw new Error(`Failed to update document against sub product: ${error.message}`);
+    }
+
+    return mapDocAgainstSubProductData(data?.[0]);
+  }
+
+  static async deleteDocAgainstSubProduct(id: string) {
+    console.log('Deleting document against sub product:', id);
+    
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.DOC_AGAINST_SUB_PRODUCT)
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting document against sub product:', error);
+      throw new Error(`Failed to delete document against sub product: ${error.message}`);
+    }
+  }
+
+  // File Signature Management
+  static async getFileSignatures(filters?: { 
+    fileId?: string; 
+    userId?: string; 
+    signatureType?: 'digital' | 'electronic' | 'wet_signature';
+    isVerified?: boolean;
+  }) {
+    console.log('Fetching file signatures with filters:', filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.FILE_SIGNATURES)
+      .select(`
+        id,
+        file_id,
+        user_id,
+        signature_type,
+        signature_data,
+        signature_method,
+        is_verified,
+        verified_at,
+        verified_by,
+        expires_at,
+        metadata,
+        created_at,
+        updated_at,
+        files!inner(
+          id,
+          file_name,
+          original_name,
+          file_path,
+          file_size,
+          mime_type,
+          file_type,
+          uploader_id,
+          folder_id,
+          is_public,
+          metadata,
+          created_at,
+          updated_at
+        ),
+        users!inner(
+          id,
+          full_name,
+          name,
+          email,
+          role,
+          avatar
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (filters?.fileId) {
+      query = query.eq('file_id', filters.fileId);
+    }
+    if (filters?.userId) {
+      query = query.eq('user_id', filters.userId);
+    }
+    if (filters?.signatureType) {
+      query = query.eq('signature_type', filters.signatureType);
+    }
+    if (filters?.isVerified !== undefined) {
+      query = query.eq('is_verified', filters.isVerified);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching file signatures:', error);
+      return [];
+    }
+
+    return data?.map(mapFileSignatureData) || [];
+  }
+
+  static async createFileSignature(data: {
+    fileId: string;
+    userId: string;
+    signatureType: 'digital' | 'electronic' | 'wet_signature';
+    signatureData: string;
+    signatureMethod: 'biometric' | 'pin' | 'password' | 'certificate' | 'other';
+    expiresAt?: string;
+    metadata?: any;
+  }) {
+    console.log('Creating file signature:', data);
+    
+    const { data: result, error } = await supabase
+      .from(SUPABASE_TABLES.FILE_SIGNATURES)
+      .insert({
+        file_id: data.fileId,
+        user_id: data.userId,
+        signature_type: data.signatureType,
+        signature_data: data.signatureData,
+        signature_method: data.signatureMethod,
+        is_verified: false,
+        expires_at: data.expiresAt,
+        metadata: data.metadata,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating file signature:', error);
+      throw new Error(`Failed to create file signature: ${error.message}`);
+    }
+
+    return mapFileSignatureData(result?.[0]);
+  }
+
+  static async updateFileSignature(id: string, updates: Partial<{
+    signatureType?: 'digital' | 'electronic' | 'wet_signature';
+    signatureData?: string;
+    signatureMethod?: 'biometric' | 'pin' | 'password' | 'certificate' | 'other';
+    isVerified?: boolean;
+    verifiedBy?: string;
+    verifiedAt?: string;
+    expiresAt?: string;
+    metadata?: any;
+  }>) {
+    console.log('Updating file signature:', id, updates);
+    
+    const updateData: any = {
+      ...updates,
+      updated_at: new Date().toISOString()
+    };
+
+    if (updates.isVerified) {
+      updateData.verified_at = new Date().toISOString();
+    }
+
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.FILE_SIGNATURES)
+      .update(updateData)
+      .eq('id', id)
+      .select();
+
+    if (error) {
+      console.error('Error updating file signature:', error);
+      throw new Error(`Failed to update file signature: ${error.message}`);
+    }
+
+    return mapFileSignatureData(data?.[0]);
+  }
+
+  static async deleteFileSignature(id: string) {
+    console.log('Deleting file signature:', id);
+    
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.FILE_SIGNATURES)
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting file signature:', error);
+      throw new Error(`Failed to delete file signature: ${error.message}`);
+    }
+  }
+
+  // Real-time subscriptions for document management
+  static subscribeToFolders(callback: (payload: any) => void) {
+    return supabase
+      .channel('folders-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.FOLDERS },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToDocumentAgainstProduct(callback: (payload: any) => void) {
+    return supabase
+      .channel('document-against-product-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.DOCUMENT_AGAINST_PRODUCT },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToDocAgainstSubProduct(callback: (payload: any) => void) {
+    return supabase
+      .channel('doc-against-sub-product-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.DOC_AGAINST_SUB_PRODUCT },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToFileSignatures(callback: (payload: any) => void) {
+    return supabase
+      .channel('file-signatures-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.FILE_SIGNATURES },
+        callback
+      )
+      .subscribe();
+  }
+
+  // =============================================================================
   // PHASE 2: CORE BUSINESS LOGIC - LOAN APPLICATIONS
   // =============================================================================
 
@@ -4766,12 +5431,11 @@ export class SupabaseDatabaseService {
 
     // Create audit log
     await this.createAuditLog({
+      userId: approvalData.approvedBy,
       action: 'case_approved',
-      entity_type: 'case',
-      entity_id: caseId,
-      user_id: approvalData.approvedBy,
+      resourceType: 'case',
+      resourceId: caseId,
       details: `Case approved with notes: ${approvalData.notes || 'No notes'}`,
-      severity: 'info',
       metadata: { approvalData }
     });
 
@@ -4804,12 +5468,11 @@ export class SupabaseDatabaseService {
 
     // Create audit log
     await this.createAuditLog({
+      userId: rejectionData.rejectedBy,
       action: 'case_rejected',
-      entity_type: 'case',
-      entity_id: caseId,
-      user_id: rejectionData.rejectedBy,
+      resourceType: 'case',
+      resourceId: caseId,
       details: `Case rejected: ${rejectionData.reason}`,
-      severity: 'medium',
       metadata: { rejectionData }
     });
 
@@ -4843,12 +5506,11 @@ export class SupabaseDatabaseService {
 
     // Create audit log
     await this.createAuditLog({
+      userId: resolutionData.resolvedBy,
       action: 'compliance_issue_resolved',
-      entity_type: 'compliance_issue',
-      entity_id: issueId,
-      user_id: resolutionData.resolvedBy,
+      resourceType: 'compliance_issue',
+      resourceId: issueId,
       details: `Compliance issue resolved: ${resolutionData.resolutionNotes}`,
-      severity: 'info',
       metadata: { resolutionData }
     });
 
@@ -4881,12 +5543,11 @@ export class SupabaseDatabaseService {
 
     // Create audit log
     await this.createAuditLog({
+      userId: escalationData.escalatedBy,
       action: 'compliance_issue_escalated',
-      entity_type: 'compliance_issue',
-      entity_id: issueId,
-      user_id: escalationData.escalatedBy,
+      resourceType: 'compliance_issue',
+      resourceId: issueId,
       details: `Compliance issue escalated: ${escalationData.escalationReason}`,
-      severity: 'high',
       metadata: { escalationData }
     });
 
@@ -4984,12 +5645,11 @@ export class SupabaseDatabaseService {
 
     // Create audit log
     await this.createAuditLog({
+      userId: approvalData.approvedBy,
       action: 'review_approved',
-      entity_type: 'case',
-      entity_id: reviewId,
-      user_id: approvalData.approvedBy,
+      resourceType: 'case',
+      resourceId: reviewId,
       details: `Review approved: ${approvalData.approvalNotes}`,
-      severity: 'info',
       metadata: { approvalData }
     });
 
@@ -5022,12 +5682,11 @@ export class SupabaseDatabaseService {
 
     // Create audit log
     await this.createAuditLog({
+      userId: rejectionData.rejectedBy,
       action: 'review_rejected',
-      entity_type: 'case',
-      entity_id: reviewId,
-      user_id: rejectionData.rejectedBy,
+      resourceType: 'case',
+      resourceId: reviewId,
       details: `Review rejected: ${rejectionData.rejectionReason}`,
-      severity: 'medium',
       metadata: { rejectionData }
     });
 
@@ -5060,12 +5719,11 @@ export class SupabaseDatabaseService {
 
     // Create audit log
     await this.createAuditLog({
+      userId: requestData.requestedBy,
       action: 'additional_info_requested',
-      entity_type: 'case',
-      entity_id: reviewId,
-      user_id: requestData.requestedBy,
+      resourceType: 'case',
+      resourceId: reviewId,
       details: `Additional info requested: ${requestData.infoRequest}`,
-      severity: 'info',
       metadata: { requestData }
     });
 
@@ -5357,6 +6015,2733 @@ export class SupabaseDatabaseService {
       .channel('pending-reviews-updates')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: SUPABASE_TABLES.CASES },
+        callback
+      )
+      .subscribe();
+  }
+
+  // =============================================================================
+  // CORE BUSINESS TABLES - MISSING INTEGRATIONS
+  // =============================================================================
+
+  // Customers Management
+  static async getCustomers(filters?: { 
+    organizationId?: string; 
+    isActive?: boolean; 
+    employmentType?: string;
+    riskProfile?: string;
+  }) {
+    console.log('Fetching customers with filters:', filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.CUSTOMERS)
+      .select(`
+        id,
+        user_id,
+        full_name,
+        mobile,
+        email,
+        pan_number,
+        aadhaar_number,
+        date_of_birth,
+        gender,
+        marital_status,
+        employment_type,
+        risk_profile,
+        kyc_status,
+        metadata,
+        created_at,
+        updated_at,
+        users!inner(
+          id,
+          full_name,
+          email,
+          role
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    // Apply filters
+    if (filters?.isActive !== undefined) {
+      query = query.eq('is_active', filters.isActive);
+    }
+    if (filters?.employmentType) {
+      query = query.eq('employment_type', filters.employmentType);
+    }
+    if (filters?.riskProfile) {
+      query = query.eq('risk_profile', filters.riskProfile);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching customers:', error);
+      return [];
+    }
+
+    return data?.map(customer => ({
+      id: customer.id,
+      userId: customer.user_id,
+      name: customer.full_name,
+      phone: customer.mobile,
+      email: customer.email,
+      panNumber: customer.pan_number,
+      aadhaarNumber: customer.aadhaar_number,
+      dateOfBirth: customer.date_of_birth,
+      gender: customer.gender,
+      maritalStatus: customer.marital_status,
+      employment: customer.employment_type,
+      riskProfile: customer.risk_profile,
+      kycStatus: customer.kyc_status,
+      age: customer.date_of_birth ? 
+        Math.floor((Date.now() - new Date(customer.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 0,
+      metadata: customer.metadata,
+      createdAt: customer.created_at,
+      updatedAt: customer.updated_at,
+      user: Array.isArray(customer.users) ? customer.users[0] : customer.users,
+    })) || [];
+  }
+
+  static async createCustomer(customerData: any) {
+    console.log('Creating customer:', customerData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.CUSTOMERS)
+      .insert({
+        ...customerData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating customer:', error);
+      throw new Error(`Failed to create customer: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  static async updateCustomer(customerId: string, updates: any) {
+    console.log('Updating customer:', customerId, updates);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.CUSTOMERS)
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', customerId)
+      .select();
+
+    if (error) {
+      console.error('Error updating customer:', error);
+      throw new Error(`Failed to update customer: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  static async deleteCustomer(customerId: string) {
+    console.log('Deleting customer:', customerId);
+    
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.CUSTOMERS)
+      .delete()
+      .eq('id', customerId);
+
+    if (error) {
+      console.error('Error deleting customer:', error);
+      throw new Error(`Failed to delete customer: ${error.message}`);
+    }
+  }
+
+
+  // Departments Management
+  static async getDepartments(filters?: { 
+    departmentType?: string; 
+    isActive?: boolean; 
+    parentDepartmentId?: string;
+  }) {
+    console.log('Fetching departments with filters:', filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.DEPARTMENTS)
+      .select(`
+        id,
+        name,
+        code,
+        description,
+        department_type,
+        parent_department_id,
+        manager_id,
+        is_active,
+        metadata,
+        created_at,
+        updated_at,
+        users!left(
+          id,
+          full_name,
+          email
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    // Apply filters
+    if (filters?.departmentType) {
+      query = query.eq('department_type', filters.departmentType);
+    }
+    if (filters?.isActive !== undefined) {
+      query = query.eq('is_active', filters.isActive);
+    }
+    if (filters?.parentDepartmentId) {
+      query = query.eq('parent_department_id', filters.parentDepartmentId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching departments:', error);
+      return [];
+    }
+
+    return data?.map(department => ({
+      id: department.id,
+      name: department.name,
+      code: department.code,
+      description: department.description,
+      departmentType: department.department_type,
+      parentDepartmentId: department.parent_department_id,
+      managerId: department.manager_id,
+      isActive: department.is_active,
+      metadata: department.metadata,
+      createdAt: department.created_at,
+      updatedAt: department.updated_at,
+      users: Array.isArray(department.users) ? department.users : (department.users ? [department.users] : []),
+    })) || [];
+  }
+
+  static async createDepartment(departmentData: any) {
+    console.log('Creating department:', departmentData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.DEPARTMENTS)
+      .insert({
+        ...departmentData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating department:', error);
+      throw new Error(`Failed to create department: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  static async updateDepartment(departmentId: string, updates: Partial<{
+    name: string;
+    code: string;
+    description: string;
+    departmentType: string;
+    parentDepartmentId: string;
+    managerId: string;
+    isActive: boolean;
+    metadata: any;
+  }>) {
+    console.log('Updating department:', departmentId, updates);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.DEPARTMENTS)
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', departmentId)
+      .select();
+
+    if (error) {
+      console.error('Error updating department:', error);
+      throw new Error(`Failed to update department: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  static async deleteDepartment(departmentId: string) {
+    console.log('Deleting department:', departmentId);
+    
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.DEPARTMENTS)
+      .delete()
+      .eq('id', departmentId);
+
+    if (error) {
+      console.error('Error deleting department:', error);
+      throw new Error(`Failed to delete department: ${error.message}`);
+    }
+  }
+
+  // Employment Types Management
+  static async getEmploymentTypes(filters?: { isActive?: boolean }) {
+    console.log('Fetching employment types with filters:', filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.EMPLOYMENT_TYPES)
+      .select(`
+        id,
+        name,
+        code,
+        description,
+        is_active,
+        metadata,
+        created_at,
+        updated_at
+      `)
+      .order('name', { ascending: true });
+
+    // Apply filters
+    if (filters?.isActive !== undefined) {
+      query = query.eq('is_active', filters.isActive);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching employment types:', error);
+      return [];
+    }
+
+    return data?.map(employmentType => ({
+      id: employmentType.id,
+      name: employmentType.name,
+      code: employmentType.code,
+      description: employmentType.description,
+      isActive: employmentType.is_active,
+      metadata: employmentType.metadata,
+      createdAt: employmentType.created_at,
+      updatedAt: employmentType.updated_at,
+    })) || [];
+  }
+
+  static async createEmploymentType(employmentTypeData: any) {
+    console.log('Creating employment type:', employmentTypeData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.EMPLOYMENT_TYPES)
+      .insert({
+        ...employmentTypeData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating employment type:', error);
+      throw new Error(`Failed to create employment type: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  static async updateEmploymentType(employmentTypeId: string, updates: Partial<{
+    name: string;
+    code: string;
+    description: string;
+    isActive: boolean;
+    metadata: any;
+  }>) {
+    console.log('Updating employment type:', employmentTypeId, updates);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.EMPLOYMENT_TYPES)
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', employmentTypeId)
+      .select();
+
+    if (error) {
+      console.error('Error updating employment type:', error);
+      throw new Error(`Failed to update employment type: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  static async deleteEmploymentType(employmentTypeId: string) {
+    console.log('Deleting employment type:', employmentTypeId);
+    
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.EMPLOYMENT_TYPES)
+      .delete()
+      .eq('id', employmentTypeId);
+
+    if (error) {
+      console.error('Error deleting employment type:', error);
+      throw new Error(`Failed to delete employment type: ${error.message}`);
+    }
+  }
+
+  // Task Types Management
+  static async getTaskTypes(filters?: { 
+    category?: string; 
+    isActive?: boolean;
+  }) {
+    console.log('Fetching task types with filters:', filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.TASK_TYPES)
+      .select(`
+        id,
+        name,
+        code,
+        description,
+        category,
+        is_active,
+        metadata,
+        created_at,
+        updated_at
+      `)
+      .order('name', { ascending: true });
+
+    // Apply filters
+    if (filters?.category) {
+      query = query.eq('category', filters.category);
+    }
+    if (filters?.isActive !== undefined) {
+      query = query.eq('is_active', filters.isActive);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching task types:', error);
+      return [];
+    }
+
+    return data?.map(taskType => ({
+      id: taskType.id,
+      name: taskType.name,
+      code: taskType.code,
+      description: taskType.description,
+      category: taskType.category,
+      isActive: taskType.is_active,
+      metadata: taskType.metadata,
+      createdAt: taskType.created_at,
+      updatedAt: taskType.updated_at,
+    })) || [];
+  }
+
+  static async createTaskType(taskTypeData: any) {
+    console.log('Creating task type:', taskTypeData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.TASK_TYPES)
+      .insert({
+        ...taskTypeData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating task type:', error);
+      throw new Error(`Failed to create task type: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  static async updateTaskType(taskTypeId: string, updates: Partial<{
+    name: string;
+    code: string;
+    description: string;
+    category: string;
+    isActive: boolean;
+    metadata: any;
+  }>) {
+    console.log('Updating task type:', taskTypeId, updates);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.TASK_TYPES)
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', taskTypeId)
+      .select();
+
+    if (error) {
+      console.error('Error updating task type:', error);
+      throw new Error(`Failed to update task type: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  static async deleteTaskType(taskTypeId: string) {
+    console.log('Deleting task type:', taskTypeId);
+    
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.TASK_TYPES)
+      .delete()
+      .eq('id', taskTypeId);
+
+    if (error) {
+      console.error('Error deleting task type:', error);
+      throw new Error(`Failed to delete task type: ${error.message}`);
+    }
+  }
+
+  // Task SLA Policies Management
+  static async getTaskSlaPolicies(filters?: { 
+    taskTypeId?: string; 
+    departmentId?: string; 
+    priority?: string;
+    isActive?: boolean;
+  }) {
+    console.log('Fetching task SLA policies with filters:', filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.TASK_SLA_POLICIES)
+      .select(`
+        id,
+        name,
+        description,
+        task_type_id,
+        department_id,
+        priority,
+        sla_hours,
+        escalation_hours,
+        is_active,
+        metadata,
+        created_at,
+        updated_at,
+        task_types!inner(
+          id,
+          name,
+          code
+        ),
+        departments!left(
+          id,
+          name,
+          code
+        )
+      `)
+      .order('priority', { ascending: true });
+
+    // Apply filters
+    if (filters?.taskTypeId) {
+      query = query.eq('task_type_id', filters.taskTypeId);
+    }
+    if (filters?.departmentId) {
+      query = query.eq('department_id', filters.departmentId);
+    }
+    if (filters?.priority) {
+      query = query.eq('priority', filters.priority);
+    }
+    if (filters?.isActive !== undefined) {
+      query = query.eq('is_active', filters.isActive);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching task SLA policies:', error);
+      return [];
+    }
+
+    return data?.map(policy => ({
+      id: policy.id,
+      name: policy.name,
+      description: policy.description,
+      taskTypeId: policy.task_type_id,
+      departmentId: policy.department_id,
+      priority: policy.priority,
+      slaHours: policy.sla_hours,
+      escalationHours: policy.escalation_hours,
+      isActive: policy.is_active,
+      metadata: policy.metadata,
+      createdAt: policy.created_at,
+      updatedAt: policy.updated_at,
+      taskType: Array.isArray(policy.task_types) ? policy.task_types[0] : policy.task_types,
+      department: Array.isArray(policy.departments) ? policy.departments[0] : policy.departments,
+    })) || [];
+  }
+
+  static async createTaskSlaPolicy(policyData: any) {
+    console.log('Creating task SLA policy:', policyData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.TASK_SLA_POLICIES)
+      .insert({
+        ...policyData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating task SLA policy:', error);
+      throw new Error(`Failed to create task SLA policy: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  static async updateTaskSlaPolicy(policyId: string, updates: Partial<{
+    name: string;
+    description: string;
+    taskTypeId: string;
+    departmentId: string;
+    priority: string;
+    slaHours: number;
+    escalationHours: number;
+    isActive: boolean;
+    metadata: any;
+  }>) {
+    console.log('Updating task SLA policy:', policyId, updates);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.TASK_SLA_POLICIES)
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', policyId)
+      .select();
+
+    if (error) {
+      console.error('Error updating task SLA policy:', error);
+      throw new Error(`Failed to update task SLA policy: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  static async deleteTaskSlaPolicy(policyId: string) {
+    console.log('Deleting task SLA policy:', policyId);
+    
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.TASK_SLA_POLICIES)
+      .delete()
+      .eq('id', policyId);
+
+    if (error) {
+      console.error('Error deleting task SLA policy:', error);
+      throw new Error(`Failed to delete task SLA policy: ${error.message}`);
+    }
+  }
+
+  // Real-time subscriptions for core business tables
+  static subscribeToCustomersUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('customers-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.CUSTOMERS },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToSubProductsUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('sub-products-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.SUB_PRODUCTS },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToDepartmentsUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('departments-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.DEPARTMENTS },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToEmploymentTypesUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('employment-types-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.EMPLOYMENT_TYPES },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToTaskTypesUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('task-types-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.TASK_TYPES },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToTaskSlaPoliciesUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('task-sla-policies-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.TASK_SLA_POLICIES },
+        callback
+      )
+      .subscribe();
+  }
+
+  // =============================================================================
+  // WORKFLOW & CASE MANAGEMENT METHODS
+  // =============================================================================
+
+  // Case Status History Methods
+  static async getCaseStatusHistory(caseId?: string, filters?: { status?: string; changed_by?: string }) {
+    console.log('Fetching case status history with filters:', { caseId, filters });
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.CASE_STATUS_HISTORY)
+      .select(`
+        id,
+        case_id,
+        status,
+        previous_status,
+        changed_by,
+        changed_at,
+        reason,
+        notes,
+        metadata,
+        created_at,
+        updated_at,
+        cases!inner(
+          id,
+          case_number,
+          status,
+          priority,
+          created_at
+        ),
+        users!inner(
+          id,
+          full_name,
+          email,
+          role
+        )
+      `)
+      .order('changed_at', { ascending: false });
+
+    if (caseId) {
+      query = query.eq('case_id', caseId);
+    }
+
+    if (filters?.status) {
+      query = query.eq('status', filters.status);
+    }
+
+    if (filters?.changed_by) {
+      query = query.eq('changed_by', filters.changed_by);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching case status history:', error);
+      return [];
+    }
+
+    return data?.map(item => mapCaseStatusHistoryData(item)) || [];
+  }
+
+  static async createCaseStatusHistory(historyData: {
+    case_id: string;
+    status: string;
+    previous_status?: string;
+    changed_by: string;
+    reason?: string;
+    notes?: string;
+    metadata?: any;
+  }) {
+    console.log('Creating case status history:', historyData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.CASE_STATUS_HISTORY)
+      .insert({
+        ...historyData,
+        changed_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating case status history:', error);
+      throw new Error(`Failed to create case status history: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  // Case Workflow Stage Methods
+  static async getCaseWorkflowStages(caseId?: string, filters?: { stage_name?: string; is_active?: boolean }) {
+    console.log('Fetching case workflow stages with filters:', { caseId, filters });
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.CASE_WORKFLOW_STAGE)
+      .select(`
+        id,
+        case_id,
+        stage_name,
+        stage_order,
+        is_active,
+        started_at,
+        completed_at,
+        assigned_to,
+        stage_data,
+        created_at,
+        updated_at,
+        cases!inner(
+          id,
+          case_number,
+          status,
+          priority,
+          created_at
+        ),
+        users!inner(
+          id,
+          full_name,
+          email,
+          role
+        )
+      `)
+      .order('stage_order', { ascending: true });
+
+    if (caseId) {
+      query = query.eq('case_id', caseId);
+    }
+
+    if (filters?.stage_name) {
+      query = query.eq('stage_name', filters.stage_name);
+    }
+
+    if (filters?.is_active !== undefined) {
+      query = query.eq('is_active', filters.is_active);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching case workflow stages:', error);
+      return [];
+    }
+
+    return data?.map(item => mapCaseWorkflowStageData(item)) || [];
+  }
+
+  static async createCaseWorkflowStage(stageData: {
+    case_id: string;
+    stage_name: string;
+    stage_order: number;
+    assigned_to?: string;
+    stage_data?: any;
+  }) {
+    console.log('Creating case workflow stage:', stageData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.CASE_WORKFLOW_STAGE)
+      .insert({
+        ...stageData,
+        is_active: true,
+        started_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating case workflow stage:', error);
+      throw new Error(`Failed to create case workflow stage: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  static async updateCaseWorkflowStage(stageId: string, updates: {
+    stage_name?: string;
+    is_active?: boolean;
+    completed_at?: string;
+    assigned_to?: string;
+    stage_data?: any;
+  }) {
+    console.log('Updating case workflow stage:', stageId, updates);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.CASE_WORKFLOW_STAGE)
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', stageId)
+      .select();
+
+    if (error) {
+      console.error('Error updating case workflow stage:', error);
+      throw new Error(`Failed to update case workflow stage: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  // Assign Case Setting Methods
+  static async getAssignCaseSettings(filters?: { setting_name?: string; is_active?: boolean }) {
+    console.log('Fetching assign case settings with filters:', filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.ASSIGN_CASE_SETTING)
+      .select(`
+        id,
+        setting_name,
+        setting_value,
+        description,
+        is_active,
+        priority,
+        conditions,
+        created_at,
+        updated_at
+      `)
+      .order('priority', { ascending: true });
+
+    if (filters?.setting_name) {
+      query = query.eq('setting_name', filters.setting_name);
+    }
+
+    if (filters?.is_active !== undefined) {
+      query = query.eq('is_active', filters.is_active);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching assign case settings:', error);
+      return [];
+    }
+
+    return data?.map(item => mapAssignCaseSettingData(item)) || [];
+  }
+
+  static async createAssignCaseSetting(settingData: {
+    setting_name: string;
+    setting_value: string;
+    description?: string;
+    priority?: number;
+    conditions?: any;
+  }) {
+    console.log('Creating assign case setting:', settingData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.ASSIGN_CASE_SETTING)
+      .insert({
+        ...settingData,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating assign case setting:', error);
+      throw new Error(`Failed to create assign case setting: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  static async updateAssignCaseSetting(settingId: string, updates: {
+    setting_name?: string;
+    setting_value?: string;
+    description?: string;
+    is_active?: boolean;
+    priority?: number;
+    conditions?: any;
+  }) {
+    console.log('Updating assign case setting:', settingId, updates);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.ASSIGN_CASE_SETTING)
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', settingId)
+      .select();
+
+    if (error) {
+      console.error('Error updating assign case setting:', error);
+      throw new Error(`Failed to update assign case setting: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  // Assign Permission Methods
+  static async getAssignPermissions(filters?: { role_id?: string; permission_id?: string }) {
+    console.log('Fetching assign permissions with filters:', filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.ASSIGN_PERMISSION)
+      .select(`
+        id,
+        role_id,
+        permission_id,
+        can_assign,
+        can_reassign,
+        can_approve,
+        can_reject,
+        conditions,
+        created_at,
+        updated_at,
+        roles!inner(
+          id,
+          name,
+          description,
+          is_active
+        ),
+        permissions!inner(
+          id,
+          name,
+          description,
+          resource,
+          action
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (filters?.role_id) {
+      query = query.eq('role_id', filters.role_id);
+    }
+
+    if (filters?.permission_id) {
+      query = query.eq('permission_id', filters.permission_id);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching assign permissions:', error);
+      return [];
+    }
+
+    return data?.map(item => mapAssignPermissionData(item)) || [];
+  }
+
+  static async createAssignPermission(permissionData: {
+    role_id: string;
+    permission_id: string;
+    can_assign?: boolean;
+    can_reassign?: boolean;
+    can_approve?: boolean;
+    can_reject?: boolean;
+    conditions?: any;
+  }) {
+    console.log('Creating assign permission:', permissionData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.ASSIGN_PERMISSION)
+      .insert({
+        ...permissionData,
+        can_assign: permissionData.can_assign || false,
+        can_reassign: permissionData.can_reassign || false,
+        can_approve: permissionData.can_approve || false,
+        can_reject: permissionData.can_reject || false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating assign permission:', error);
+      throw new Error(`Failed to create assign permission: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  static async updateAssignPermission(permissionId: string, updates: {
+    can_assign?: boolean;
+    can_reassign?: boolean;
+    can_approve?: boolean;
+    can_reject?: boolean;
+    conditions?: any;
+  }) {
+    console.log('Updating assign permission:', permissionId, updates);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.ASSIGN_PERMISSION)
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', permissionId)
+      .select();
+
+    if (error) {
+      console.error('Error updating assign permission:', error);
+      throw new Error(`Failed to update assign permission: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  // Real-time subscriptions for workflow tables
+  static subscribeToCaseStatusHistoryUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('case-status-history-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.CASE_STATUS_HISTORY },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToCaseWorkflowStageUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('case-workflow-stage-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.CASE_WORKFLOW_STAGE },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToAssignCaseSettingUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('assign-case-setting-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.ASSIGN_CASE_SETTING },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToAssignPermissionUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('assign-permission-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.ASSIGN_PERMISSION },
+        callback
+      )
+      .subscribe();
+  }
+
+  // =============================================================================
+  // BACKGROUND PROCESSING METHODS
+  // =============================================================================
+
+  // Job Management
+  static async getJobs(filters?: { 
+    organizationId?: string; 
+    status?: string; 
+    jobType?: string; 
+    priority?: string;
+    limit?: number;
+  }) {
+    console.log('Fetching jobs with filters:', filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.JOBS)
+      .select(`
+        id,
+        organization_id,
+        job_type,
+        job_name,
+        payload,
+        status,
+        priority,
+        attempts,
+        max_attempts,
+        available_at,
+        started_at,
+        completed_at,
+        failed_at,
+        error_message,
+        error_details,
+        batch_id,
+        metadata,
+        created_at,
+        updated_at
+      `)
+      .order('created_at', { ascending: false });
+
+    if (filters?.organizationId) {
+      query = query.eq('organization_id', filters.organizationId);
+    }
+    if (filters?.status) {
+      query = query.eq('status', filters.status);
+    }
+    if (filters?.jobType) {
+      query = query.eq('job_type', filters.jobType);
+    }
+    if (filters?.priority) {
+      query = query.eq('priority', filters.priority);
+    }
+    if (filters?.limit) {
+      query = query.limit(filters.limit);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching jobs:', error);
+      return [];
+    }
+
+    return data?.map(mapJobData) || [];
+  }
+
+  static async createJob(jobData: {
+    organizationId: string;
+    jobType: string;
+    jobName: string;
+    payload: any;
+    priority?: string;
+    maxAttempts?: number;
+    availableAt?: string;
+    batchId?: string;
+    metadata?: any;
+  }) {
+    console.log('Creating job:', jobData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.JOBS)
+      .insert({
+        organization_id: jobData.organizationId,
+        job_type: jobData.jobType,
+        job_name: jobData.jobName,
+        payload: jobData.payload,
+        status: 'pending',
+        priority: jobData.priority || 'normal',
+        attempts: 0,
+        max_attempts: jobData.maxAttempts || 3,
+        available_at: jobData.availableAt || new Date().toISOString(),
+        batch_id: jobData.batchId,
+        metadata: jobData.metadata,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating job:', error);
+      throw new Error(`Failed to create job: ${error.message}`);
+    }
+
+    return data?.[0] ? mapJobData(data[0]) : null;
+  }
+
+  static async updateJobStatus(jobId: string, status: string, updates?: {
+    startedAt?: string;
+    completedAt?: string;
+    failedAt?: string;
+    errorMessage?: string;
+    errorDetails?: any;
+    attempts?: number;
+  }) {
+    console.log('Updating job status:', jobId, status, updates);
+    
+    const updateData: any = {
+      status,
+      updated_at: new Date().toISOString()
+    };
+
+    if (updates?.startedAt) updateData.started_at = updates.startedAt;
+    if (updates?.completedAt) updateData.completed_at = updates.completedAt;
+    if (updates?.failedAt) updateData.failed_at = updates.failedAt;
+    if (updates?.errorMessage) updateData.error_message = updates.errorMessage;
+    if (updates?.errorDetails) updateData.error_details = updates.errorDetails;
+    if (updates?.attempts !== undefined) updateData.attempts = updates.attempts;
+
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.JOBS)
+      .update(updateData)
+      .eq('id', jobId)
+      .select();
+
+    if (error) {
+      console.error('Error updating job status:', error);
+      throw new Error(`Failed to update job status: ${error.message}`);
+    }
+
+    return data?.[0] ? mapJobData(data[0]) : null;
+  }
+
+  static async deleteJob(jobId: string) {
+    console.log('Deleting job:', jobId);
+    
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.JOBS)
+      .delete()
+      .eq('id', jobId);
+
+    if (error) {
+      console.error('Error deleting job:', error);
+      throw new Error(`Failed to delete job: ${error.message}`);
+    }
+  }
+
+  // Job Batch Management
+  static async getJobBatches(filters?: { 
+    organizationId?: string; 
+    status?: string;
+    limit?: number;
+  }) {
+    console.log('Fetching job batches with filters:', filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.JOB_BATCHES)
+      .select(`
+        id,
+        organization_id,
+        batch_name,
+        total_jobs,
+        pending_jobs,
+        processed_jobs,
+        failed_jobs,
+        status,
+        progress,
+        started_at,
+        completed_at,
+        cancelled_at,
+        metadata,
+        created_at,
+        updated_at
+      `)
+      .order('created_at', { ascending: false });
+
+    if (filters?.organizationId) {
+      query = query.eq('organization_id', filters.organizationId);
+    }
+    if (filters?.status) {
+      query = query.eq('status', filters.status);
+    }
+    if (filters?.limit) {
+      query = query.limit(filters.limit);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching job batches:', error);
+      return [];
+    }
+
+    return data?.map(mapJobBatchData) || [];
+  }
+
+  static async createJobBatch(batchData: {
+    organizationId: string;
+    batchName: string;
+    totalJobs: number;
+    metadata?: any;
+  }) {
+    console.log('Creating job batch:', batchData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.JOB_BATCHES)
+      .insert({
+        organization_id: batchData.organizationId,
+        batch_name: batchData.batchName,
+        total_jobs: batchData.totalJobs,
+        pending_jobs: batchData.totalJobs,
+        processed_jobs: 0,
+        failed_jobs: 0,
+        status: 'pending',
+        progress: 0,
+        metadata: batchData.metadata,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating job batch:', error);
+      throw new Error(`Failed to create job batch: ${error.message}`);
+    }
+
+    return data?.[0] ? mapJobBatchData(data[0]) : null;
+  }
+
+  static async updateJobBatch(batchId: string, updates: {
+    status?: string;
+    progress?: number;
+    pendingJobs?: number;
+    processedJobs?: number;
+    failedJobs?: number;
+    startedAt?: string;
+    completedAt?: string;
+    cancelledAt?: string;
+  }) {
+    console.log('Updating job batch:', batchId, updates);
+    
+    const updateData: any = {
+      ...updates,
+      updated_at: new Date().toISOString()
+    };
+
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.JOB_BATCHES)
+      .update(updateData)
+      .eq('id', batchId)
+      .select();
+
+    if (error) {
+      console.error('Error updating job batch:', error);
+      throw new Error(`Failed to update job batch: ${error.message}`);
+    }
+
+    return data?.[0] ? mapJobBatchData(data[0]) : null;
+  }
+
+  // Failed Jobs Management
+  static async getFailedJobs(filters?: { 
+    organizationId?: string; 
+    isResolved?: boolean;
+    jobType?: string;
+    limit?: number;
+  }) {
+    console.log('Fetching failed jobs with filters:', filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.FAILED_JOBS)
+      .select(`
+        id,
+        job_id,
+        organization_id,
+        job_type,
+        job_name,
+        payload,
+        error_message,
+        error_details,
+        stack_trace,
+        failed_at,
+        retry_count,
+        max_retries,
+        is_resolved,
+        resolved_at,
+        resolved_by,
+        resolution,
+        metadata,
+        created_at,
+        updated_at
+      `)
+      .order('failed_at', { ascending: false });
+
+    if (filters?.organizationId) {
+      query = query.eq('organization_id', filters.organizationId);
+    }
+    if (filters?.isResolved !== undefined) {
+      query = query.eq('is_resolved', filters.isResolved);
+    }
+    if (filters?.jobType) {
+      query = query.eq('job_type', filters.jobType);
+    }
+    if (filters?.limit) {
+      query = query.limit(filters.limit);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching failed jobs:', error);
+      return [];
+    }
+
+    return data?.map(mapFailedJobData) || [];
+  }
+
+  static async createFailedJob(failedJobData: {
+    jobId: string;
+    organizationId: string;
+    jobType: string;
+    jobName: string;
+    payload: any;
+    errorMessage: string;
+    errorDetails?: any;
+    stackTrace?: string;
+    retryCount?: number;
+    maxRetries?: number;
+    metadata?: any;
+  }) {
+    console.log('Creating failed job record:', failedJobData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.FAILED_JOBS)
+      .insert({
+        job_id: failedJobData.jobId,
+        organization_id: failedJobData.organizationId,
+        job_type: failedJobData.jobType,
+        job_name: failedJobData.jobName,
+        payload: failedJobData.payload,
+        error_message: failedJobData.errorMessage,
+        error_details: failedJobData.errorDetails,
+        stack_trace: failedJobData.stackTrace,
+        failed_at: new Date().toISOString(),
+        retry_count: failedJobData.retryCount || 0,
+        max_retries: failedJobData.maxRetries || 3,
+        is_resolved: false,
+        metadata: failedJobData.metadata,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating failed job record:', error);
+      throw new Error(`Failed to create failed job record: ${error.message}`);
+    }
+
+    return data?.[0] ? mapFailedJobData(data[0]) : null;
+  }
+
+  static async resolveFailedJob(failedJobId: string, resolution: string, resolvedBy: string) {
+    console.log('Resolving failed job:', failedJobId, resolution);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.FAILED_JOBS)
+      .update({
+        is_resolved: true,
+        resolved_at: new Date().toISOString(),
+        resolved_by: resolvedBy,
+        resolution,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', failedJobId)
+      .select();
+
+    if (error) {
+      console.error('Error resolving failed job:', error);
+      throw new Error(`Failed to resolve failed job: ${error.message}`);
+    }
+
+    return data?.[0] ? mapFailedJobData(data[0]) : null;
+  }
+
+  // Third Party API Log Management
+  static async getThirdPartyApiLogs(filters?: { 
+    organizationId?: string; 
+    integrationId?: string;
+    status?: string;
+    isSuccess?: boolean;
+    limit?: number;
+  }) {
+    console.log('Fetching third party API logs with filters:', filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.THIRD_PARTY_API_LOG)
+      .select(`
+        id,
+        organization_id,
+        integration_id,
+        api_name,
+        endpoint,
+        method,
+        request_payload,
+        response_payload,
+        status_code,
+        response_time,
+        status,
+        error_message,
+        retry_count,
+        is_success,
+        metadata,
+        created_at,
+        updated_at
+      `)
+      .order('created_at', { ascending: false });
+
+    if (filters?.organizationId) {
+      query = query.eq('organization_id', filters.organizationId);
+    }
+    if (filters?.integrationId) {
+      query = query.eq('integration_id', filters.integrationId);
+    }
+    if (filters?.status) {
+      query = query.eq('status', filters.status);
+    }
+    if (filters?.isSuccess !== undefined) {
+      query = query.eq('is_success', filters.isSuccess);
+    }
+    if (filters?.limit) {
+      query = query.limit(filters.limit);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching third party API logs:', error);
+      return [];
+    }
+
+    return data?.map(mapThirdPartyApiLogData) || [];
+  }
+
+  static async createThirdPartyApiLog(logData: {
+    organizationId: string;
+    integrationId?: string;
+    apiName: string;
+    endpoint: string;
+    method: string;
+    requestPayload?: any;
+    responsePayload?: any;
+    statusCode?: number;
+    responseTime?: number;
+    status: string;
+    errorMessage?: string;
+    retryCount?: number;
+    isSuccess: boolean;
+    metadata?: any;
+  }) {
+    console.log('Creating third party API log:', logData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.THIRD_PARTY_API_LOG)
+      .insert({
+        organization_id: logData.organizationId,
+        integration_id: logData.integrationId,
+        api_name: logData.apiName,
+        endpoint: logData.endpoint,
+        method: logData.method,
+        request_payload: logData.requestPayload,
+        response_payload: logData.responsePayload,
+        status_code: logData.statusCode,
+        response_time: logData.responseTime,
+        status: logData.status,
+        error_message: logData.errorMessage,
+        retry_count: logData.retryCount || 0,
+        is_success: logData.isSuccess,
+        metadata: logData.metadata,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating third party API log:', error);
+      throw new Error(`Failed to create third party API log: ${error.message}`);
+    }
+
+    return data?.[0] ? mapThirdPartyApiLogData(data[0]) : null;
+  }
+
+  // Webhook Management
+  static async getWebhooks(filters?: { 
+    organizationId?: string; 
+    status?: string;
+    isActive?: boolean;
+    eventType?: string;
+    limit?: number;
+  }) {
+    console.log('Fetching webhooks with filters:', filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.WEBHOOKS)
+      .select(`
+        id,
+        organization_id,
+        webhook_name,
+        webhook_url,
+        event_type,
+        status,
+        is_active,
+        secret,
+        headers,
+        retry_count,
+        max_retries,
+        timeout,
+        last_triggered_at,
+        last_success_at,
+        last_failure_at,
+        failure_count,
+        metadata,
+        created_at,
+        updated_at
+      `)
+      .order('created_at', { ascending: false });
+
+    if (filters?.organizationId) {
+      query = query.eq('organization_id', filters.organizationId);
+    }
+    if (filters?.status) {
+      query = query.eq('status', filters.status);
+    }
+    if (filters?.isActive !== undefined) {
+      query = query.eq('is_active', filters.isActive);
+    }
+    if (filters?.eventType) {
+      query = query.eq('event_type', filters.eventType);
+    }
+    if (filters?.limit) {
+      query = query.limit(filters.limit);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching webhooks:', error);
+      return [];
+    }
+
+    return data?.map(mapWebhookData) || [];
+  }
+
+  static async createWebhook(webhookData: {
+    organizationId: string;
+    webhookName: string;
+    webhookUrl: string;
+    eventType: string;
+    secret?: string;
+    headers?: any;
+    maxRetries?: number;
+    timeout?: number;
+    metadata?: any;
+  }) {
+    console.log('Creating webhook:', webhookData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.WEBHOOKS)
+      .insert({
+        organization_id: webhookData.organizationId,
+        webhook_name: webhookData.webhookName,
+        webhook_url: webhookData.webhookUrl,
+        event_type: webhookData.eventType,
+        status: 'active',
+        is_active: true,
+        secret: webhookData.secret,
+        headers: webhookData.headers,
+        retry_count: 0,
+        max_retries: webhookData.maxRetries || 3,
+        timeout: webhookData.timeout || 30,
+        failure_count: 0,
+        metadata: webhookData.metadata,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating webhook:', error);
+      throw new Error(`Failed to create webhook: ${error.message}`);
+    }
+
+    return data?.[0] ? mapWebhookData(data[0]) : null;
+  }
+
+  static async updateWebhook(webhookId: string, updates: {
+    webhookName?: string;
+    webhookUrl?: string;
+    eventType?: string;
+    status?: string;
+    isActive?: boolean;
+    secret?: string;
+    headers?: any;
+    maxRetries?: number;
+    timeout?: number;
+    lastTriggeredAt?: string;
+    lastSuccessAt?: string;
+    lastFailureAt?: string;
+    failureCount?: number;
+    metadata?: any;
+  }) {
+    console.log('Updating webhook:', webhookId, updates);
+    
+    const updateData: any = {
+      ...updates,
+      updated_at: new Date().toISOString()
+    };
+
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.WEBHOOKS)
+      .update(updateData)
+      .eq('id', webhookId)
+      .select();
+
+    if (error) {
+      console.error('Error updating webhook:', error);
+      throw new Error(`Failed to update webhook: ${error.message}`);
+    }
+
+    return data?.[0] ? mapWebhookData(data[0]) : null;
+  }
+
+  static async deleteWebhook(webhookId: string) {
+    console.log('Deleting webhook:', webhookId);
+    
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.WEBHOOKS)
+      .delete()
+      .eq('id', webhookId);
+
+    if (error) {
+      console.error('Error deleting webhook:', error);
+      throw new Error(`Failed to delete webhook: ${error.message}`);
+    }
+  }
+
+  // Real-time subscriptions for background processing
+  static subscribeToJobUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('job-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.JOBS },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToJobBatchUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('job-batch-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.JOB_BATCHES },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToFailedJobUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('failed-job-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.FAILED_JOBS },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToWebhookUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('webhook-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.WEBHOOKS },
+        callback
+      )
+      .subscribe();
+  }
+
+  // =============================================================================
+  // AUTHENTICATION & SYSTEM MANAGEMENT
+  // =============================================================================
+
+  // Auth Accounts Management
+  static async getAuthAccounts(userId?: string) {
+    console.log('Fetching auth accounts for user:', userId);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.AUTH_ACCOUNTS)
+      .select(`
+        id,
+        user_id,
+        provider,
+        provider_account_id,
+        email,
+        email_verified,
+        phone_verified,
+        two_factor_enabled,
+        failed_login_attempts,
+        locked_until,
+        last_login_at,
+        last_login_ip,
+        is_active,
+        metadata,
+        created_at,
+        updated_at
+      `)
+      .order('created_at', { ascending: false });
+
+    if (userId) {
+      query = query.eq('user_id', userId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching auth accounts:', error);
+      return [];
+    }
+
+    return data?.map(mapAuthAccountData) || [];
+  }
+
+  static async createAuthAccount(accountData: any) {
+    console.log('Creating auth account:', accountData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.AUTH_ACCOUNTS)
+      .insert({
+        ...accountData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating auth account:', error);
+      throw new Error(`Failed to create auth account: ${error.message}`);
+    }
+
+    return data?.[0] ? mapAuthAccountData(data[0]) : null;
+  }
+
+  static async updateAuthAccount(accountId: string, updates: any) {
+    console.log('Updating auth account:', accountId, updates);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.AUTH_ACCOUNTS)
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', accountId)
+      .select();
+
+    if (error) {
+      console.error('Error updating auth account:', error);
+      throw new Error(`Failed to update auth account: ${error.message}`);
+    }
+
+    return data?.[0] ? mapAuthAccountData(data[0]) : null;
+  }
+
+  // Sessions Management
+  static async getSessions(userId?: string) {
+    console.log('Fetching sessions for user:', userId);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.SESSIONS)
+      .select(`
+        id,
+        user_id,
+        session_token,
+        refresh_token,
+        ip_address,
+        user_agent,
+        device_info,
+        location_info,
+        login_at,
+        last_activity_at,
+        expires_at,
+        logout_at,
+        is_active,
+        is_remembered,
+        metadata,
+        created_at,
+        updated_at
+      `)
+      .order('created_at', { ascending: false });
+
+    if (userId) {
+      query = query.eq('user_id', userId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching sessions:', error);
+      return [];
+    }
+
+    return data?.map(mapSessionData) || [];
+  }
+
+  static async createSession(sessionData: any) {
+    console.log('Creating session:', sessionData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.SESSIONS)
+      .insert({
+        ...sessionData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating session:', error);
+      throw new Error(`Failed to create session: ${error.message}`);
+    }
+
+    return data?.[0] ? mapSessionData(data[0]) : null;
+  }
+
+  static async updateSession(sessionId: string, updates: any) {
+    console.log('Updating session:', sessionId, updates);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.SESSIONS)
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+      .select();
+
+    if (error) {
+      console.error('Error updating session:', error);
+      throw new Error(`Failed to update session: ${error.message}`);
+    }
+
+    return data?.[0] ? mapSessionData(data[0]) : null;
+  }
+
+  static async deleteSession(sessionId: string) {
+    console.log('Deleting session:', sessionId);
+    
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.SESSIONS)
+      .delete()
+      .eq('id', sessionId);
+
+    if (error) {
+      console.error('Error deleting session:', error);
+      throw new Error(`Failed to delete session: ${error.message}`);
+    }
+  }
+
+  // User Roles Management
+  static async getUserRoles(userId?: string, organizationId?: string) {
+    console.log('Fetching user roles for user:', userId, 'organization:', organizationId);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.USER_ROLES)
+      .select(`
+        id,
+        user_id,
+        role_id,
+        organization_id,
+        department_id,
+        assigned_by,
+        assigned_at,
+        revoked_at,
+        revoked_by,
+        is_active,
+        is_primary,
+        metadata,
+        created_at,
+        updated_at,
+        roles!inner(
+          id,
+          name,
+          description,
+          permissions,
+          is_active
+        ),
+        users!inner(
+          id,
+          full_name,
+          email,
+          role,
+          avatar
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (userId) {
+      query = query.eq('user_id', userId);
+    }
+    if (organizationId) {
+      query = query.eq('organization_id', organizationId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching user roles:', error);
+      return [];
+    }
+
+    return data?.map(mapUserRoleData) || [];
+  }
+
+  static async assignUserRole(roleData: any) {
+    console.log('Assigning user role:', roleData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.USER_ROLES)
+      .insert({
+        ...roleData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error assigning user role:', error);
+      throw new Error(`Failed to assign user role: ${error.message}`);
+    }
+
+    return data?.[0] ? mapUserRoleData(data[0]) : null;
+  }
+
+  static async revokeUserRole(userRoleId: string, revokedBy: string) {
+    console.log('Revoking user role:', userRoleId, 'by:', revokedBy);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.USER_ROLES)
+      .update({
+        revoked_at: new Date().toISOString(),
+        revoked_by: revokedBy,
+        is_active: false,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userRoleId)
+      .select();
+
+    if (error) {
+      console.error('Error revoking user role:', error);
+      throw new Error(`Failed to revoke user role: ${error.message}`);
+    }
+
+    return data?.[0] ? mapUserRoleData(data[0]) : null;
+  }
+
+  // Password Reset Tokens Management
+  static async createPasswordResetToken(tokenData: any) {
+    console.log('Creating password reset token:', tokenData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.PASSWORD_RESET_TOKENS)
+      .insert({
+        ...tokenData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating password reset token:', error);
+      throw new Error(`Failed to create password reset token: ${error.message}`);
+    }
+
+    return data?.[0] ? mapPasswordResetTokenData(data[0]) : null;
+  }
+
+  static async validatePasswordResetToken(token: string) {
+    console.log('Validating password reset token:', token);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.PASSWORD_RESET_TOKENS)
+      .select('*')
+      .eq('token', token)
+      .eq('is_used', false)
+      .gt('expires_at', new Date().toISOString())
+      .single();
+
+    if (error) {
+      console.error('Error validating password reset token:', error);
+      return null;
+    }
+
+    return data ? mapPasswordResetTokenData(data) : null;
+  }
+
+  static async markPasswordResetTokenAsUsed(tokenId: string) {
+    console.log('Marking password reset token as used:', tokenId);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.PASSWORD_RESET_TOKENS)
+      .update({
+        is_used: true,
+        used_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', tokenId)
+      .select();
+
+    if (error) {
+      console.error('Error marking password reset token as used:', error);
+      throw new Error(`Failed to mark token as used: ${error.message}`);
+    }
+
+    return data?.[0] ? mapPasswordResetTokenData(data[0]) : null;
+  }
+
+  // Personal Access Tokens Management
+  static async getPersonalAccessTokens(userId: string) {
+    console.log('Fetching personal access tokens for user:', userId);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.PERSONAL_ACCESS_TOKENS)
+      .select(`
+        id,
+        user_id,
+        name,
+        token_hash,
+        token_preview,
+        scopes,
+        last_used_at,
+        last_used_ip,
+        last_used_user_agent,
+        expires_at,
+        revoked_at,
+        revoked_by,
+        is_active,
+        metadata,
+        created_at,
+        updated_at
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching personal access tokens:', error);
+      return [];
+    }
+
+    return data?.map(mapPersonalAccessTokenData) || [];
+  }
+
+  static async createPersonalAccessToken(tokenData: any) {
+    console.log('Creating personal access token:', tokenData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.PERSONAL_ACCESS_TOKENS)
+      .insert({
+        ...tokenData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating personal access token:', error);
+      throw new Error(`Failed to create personal access token: ${error.message}`);
+    }
+
+    return data?.[0] ? mapPersonalAccessTokenData(data[0]) : null;
+  }
+
+  static async revokePersonalAccessToken(tokenId: string, revokedBy: string) {
+    console.log('Revoking personal access token:', tokenId, 'by:', revokedBy);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.PERSONAL_ACCESS_TOKENS)
+      .update({
+        revoked_at: new Date().toISOString(),
+        revoked_by: revokedBy,
+        is_active: false,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', tokenId)
+      .select();
+
+    if (error) {
+      console.error('Error revoking personal access token:', error);
+      throw new Error(`Failed to revoke personal access token: ${error.message}`);
+    }
+
+    return data?.[0] ? mapPersonalAccessTokenData(data[0]) : null;
+  }
+
+  // Auth Audit Log Management
+  static async logAuthEvent(eventData: any) {
+    console.log('Logging auth event:', eventData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.AUTH_AUDIT_LOG)
+      .insert({
+        ...eventData,
+        created_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error logging auth event:', error);
+      throw new Error(`Failed to log auth event: ${error.message}`);
+    }
+
+    return data?.[0] ? mapAuthAuditLogData(data[0]) : null;
+  }
+
+  static async getAuthAuditLogs(userId?: string, eventType?: string, limit: number = 100) {
+    console.log('Fetching auth audit logs for user:', userId, 'event type:', eventType);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.AUTH_AUDIT_LOG)
+      .select(`
+        id,
+        user_id,
+        session_id,
+        event_type,
+        event_description,
+        ip_address,
+        user_agent,
+        device_info,
+        location_info,
+        success,
+        failure_reason,
+        metadata,
+        created_at
+      `)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (userId) {
+      query = query.eq('user_id', userId);
+    }
+    if (eventType) {
+      query = query.eq('event_type', eventType);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching auth audit logs:', error);
+      return [];
+    }
+
+    return data?.map(mapAuthAuditLogData) || [];
+  }
+
+  // Real-time subscriptions for authentication tables
+  static subscribeToAuthAccountUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('auth-accounts-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.AUTH_ACCOUNTS },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToSessionUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('sessions-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.SESSIONS },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToUserRoleUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('user-roles-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.USER_ROLES },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToPersonalAccessTokenUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('personal-access-tokens-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.PERSONAL_ACCESS_TOKENS },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToAuthAuditLogUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('auth-audit-log-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.AUTH_AUDIT_LOG },
+        callback
+      )
+      .subscribe();
+  }
+
+  // =============================================================================
+  // CACHING & PERFORMANCE METHODS
+  // =============================================================================
+
+  // Cache Management
+  static async getCacheEntry(organizationId: string, cacheKey: string) {
+    console.log('Getting cache entry:', { organizationId, cacheKey });
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.CACHE)
+      .select('*')
+      .eq('organization_id', organizationId)
+      .eq('cache_key', cacheKey)
+      .gt('expires_at', new Date().toISOString())
+      .single();
+
+    if (error) {
+      console.error('Error getting cache entry:', error);
+      return null;
+    }
+
+    // Update access count and accessed_at
+    await supabase
+      .from(SUPABASE_TABLES.CACHE)
+      .update({
+        accessed_at: new Date().toISOString(),
+        access_count: (data.access_count || 0) + 1
+      })
+      .eq('id', data.id);
+
+    return mapCacheData(data);
+  }
+
+  static async setCacheEntry(
+    organizationId: string, 
+    cacheKey: string, 
+    cacheValue: any, 
+    options: {
+      cacheType?: string;
+      tags?: string[];
+      ttlSeconds?: number;
+      isCompressed?: boolean;
+      compressionType?: string;
+      metadata?: any;
+    } = {}
+  ) {
+    console.log('Setting cache entry:', { organizationId, cacheKey, options });
+    
+    const {
+      cacheType = 'general',
+      tags = [],
+      ttlSeconds = 3600, // 1 hour default
+      isCompressed = false,
+      compressionType = null,
+      metadata = {}
+    } = options;
+
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
+    const cacheValueJson = typeof cacheValue === 'string' ? JSON.parse(cacheValue) : cacheValue;
+    const sizeBytes = JSON.stringify(cacheValueJson).length;
+
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.CACHE)
+      .upsert({
+        organization_id: organizationId,
+        cache_key: cacheKey,
+        cache_value: cacheValueJson,
+        cache_type: cacheType,
+        tags: tags,
+        expires_at: expiresAt,
+        size_bytes: sizeBytes,
+        is_compressed: isCompressed,
+        compression_type: compressionType,
+        metadata: metadata,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        accessed_at: new Date().toISOString(),
+        access_count: 0
+      })
+      .select();
+
+    if (error) {
+      console.error('Error setting cache entry:', error);
+      throw new Error(`Failed to set cache entry: ${error.message}`);
+    }
+
+    return mapCacheData(data[0]);
+  }
+
+  static async deleteCacheEntry(organizationId: string, cacheKey: string) {
+    console.log('Deleting cache entry:', { organizationId, cacheKey });
+    
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.CACHE)
+      .delete()
+      .eq('organization_id', organizationId)
+      .eq('cache_key', cacheKey);
+
+    if (error) {
+      console.error('Error deleting cache entry:', error);
+      throw new Error(`Failed to delete cache entry: ${error.message}`);
+    }
+  }
+
+  static async invalidateCacheByTags(organizationId: string, tags: string[], invalidatedBy: string = 'system') {
+    console.log('Invalidating cache by tags:', { organizationId, tags, invalidatedBy });
+    
+    const { data, error } = await supabase.rpc('invalidate_cache_by_tags', {
+      p_organization_id: organizationId,
+      p_tags: tags,
+      p_invalidated_by: invalidatedBy
+    });
+
+    if (error) {
+      console.error('Error invalidating cache by tags:', error);
+      throw new Error(`Failed to invalidate cache by tags: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  static async clearExpiredCache() {
+    console.log('Clearing expired cache entries');
+    
+    const { data, error } = await supabase.rpc('cleanup_expired_cache');
+
+    if (error) {
+      console.error('Error clearing expired cache:', error);
+      throw new Error(`Failed to clear expired cache: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  static async getCacheStatistics(organizationId?: string, cacheType?: string, days: number = 7) {
+    console.log('Getting cache statistics:', { organizationId, cacheType, days });
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.CACHE_STATISTICS)
+      .select('*')
+      .gte('date', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+      .order('date', { ascending: false });
+
+    if (organizationId) {
+      query = query.eq('organization_id', organizationId);
+    }
+
+    if (cacheType) {
+      query = query.eq('cache_type', cacheType);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error getting cache statistics:', error);
+      return [];
+    }
+
+    return data?.map(mapCacheStatisticsData) || [];
+  }
+
+  static async getCacheHitRatio(organizationId?: string, cacheType?: string, days: number = 7) {
+    console.log('Getting cache hit ratio:', { organizationId, cacheType, days });
+    
+    const { data, error } = await supabase.rpc('get_cache_hit_ratio', {
+      p_organization_id: organizationId,
+      p_cache_type: cacheType,
+      p_days: days
+    });
+
+    if (error) {
+      console.error('Error getting cache hit ratio:', error);
+      return [];
+    }
+
+    return data || [];
+  }
+
+  // Cache Lock Management
+  static async acquireCacheLock(
+    organizationId: string, 
+    lockKey: string, 
+    lockedBy: string, 
+    ttlSeconds: number = 300, // 5 minutes default
+    lockType: string = 'exclusive'
+  ) {
+    console.log('Acquiring cache lock:', { organizationId, lockKey, lockedBy, ttlSeconds, lockType });
+    
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
+
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.CACHE_LOCKS)
+      .upsert({
+        organization_id: organizationId,
+        lock_key: lockKey,
+        lock_type: lockType,
+        locked_by: lockedBy,
+        expires_at: expiresAt,
+        acquired_count: 1,
+        metadata: {}
+      })
+      .select();
+
+    if (error) {
+      console.error('Error acquiring cache lock:', error);
+      throw new Error(`Failed to acquire cache lock: ${error.message}`);
+    }
+
+    return mapCacheLockData(data[0]);
+  }
+
+  static async releaseCacheLock(organizationId: string, lockKey: string, lockedBy: string) {
+    console.log('Releasing cache lock:', { organizationId, lockKey, lockedBy });
+    
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.CACHE_LOCKS)
+      .delete()
+      .eq('organization_id', organizationId)
+      .eq('lock_key', lockKey)
+      .eq('locked_by', lockedBy);
+
+    if (error) {
+      console.error('Error releasing cache lock:', error);
+      throw new Error(`Failed to release cache lock: ${error.message}`);
+    }
+  }
+
+  static async clearExpiredCacheLocks() {
+    console.log('Clearing expired cache locks');
+    
+    const { data, error } = await supabase.rpc('cleanup_expired_cache_locks');
+
+    if (error) {
+      console.error('Error clearing expired cache locks:', error);
+      throw new Error(`Failed to clear expired cache locks: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  // Migration Management
+  static async getMigrations() {
+    console.log('Getting migrations');
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.MIGRATIONS)
+      .select('*')
+      .order('applied_at', { ascending: false });
+
+    if (error) {
+      console.error('Error getting migrations:', error);
+      return [];
+    }
+
+    return data?.map(mapMigrationData) || [];
+  }
+
+  static async getMigrationByName(migrationName: string) {
+    console.log('Getting migration by name:', migrationName);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.MIGRATIONS)
+      .select('*')
+      .eq('migration_name', migrationName)
+      .single();
+
+    if (error) {
+      console.error('Error getting migration by name:', error);
+      return null;
+    }
+
+    return mapMigrationData(data);
+  }
+
+  static async createMigration(migrationData: {
+    migrationName: string;
+    migrationVersion: string;
+    migrationType: string;
+    description?: string;
+    sqlContent: string;
+    checksum: string;
+    appliedBy: string;
+    executionTimeMs?: number;
+    status?: string;
+    dependencies?: string[];
+    metadata?: any;
+  }) {
+    console.log('Creating migration:', migrationData.migrationName);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.MIGRATIONS)
+      .insert({
+        migration_name: migrationData.migrationName,
+        migration_version: migrationData.migrationVersion,
+        migration_type: migrationData.migrationType,
+        description: migrationData.description,
+        sql_content: migrationData.sqlContent,
+        checksum: migrationData.checksum,
+        applied_by: migrationData.appliedBy,
+        execution_time_ms: migrationData.executionTimeMs || 0,
+        status: migrationData.status || 'success',
+        dependencies: migrationData.dependencies || [],
+        metadata: migrationData.metadata || {},
+        applied_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating migration:', error);
+      throw new Error(`Failed to create migration: ${error.message}`);
+    }
+
+    return mapMigrationData(data[0]);
+  }
+
+  // Cache Invalidation Logs
+  static async getCacheInvalidationLogs(organizationId?: string, limit: number = 100) {
+    console.log('Getting cache invalidation logs:', { organizationId, limit });
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.CACHE_INVALIDATION_LOGS)
+      .select('*')
+      .order('invalidated_at', { ascending: false })
+      .limit(limit);
+
+    if (organizationId) {
+      query = query.eq('organization_id', organizationId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error getting cache invalidation logs:', error);
+      return [];
+    }
+
+    return data?.map(mapCacheInvalidationLogData) || [];
+  }
+
+  // Real-time subscriptions for caching tables
+  static subscribeToCacheUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('cache-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.CACHE },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToCacheLockUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('cache-locks-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.CACHE_LOCKS },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToMigrationUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('migrations-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.MIGRATIONS },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToCacheStatisticsUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('cache-statistics-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.CACHE_STATISTICS },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToCacheInvalidationLogUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('cache-invalidation-logs-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.CACHE_INVALIDATION_LOGS },
         callback
       )
       .subscribe();
