@@ -120,15 +120,17 @@ export function PendingReviews({ onBack, onNavigateToCase }: PendingReviewsProps
 
   const sortedReviews = [...filteredReviews].sort((a, b) => {
     switch (sortBy) {
-      case 'priority':
+      case 'priority': {
         const priorityOrder = { high: 3, medium: 2, low: 1 };
         return priorityOrder[b.priority as keyof typeof priorityOrder] - priorityOrder[a.priority as keyof typeof priorityOrder];
+      }
       case 'waitTime':
         return b.waitTime.localeCompare(a.waitTime);
-      case 'amount':
+      case 'amount': {
         const amountA = parseFloat(a.amount.replace(/[₹,]/g, ''));
         const amountB = parseFloat(b.amount.replace(/[₹,]/g, ''));
         return amountB - amountA;
+      }
       default:
         return 0;
     }

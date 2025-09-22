@@ -198,7 +198,7 @@ export function AdaptivePopulator() {
             }
           }
         }
-      } catch (error) {
+      } catch {
         console.log('⚠️ Customers table not available or has different structure');
       }
 
@@ -245,7 +245,7 @@ export function AdaptivePopulator() {
             }
           }
         }
-      } catch (error) {
+      } catch {
         console.log('⚠️ Cases table not available or has different structure');
       }
 

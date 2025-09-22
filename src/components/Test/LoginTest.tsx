@@ -36,20 +36,47 @@ export function LoginTest() {
           
           <div className="space-y-2">
             <Button 
-              onClick={() => testLogin('superadmin@veriphy.com', 'password123')}
+              onClick={() => testLogin('admin@veriphy.com', 'test123')}
               disabled={testLoading}
               className="w-full"
             >
-              {testLoading ? 'Testing...' : 'Test Super Admin Login'}
+              {testLoading ? 'Testing...' : 'Test Admin User Login'}
             </Button>
             
             <Button 
-              onClick={() => testLogin('admin@veriphy.com', 'password123')}
+              onClick={() => testLogin('manager@veriphy.com', 'test123')}
               disabled={testLoading}
               variant="outline"
               className="w-full"
             >
-              {testLoading ? 'Testing...' : 'Test Admin Login'}
+              {testLoading ? 'Testing...' : 'Test Manager User Login'}
+            </Button>
+            
+            <Button 
+              onClick={() => testLogin('sales@veriphy.com', 'test123')}
+              disabled={testLoading}
+              variant="outline"
+              className="w-full"
+            >
+              {testLoading ? 'Testing...' : 'Test Sales Person Login'}
+            </Button>
+            
+            <Button 
+              onClick={() => testLogin('credit@veriphy.com', 'test123')}
+              disabled={testLoading}
+              variant="outline"
+              className="w-full"
+            >
+              {testLoading ? 'Testing...' : 'Test Credit Operations Login'}
+            </Button>
+            
+            <Button 
+              onClick={() => testLogin('compliance@veriphy.com', 'test123')}
+              disabled={testLoading}
+              variant="outline"
+              className="w-full"
+            >
+              {testLoading ? 'Testing...' : 'Test Compliance Officer Login'}
             </Button>
           </div>
           
@@ -63,3 +90,4 @@ export function LoginTest() {
     </Card>
   );
 }
+

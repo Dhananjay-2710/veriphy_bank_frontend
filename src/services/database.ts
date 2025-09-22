@@ -389,7 +389,7 @@ export class DatabaseService {
   // DASHBOARD STATISTICS
   // =============================================================================
 
-  static async getDashboardStats(userId: string, _role: string) {
+  static async getDashboardStats(userId: string) {
     const stats = {
       totalCases: 0,
       activeCases: 0,
@@ -448,7 +448,7 @@ export class DatabaseService {
   // WORKLOAD PLANNING
   // =============================================================================
 
-  static async getWorkloadTasks(userId: string, _date?: string) {
+  static async getWorkloadTasks(userId: string) {
     const { data, error } = await supabase
       .from('tasks')
       .select(`
@@ -558,7 +558,7 @@ export class DatabaseService {
   // TEAM OVERSIGHT
   // =============================================================================
 
-  static async getTeamMembers(_organizationId?: string) {
+  static async getTeamMembers() {
     const { data, error } = await supabase
       .from('users')
       .select(`

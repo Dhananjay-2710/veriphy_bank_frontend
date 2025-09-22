@@ -28,6 +28,18 @@ export function SalespersonDashboard({
     assignedTo: user?.id,
     status: 'in-progress'
   });
+
+  // Show loading state while data is being fetched
+  if (statsLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
   const handleStatDoubleClick = (statType: string) => {
     switch (statType) {
       case 'active-cases':
@@ -120,7 +132,7 @@ export function SalespersonDashboard({
   const dashboardStats = [
     { 
       label: 'Active Cases', 
-      value: statsLoading ? '...' : stats.activeCases.toString(), 
+      value: stats?.activeCases?.toString() || '0', 
       icon: FileText, 
       color: 'blue', 
       type: 'active-cases', 
@@ -128,7 +140,7 @@ export function SalespersonDashboard({
     },
     { 
       label: 'Pending Documents', 
-      value: statsLoading ? '...' : stats.pendingDocuments.toString(), 
+      value: stats?.pendingDocuments?.toString() || '0', 
       icon: Clock, 
       color: 'yellow', 
       type: 'pending-documents', 
@@ -136,7 +148,7 @@ export function SalespersonDashboard({
     },
     { 
       label: 'Completed Today', 
-      value: statsLoading ? '...' : stats.completedToday.toString(), 
+      value: stats?.completedToday?.toString() || '0', 
       icon: CheckCircle, 
       color: 'green', 
       type: 'completed-today', 
@@ -144,7 +156,7 @@ export function SalespersonDashboard({
     },
     { 
       label: 'Overdue Tasks', 
-      value: statsLoading ? '...' : stats.overdueTasks.toString(), 
+      value: stats?.overdueTasks?.toString() || '0', 
       icon: AlertTriangle, 
       color: 'red', 
       type: 'overdue-tasks', 

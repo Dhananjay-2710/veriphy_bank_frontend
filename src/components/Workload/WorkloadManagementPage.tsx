@@ -9,9 +9,7 @@ import {
   RefreshCw,
   AlertTriangle,
   CheckCircle,
-  XCircle,
-  Play,
-  Pause
+  Play
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
@@ -27,8 +25,7 @@ interface WorkloadManagementPageProps {
 }
 
 export function WorkloadManagementPage({ 
-  onNavigateToCases,
-  onNavigateToTasks
+  onBack: _onBack
 }: WorkloadManagementPageProps) {
   const [selectedFilters, setSelectedFilters] = useState<{
     userId?: string;

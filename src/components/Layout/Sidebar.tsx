@@ -1,23 +1,16 @@
 import { 
-  Home, 
-  FileText, 
-  Users, 
-  Calendar, 
-  BarChart3, 
-  Shield,
-  CheckCircle,
-  Clock,
-  MessageCircle
+  Shield
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContextFixed';
 import { Link, useLocation } from "react-router-dom";
+import { getNavigationForRole, NavigationItem } from '../../constants/navigation';
 
 interface SidebarProps {
   activeView: string;
   setActiveView: (view: string) => void;
 }
 
-export function Sidebar({  }: SidebarProps) {
+export function Sidebar({ activeView, setActiveView }: SidebarProps) {
   const { user, loading } = useAuth();
   const location = useLocation();
 
@@ -30,57 +23,12 @@ export function Sidebar({  }: SidebarProps) {
     );
   }
 
-  const getMenuItems = () => {
+  const getMenuItems = (): NavigationItem[] => {
     if (!user) {
       return []; // Return an empty array if there's no user
     }
     console.log("User role in Sidebar:", user.role);
-    switch (user.role) {
-      case 'super-admin':
-      return [
-        { id: 'dashboard', label: 'Master Dashboard', icon: Home },
-        { id: 'user-management', label: 'User Management', icon: Users },
-        { id: 'all-orgs', label: 'Organizations', icon: Users },
-        { id: 'settings', label: 'Global Settings', icon: Shield },
-        { id: 'audit', label: 'System Audit', icon: FileText },
-        { id: 'analytics', label: 'Global Analytics', icon: BarChart3 },
-      ];
-      case 'salesperson':
-        return [
-          { id: 'dashboard', label: 'Dashboard', icon: Home },
-          { id: 'cases', label: 'My Cases', icon: FileText },
-          { id: 'document-manager', label: 'Document Manager', icon: FileText },
-          { id: 'communicator', label: 'Customer Chat', icon: MessageCircle },
-          { id: 'workload', label: 'Workload Planner', icon: Calendar },
-        ];
-      case 'manager':
-        return [
-          { id: 'dashboard', label: 'Dashboard', icon: Home },
-          { id: 'team', label: 'Team Oversight', icon: Users },
-          { id: 'cases', label: 'All Cases', icon: FileText },
-          { id: 'document-manager', label: 'Document Manager', icon: FileText },
-          { id: 'communicator', label: 'Customer Chat', icon: MessageCircle },
-          { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-        ];
-      case 'credit-ops':
-        return [
-          { id: 'dashboard', label: 'Dashboard', icon: Home },
-          { id: 'approval-queue', label: 'Approval Queue', icon: CheckCircle },
-          { id: 'compliance-reports', label: 'Compliance Reports', icon: BarChart3 },
-          { id: 'compliance-review', label: 'Compliance Review', icon: Shield },
-          { id: 'pending-reviews', label: 'Pending Reviews', icon: Clock },
-        ];
-      case 'admin':
-        return [
-          { id: 'dashboard', label: 'Dashboard', icon: Home },
-          { id: 'user-management', label: 'User Management', icon: Users },
-          { id: 'system-settings', label: 'System Settings', icon: Shield },
-          { id: 'audit-logs', label: 'Audit Logs', icon: FileText },
-          { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-        ];
-      default:
-        return [];
-    }
+    return getNavigationForRole(user.role);
   };
 
   const menuItems = getMenuItems();
@@ -99,44 +47,64 @@ export function Sidebar({  }: SidebarProps) {
         <ul className="space-y-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname.includes(item.id);
-            // const isActive = activeView === item.id;
+            const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
             
             return (
               <li key={item.id}>
-                <Link
-                  to={item.id === 'dashboard' ? '/' : `/${item.id}`}
-                  className={`
-                    w-full flex items-center space-x-3 px-3 py-2 rounded-md
-                    transition-colors duration-200
-                    ${isActive 
-                      ? "bg-blue-600 text-white"
-                      : "text-gray-300 hover:bg-gray-800 hover:text-white"}
-                  `}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span className="font-medium">{item.label}</span>
-                </Link>
+                {item.children ? (
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-3 px-3 py-2 rounded-md text-gray-300">
+                      <Icon className="h-5 w-5" />
+                      <span className="font-medium">{item.label}</span>
+                    </div>
+                    <ul className="ml-4 space-y-1">
+                      {item.children.map((child) => {
+                        const ChildIcon = child.icon;
+                        const isChildActive = location.pathname === child.path || location.pathname.startsWith(child.path + '/');
+                        
+                        return (
+                          <li key={child.id}>
+                            <Link
+                              to={child.path}
+                              className={`
+                                w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm
+                                transition-colors duration-200
+                                ${isChildActive 
+                                  ? "bg-blue-600 text-white"
+                                  : "text-gray-400 hover:bg-gray-800 hover:text-white"}
+                              `}
+                            >
+                              <ChildIcon className="h-4 w-4" />
+                              <span className="font-medium">{child.label}</span>
+                              {child.isNew && (
+                                <span className="ml-auto bg-green-600 text-xs px-2 py-1 rounded-full">New</span>
+                              )}
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ) : (
+                  <Link
+                    to={item.path}
+                    className={`
+                      w-full flex items-center space-x-3 px-3 py-2 rounded-md
+                      transition-colors duration-200
+                      ${isActive 
+                        ? "bg-blue-600 text-white"
+                        : "text-gray-300 hover:bg-gray-800 hover:text-white"}
+                    `}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="font-medium">{item.label}</span>
+                    {item.isNew && (
+                      <span className="ml-auto bg-green-600 text-xs px-2 py-1 rounded-full">New</span>
+                    )}
+                  </Link>
+                )}
               </li>
             );
-            // return (
-            //   <li key={item.id}>
-            //     <button
-            //       onClick={() => setActiveView(item.id)}
-            //       className={`
-            //         w-full flex items-center space-x-3 px-3 py-2 rounded-md text-left
-            //         transition-colors duration-200
-            //         ${isActive 
-            //           ? 'bg-blue-600 text-white' 
-            //           : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-            //         }
-            //       `}
-            //     >
-            //       <Icon className="h-5 w-5" />
-            //       <span className="font-medium">{item.label}</span>
-            //     </button>
-            //   </li>
-            // );
           })}
         </ul>
       </nav>

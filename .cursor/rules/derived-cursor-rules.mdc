@@ -1,0 +1,102 @@
+---
+description: AI rules derived by SpecStory from the project AI interaction history
+globs: *
+---
+
+## PROJECT RULES & CODING STANDARDS
+
+Comprehensive validation must be added across all text input fields in the project wherever required. When using `useCallback` in TypeScript, ensure the correct syntax for return type annotations is used. The correct syntax is `useCallback((): boolean => { ... })` and not `useCallback(): boolean => { ... }`. Ensure all JSX components have corresponding closing tags and proper nesting. When authenticating users against a database without Supabase Auth accounts, the login function should query the users table directly by email. Password validation must be implemented with proper hashing and validation, and should not be disabled in production environments. User roles from the database should be properly mapped to application roles. When authenticating users against a database without Supabase Auth accounts, the login function must query the users table directly by email, skipping Supabase Auth. Password validation must be implemented (but can be temporarily disabled for local testing). Role mapping should handle roles such as admin, manager, salesperson, credit-ops, and compliance. The application must support both Supabase Auth users (new signups) and database-only users (existing users). Registration must create Supabase Auth users and sync to the database, assigning roles via the `user_roles` table. The registration form should offer roles that match the database: `salesperson`, `manager`, `credit-ops`, `admin`, and `auditor`, and `compliance`. The application must support creating a `super_admin` role during initial setup.
+
+The `users` table includes the following fields: `id`, `full_name`, `email`, `mobile`, `email_verified_at`, `remember_token`, `department_id`, `employment_type_id`, `organization_id`, `status`, `metadata`, `created_at`, `updated_at`, `deleted_at`, `auth_id`, `role`. Passwords are handled by Supabase Auth, and the `auth_id` field links to Supabase Auth users. The `full_name` field should be used instead of separate first/last names. Use `mobile` instead of `phone`. The `role` field is stored directly in the `users` table.
+
+The application uses a dual authentication system:
+1.  Supabase Auth users (new signups with proper authentication)
+2.  Database-only users (existing users without Supabase Auth accounts)
+
+The `src/contexts/AuthContextFixed.tsx` file is the main authentication context for the Veriphy Bank frontend application. When importing `AuthContext`, ensure to import from `AuthContextFixed` due to the actual file name. The AuthContext supports registration functionality, including the creation of a `super_admin` user. The super admin is responsible for the initial organization setup using Supabase CRUD APIs. The admin can then configure their organization. The system should support adding one row to every table using CRUD operations in the super admin dashboard to populate the database initially.
+
+## WORKFLOW & RELEASE RULES
+
+When integrating Supabase live data, follow these steps:
+1. Analyze current Supabase integration status across all components.
+2. Review Supabase database service methods and functionality.
+3. Check all components for live data integration.
+4. Identify components missing Supabase integration.
+5. Generate comprehensive integration status report.
+
+After integrating components, the system is ready for:
+1. **Navigation Integration** - Add these components to the main app routing
+2. **Advanced Features** - Implement pagination, bulk operations, and advanced filtering
+3. **Testing** - Add comprehensive unit and integration tests
+4. **Performance Optimization** - Implement caching strategies and query optimization
+5. **User Experience** - Add advanced UI features like drag-and-drop, bulk actions, etc.
+
+When setting up the system as a super admin, follow these steps:
+1. Login as Super Admin → Access Super Admin Dashboard
+2. Click "System Setup" → Opens the setup wizard
+3. Step 1: Organizations → Create your first organization
+4. Step 2: Departments → Set up department structure
+5. Step 3: Products → Configure loan products
+6. Step 4: Workflows → (Coming soon)
+
+When setting up the system as an admin:
+1. Login as Admin → Access Admin Dashboard
+2. Use the same components to set up within their organization
+3. Create users and assign to departments
+4. Configure organization-specific settings
+
+To fix import errors:
+1. Check the exact file path and name.
+2. Correct the import statement to match the actual location.
+
+The Super Admin setup involves these steps:
+1. **Organization Management** - Create/edit organizations
+2. **Department Management** - Set up departments for each organization
+3. **Role & Permission Management** - Define roles and permissions
+4. **Product Management** - Create loan products
+5. **Document Type Management** - Define required documents
+6. **Workflow Setup** - Create approval workflows
+
+The Admin setup (Organization Level) involves these steps:
+1. **User Management** - Create users within their organization
+2. **Department Assignment** - Assign users to departments
+3. **Task Category Setup** - Create task categories
+4. **Compliance Setup** - Set up compliance rules
+
+Multiple methods are available for Super Admin setup:
+1. **Quick Setup (Recommended)**
+   1. Start your app: `npm run dev`
+   2. Go to setup page: `http://localhost:5173/setup`
+   3. Click "Create Super Admin"
+   4. Login with: `superadmin@veriphy.com` (any password)
+2. **Direct Database**
+   1. Open Supabase Dashboard
+   2. Go to Table Editor → users table
+   3. Insert the super admin record (see SUPER_ADMIN_SETUP.md)
+3. **Browser Console**
+   1. Open your app in browser
+   2. Press F12 → Console
+   3. Run the setup script (see SUPER_ADMIN_SETUP.md)
+
+To resolve project issues, follow these steps:
+1.  Run the build command: `npm run build`
+2.  Check for TypeScript compilation errors: `npx tsc --noEmit`
+3.  Run the linter: `npm run lint`
+4.  Address linting errors systematically, prioritizing the following:
+    - Remove unused variables and imports.
+    - Replace 'any' types with proper TypeScript types.
+    - Ensure variables are correctly declared as `const` instead of `let` where appropriate.
+    - Fix lexical declarations in case blocks.
+    - Correct parsing errors.
+    - Remove unnecessary escape characters in regex.
+
+## TECH STACK
+
+## PROJECT DOCUMENTATION & CONTEXT SYSTEM
+
+## DEBUGGING
+
+Password validation is temporarily disabled for testing, but proper authentication should be implemented in production. If a `ReferenceError: SupabaseTest is not defined` error occurs, ensure all references to `SupabaseTest` (including route definitions) are removed. When encountering `Failed to resolve import "../../contexts/AuthContext"` errors in components like `UserProfileManagement.tsx`, `ComplianceIssueManagement.tsx`, `TaskCategoryManagement.tsx`, and `LoanApplicationManagement.tsx`, update the import statement to `../../contexts/AuthContextFixed`.
+When encountering "You cannot render a <Router> inside another <Router>" errors, ensure there is only one `<BrowserRouter>` component in the entire application.
+When encountering "TypeError: Cannot read properties of null (reading 'totalUsers')" in `SuperAdminDashboardFixed.tsx` or `SalespersonDashboard.tsx`, ensure proper null checks are added when accessing properties of the `stats` object, especially `stats.totalUsers`. A loading state check should also be added to prevent rendering the component when data is not yet available.
+If a `ReferenceError: Building2 is not defined` error occurs in `SuperAdminDashboardFixed.tsx`, ensure `Building2` is imported from `lucide-react`. Also ensure that `Package` is imported from `lucide-react` in the same component.

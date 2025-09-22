@@ -13,7 +13,9 @@ import {
   Home,
   UserPlus,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Building2,
+  Package
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
@@ -21,6 +23,10 @@ import { Button } from '../ui/Button';
 import { NavigationHelper } from '../Test/NavigationHelper';
 import { DatabasePopulator } from '../Test/DatabasePopulator';
 import { useAdminDashboardStats } from '../../hooks/useDashboardData';
+import { SystemSetupWizard } from '../Admin/SystemSetupWizard';
+import { OrganizationManagement } from '../Admin/OrganizationManagement';
+import { DepartmentManagement } from '../Admin/DepartmentManagement';
+import { ProductManagement } from '../Admin/ProductManagement';
 
 interface SuperAdminDashboardProps {
   onNavigateToUserManagement: () => void;
@@ -37,46 +43,59 @@ interface SuperAdminDashboardProps {
 export function SuperAdminDashboardFixed({}: SuperAdminDashboardProps) {
   const navigate = useNavigate();
   const [showDatabasePopulator, setShowDatabasePopulator] = useState(false);
+  const [currentView, setCurrentView] = useState<'dashboard' | 'setup' | 'organizations' | 'departments' | 'products'>('dashboard');
   
   // Fetch real data from Supabase
   const { stats, loading: statsLoading, error: statsError, refetch } = useAdminDashboardStats();
 
+  // Show loading state while data is being fetched
+  if (statsLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
   const systemStats = [
     { 
       label: 'Total Users', 
-      value: statsLoading ? '...' : stats.totalUsers.toString(), 
+      value: stats?.totalUsers?.toString() || '0', 
       change: '+3 this week', 
       icon: Users, 
       color: 'blue',
       type: 'total-users',
-      details: `Salespeople: ${Math.floor(stats.totalUsers * 0.5)}, Managers: ${Math.floor(stats.totalUsers * 0.2)}, Credit Ops: ${Math.floor(stats.totalUsers * 0.25)}, Admins: ${Math.floor(stats.totalUsers * 0.05)}`
+      details: `Salespeople: ${Math.floor((stats?.totalUsers || 0) * 0.5)}, Managers: ${Math.floor((stats?.totalUsers || 0) * 0.2)}, Credit Ops: ${Math.floor((stats?.totalUsers || 0) * 0.25)}, Admins: ${Math.floor((stats?.totalUsers || 0) * 0.05)}`
     },
     { 
       label: 'System Health', 
-      value: statsLoading ? '...' : `${stats.systemHealth}%`, 
+      value: `${stats?.systemHealth || 0}%`, 
       change: 'All systems operational', 
       icon: Activity, 
       color: 'green',
       type: 'system-health',
-      details: `API: ${stats.systemHealth}%, Database: ${stats.systemHealth}%, WhatsApp: 100%, Document Storage: ${stats.systemHealth}%`
+      details: `API: ${stats?.systemHealth || 0}%, Database: ${stats?.systemHealth || 0}%, WhatsApp: 100%, Document Storage: ${stats?.systemHealth || 0}%`
     },
     { 
       label: 'Security Alerts', 
-      value: statsLoading ? '...' : stats.securityAlerts.toString(), 
+      value: (stats?.securityAlerts || 0).toString(), 
       change: '1 resolved today', 
       icon: Shield, 
       color: 'yellow',
       type: 'security-alerts',
-      details: `Failed Login Attempts: ${Math.floor(stats.securityAlerts * 0.5)}, Suspicious Activity: ${Math.floor(stats.securityAlerts * 0.5)}, All Critical Systems Secure`
+      details: `Failed Login Attempts: ${Math.floor((stats?.securityAlerts || 0) * 0.5)}, Suspicious Activity: ${Math.floor((stats?.securityAlerts || 0) * 0.5)}, All Critical Systems Secure`
     },
     { 
       label: 'Total Cases', 
-      value: statsLoading ? '...' : stats.totalCases.toString(), 
+      value: (stats?.totalCases || 0).toString(), 
       change: '+89 this month', 
       icon: FileText, 
       color: 'purple',
       type: 'total-cases',
-      details: `Active: ${stats.activeCases}, Approved: ${Math.floor(stats.totalCases * 0.7)}, Rejected: ${Math.floor(stats.totalCases * 0.1)}, Under Review: ${Math.floor(stats.totalCases * 0.2)}`
+      details: `Active: ${stats?.activeCases || 0}, Approved: ${Math.floor((stats?.totalCases || 0) * 0.7)}, Rejected: ${Math.floor((stats?.totalCases || 0) * 0.1)}, Under Review: ${Math.floor((stats?.totalCases || 0) * 0.2)}`
     },
     { 
       label: 'Revenue (MTD)', 
@@ -161,6 +180,34 @@ export function SuperAdminDashboardFixed({}: SuperAdminDashboardProps) {
       icon: Database,
       color: 'red',
       onClick: () => navigate('/database-tools')
+    },
+    {
+      title: 'System Setup',
+      description: 'Complete system setup wizard',
+      icon: Settings,
+      color: 'blue',
+      onClick: () => setCurrentView('setup')
+    },
+    {
+      title: 'Organizations',
+      description: 'Manage organizations',
+      icon: Building2,
+      color: 'green',
+      onClick: () => setCurrentView('organizations')
+    },
+    {
+      title: 'Departments',
+      description: 'Manage departments',
+      icon: Users,
+      color: 'purple',
+      onClick: () => setCurrentView('departments')
+    },
+    {
+      title: 'Products',
+      description: 'Manage loan products',
+      icon: Package,
+      color: 'orange',
+      onClick: () => setCurrentView('products')
     }
   ];
 
@@ -271,7 +318,23 @@ export function SuperAdminDashboardFixed({}: SuperAdminDashboardProps) {
     );
   }
 
-  return (
+  // Render different views based on currentView state
+  const renderCurrentView = () => {
+    switch (currentView) {
+      case 'setup':
+        return <SystemSetupWizard />;
+      case 'organizations':
+        return <OrganizationManagement />;
+      case 'departments':
+        return <DepartmentManagement />;
+      case 'products':
+        return <ProductManagement />;
+      default:
+        return renderDashboard();
+    }
+  };
+
+  const renderDashboard = () => (
     <div className="space-y-6">
       {/* Navigation Helper */}
       <NavigationHelper />
@@ -497,6 +560,35 @@ export function SuperAdminDashboardFixed({}: SuperAdminDashboardProps) {
           </Button>
         </div>
       </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Navigation Breadcrumb */}
+      {currentView !== 'dashboard' && (
+        <div className="flex items-center space-x-2 text-sm text-gray-600">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setCurrentView('dashboard')}
+            className="text-blue-600 hover:text-blue-700"
+          >
+            <Home className="h-4 w-4 mr-1" />
+            Dashboard
+          </Button>
+          <span>/</span>
+          <span className="font-medium text-gray-900">
+            {currentView === 'setup' && 'System Setup'}
+            {currentView === 'organizations' && 'Organizations'}
+            {currentView === 'departments' && 'Departments'}
+            {currentView === 'products' && 'Products'}
+          </span>
+        </div>
+      )}
+
+      {/* Render Current View */}
+      {renderCurrentView()}
     </div>
   );
 }

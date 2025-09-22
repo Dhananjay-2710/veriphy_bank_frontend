@@ -29,7 +29,9 @@ import {
   Migration,
   CacheStatistics,
   CacheInvalidationLog,
-  CacheHitRatio
+  CacheHitRatio,
+  LoanApplication,
+  TaskCategory
 } from '../types';
 
 // Dashboard Stats Hook
@@ -264,7 +266,7 @@ export function useTasks(userId: string, date?: string) {
     try {
       setLoading(true);
       setError(null);
-      const result = await SupabaseDatabaseService.getWorkloadTasks(userId, date);
+      const result = await SupabaseDatabaseService.getWorkloadTasks(userId);
       setTasks(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
@@ -294,7 +296,7 @@ export function useTeamMembers(organizationId?: number) {
     try {
       setLoading(true);
       setError(null);
-      const result = await SupabaseDatabaseService.getTeamMembers(organizationId);
+      const result = await SupabaseDatabaseService.getTeamMembers();
       setTeamMembers(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch team members');
@@ -992,9 +994,8 @@ export function useWorkloadSchedules(filters?: { organizationId?: string }) {
     try {
       setLoading(true);
       setError(null);
-      // For now, return empty array as workload schedules functionality may need to be implemented
-      // const result = await SupabaseDatabaseService.getWorkloadSchedules(filters);
-      setData([]);
+      const result = await SupabaseDatabaseService.getWorkloadSchedules(filters);
+      setData(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch workload schedules');
     } finally {
@@ -1023,9 +1024,8 @@ export function useWorkloadAssignments(filters?: { organizationId?: string }) {
     try {
       setLoading(true);
       setError(null);
-      // For now, return empty array as workload assignments functionality may need to be implemented
-      // const result = await SupabaseDatabaseService.getWorkloadAssignments(filters);
-      setData([]);
+      const result = await SupabaseDatabaseService.getWorkloadAssignments(filters);
+      setData(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch workload assignments');
     } finally {
@@ -1054,9 +1054,8 @@ export function useApprovalQueues(filters?: { organizationId?: string; isActive?
     try {
       setLoading(true);
       setError(null);
-      // For now, return empty array as approval queues functionality may need to be implemented
-      // const result = await SupabaseDatabaseService.getApprovalQueues(filters);
-      setData([]);
+      const result = await SupabaseDatabaseService.getApprovalQueues(filters);
+      setData(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch approval queues');
     } finally {
@@ -1085,9 +1084,8 @@ export function useApprovalQueueItems(filters?: { organizationId?: string; queue
     try {
       setLoading(true);
       setError(null);
-      // For now, return empty array as approval queue items functionality may need to be implemented
-      // const result = await SupabaseDatabaseService.getApprovalQueueItems(filters);
-      setData([]);
+      const result = await SupabaseDatabaseService.getApprovalQueueItems(filters);
+      setData(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch approval queue items');
     } finally {
@@ -1132,9 +1130,8 @@ export function useReportTemplates(filters?: { category?: string; isActive?: boo
     try {
       setLoading(true);
       setError(null);
-      // For now, return empty array as report templates functionality may need to be implemented
-      // const result = await SupabaseDatabaseService.getReportTemplates(filters);
-      setData([]);
+      const result = await SupabaseDatabaseService.getReportTemplates(filters);
+      setData(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch report templates');
     } finally {
@@ -1163,9 +1160,8 @@ export function useComplianceReports(filters?: { period?: string; status?: strin
     try {
       setLoading(true);
       setError(null);
-      // For now, return empty array as compliance reports functionality may need to be implemented
-      // const result = await SupabaseDatabaseService.getComplianceReports(filters);
-      setData([]);
+      const result = await SupabaseDatabaseService.getComplianceReports(filters);
+      setData(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch compliance reports');
     } finally {
@@ -1194,9 +1190,8 @@ export function useComplianceIssueTypes(filters?: { category?: string; isActive?
     try {
       setLoading(true);
       setError(null);
-      // For now, return empty array as compliance issue types functionality may need to be implemented
-      // const result = await SupabaseDatabaseService.getComplianceIssueTypes(filters);
-      setData([]);
+      const result = await SupabaseDatabaseService.getComplianceIssueTypes(filters);
+      setData(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch compliance issue types');
     } finally {
@@ -1216,7 +1211,7 @@ export function useComplianceIssueTypes(filters?: { category?: string; isActive?
 }
 
 // System Integrations Hook
-export function useSystemIntegrations(filters?: { status?: string; type?: string }) {
+export function useSystemIntegrations(filters?: { organizationId?: string; status?: string; type?: string }) {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1225,9 +1220,8 @@ export function useSystemIntegrations(filters?: { status?: string; type?: string
     try {
       setLoading(true);
       setError(null);
-      // For now, return empty array as system integrations functionality may need to be implemented
-      // const result = await SupabaseDatabaseService.getSystemIntegrations(filters);
-      setData([]);
+      const result = await SupabaseDatabaseService.getSystemIntegrations(filters?.organizationId || '');
+      setData(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch system integrations');
     } finally {
@@ -1247,7 +1241,7 @@ export function useSystemIntegrations(filters?: { status?: string; type?: string
 }
 
 // Feature Flags Hook
-export function useFeatureFlags(filters?: { category?: string; isActive?: boolean }) {
+export function useFeatureFlags(filters?: { organizationId?: string; category?: string; isActive?: boolean }) {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1256,9 +1250,8 @@ export function useFeatureFlags(filters?: { category?: string; isActive?: boolea
     try {
       setLoading(true);
       setError(null);
-      // For now, return empty array as feature flags functionality may need to be implemented
-      // const result = await SupabaseDatabaseService.getFeatureFlags(filters);
-      setData([]);
+      const result = await SupabaseDatabaseService.getFeatureFlags(filters?.organizationId || '');
+      setData(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch feature flags');
     } finally {
@@ -1280,6 +1273,196 @@ export function useFeatureFlags(filters?: { category?: string; isActive?: boolea
 // =============================================================================
 // CORE BUSINESS TABLES HOOKS - MISSING INTEGRATIONS
 // =============================================================================
+
+// Loan Applications Hook
+export function useLoanApplications(filters?: { 
+  organizationId?: string; 
+  status?: string; 
+  priority?: string;
+  customerId?: string;
+  assignedSalesAgent?: string;
+  assignedCreditAnalyst?: string;
+}) {
+  const [loanApplications, setLoanApplications] = useState<LoanApplication[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await SupabaseDatabaseService.getLoanApplications(filters);
+      setLoanApplications(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch loan applications");
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
+
+  const refetch = useCallback(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Set up real-time subscription
+  useEffect(() => {
+    const subscription = SupabaseDatabaseService.subscribeToLoanApplications((payload) => {
+      console.log("Loan application real-time update:", payload);
+      fetchData(); // Refetch on any change
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchData]);
+
+  return { loanApplications, loading, error, refetch };
+}
+
+// Individual Loan Application Hook
+export function useLoanApplication(loanApplicationId: string) {
+  const [loanApplication, setLoanApplication] = useState<LoanApplication | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await SupabaseDatabaseService.getLoanApplicationById(loanApplicationId);
+      setLoanApplication(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch loan application");
+    } finally {
+      setLoading(false);
+    }
+  }, [loanApplicationId]);
+
+  const refetch = useCallback(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    if (loanApplicationId) {
+      fetchData();
+    }
+  }, [fetchData, loanApplicationId]);
+
+  // Set up real-time subscription
+  useEffect(() => {
+    if (!loanApplicationId) return;
+    
+    const subscription = SupabaseDatabaseService.subscribeToLoanApplications((payload: any) => {
+      console.log("Loan application real-time update:", payload);
+      if (payload.new?.id === loanApplicationId || payload.old?.id === loanApplicationId) {
+        fetchData(); // Refetch on specific loan application change
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchData, loanApplicationId]);
+
+  return { loanApplication, loading, error, refetch };
+}
+
+// Task Categories Hook
+export function useTaskCategories(filters?: { 
+  isActive?: boolean; 
+  searchTerm?: string;
+}) {
+  const [taskCategories, setTaskCategories] = useState<TaskCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await SupabaseDatabaseService.getTaskCategories(filters);
+      setTaskCategories(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch task categories");
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
+
+  const refetch = useCallback(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Set up real-time subscription
+  useEffect(() => {
+    const subscription = SupabaseDatabaseService.subscribeToTaskCategories((payload) => {
+      console.log("Task category real-time update:", payload);
+      fetchData(); // Refetch on any change
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchData]);
+
+  return { taskCategories, loading, error, refetch };
+}
+
+// Individual Task Category Hook
+export function useTaskCategory(categoryId: string) {
+  const [taskCategory, setTaskCategory] = useState<TaskCategory | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await SupabaseDatabaseService.getTaskCategoryById(categoryId);
+      setTaskCategory(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch task category");
+    } finally {
+      setLoading(false);
+    }
+  }, [categoryId]);
+
+  const refetch = useCallback(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    if (categoryId) {
+      fetchData();
+    }
+  }, [fetchData, categoryId]);
+
+  // Set up real-time subscription
+  useEffect(() => {
+    if (!categoryId) return;
+    
+    const subscription = SupabaseDatabaseService.subscribeToTaskCategories((payload: any) => {
+      console.log("Task category real-time update:", payload);
+      if (payload.new?.id === categoryId || payload.old?.id === categoryId) {
+        fetchData(); // Refetch on specific task category change
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchData, categoryId]);
+
+  return { taskCategory, loading, error, refetch };
+}
 
 // Customers Hook
 export function useCustomers(filters?: { 

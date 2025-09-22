@@ -3,6 +3,8 @@ import { Send, Paperclip, Smile, Phone, Video, MoreVertical, Shield } from 'luci
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { ValidatedTextarea } from '../ui/FormField';
+import { useFieldValidation } from '../../hooks/useFormValidation';
 import { WhatsAppMessage } from '../../types';
 
 interface WhatsAppCommunicatorProps {
@@ -20,10 +22,24 @@ export function WhatsAppCommunicator({
   onSendMessage,
   onSendDocument 
 }: WhatsAppCommunicatorProps) {
-  const [newMessage, setNewMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Message validation
+  const {
+    value: newMessage,
+    error: messageError,
+    handleChange: handleMessageChange,
+    setValue: setNewMessage
+  } = useFieldValidation({
+    rules: {
+      required: false,
+      maxLength: 1000,
+      message: 'Message cannot exceed 1000 characters'
+    },
+    initialValue: ''
+  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -199,14 +215,20 @@ export function WhatsAppCommunicator({
           </Button>
           
           <div className="flex-1 relative">
-            <textarea
+            <ValidatedTextarea
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              onChange={(e) => {
+                handleMessageChange(e);
+                // Auto-resize logic can be added here
+              }}
               onKeyPress={handleKeyPress}
               placeholder="Type a message..."
-              className="w-full p-3 pr-12 border border-gray-300 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              error={messageError}
+              className="rounded-2xl resize-none pr-12"
               rows={1}
               style={{ minHeight: '44px', maxHeight: '120px' }}
+              maxLength={1000}
+              showCharacterCount={newMessage.length > 800}
             />
             <Button
               variant="outline"

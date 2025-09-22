@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Users, TrendingUp, Award, AlertCircle, Clock, Search, Phone, Mail, MessageCircle, Eye, UserCheck, BarChart3, Filter, Calendar, Target, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Users, TrendingUp, Award, AlertCircle, Search, Phone, Mail, MessageCircle, Eye, UserCheck, BarChart3, RefreshCw } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -23,7 +23,7 @@ export function TeamOversight({ onBack, onNavigateToCase }: TeamOversightProps) 
   // Get real data from Supabase
   const { teamMembers: realTeamMembers, loading: teamLoading, error: teamError, refetch: refetchTeam } = useTeamMembers(user?.organization_id);
   const { cases, loading: casesLoading, error: casesError, refetch: refetchCases } = useCases();
-  const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useDashboardStats(user?.id || '', user?.role || '');
+  const { loading: statsLoading, error: statsError, refetch: refetchStats } = useDashboardStats(user?.id || '', user?.role || '');
 
   // Calculate team stats from real data
   const teamStats = [

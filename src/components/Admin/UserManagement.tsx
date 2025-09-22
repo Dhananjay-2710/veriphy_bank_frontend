@@ -3,6 +3,14 @@ import { ArrowLeft, Users, Plus, Edit, Trash2, Search, Filter, UserCheck, UserX,
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { 
+  ValidatedInput, 
+  ValidatedSelect, 
+  ValidationSummary,
+  FormActions 
+} from '../ui/FormField';
+import { useFormValidation } from '../../hooks/useFormValidation';
+import { VALIDATION_RULES } from '../../utils/validation';
 import { useTeamMembers } from '../../hooks/useDashboardData';
 import { useAuth } from '../../contexts/AuthContextFixed';
 import { UserProfile } from './UserProfile';
@@ -18,11 +26,36 @@ export function UserManagement({ onBack }: UserManagementProps) {
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [profileUser, setProfileUser] = useState<any>(null);
-  const [newUser, setNewUser] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    role: 'salesperson'
+  // Form validation for create user
+  const {
+    values: newUser,
+    errors: newUserErrors,
+    isValid: isNewUserValid,
+    isSubmitting: isCreatingUser,
+    handleChange: handleNewUserChange,
+    handleBlur: handleNewUserBlur,
+    handleSubmit: handleNewUserSubmit,
+    reset: resetNewUserForm
+  } = useFormValidation({
+    validationRules: {
+      name: VALIDATION_RULES.fullName,
+      email: VALIDATION_RULES.email,
+      phone: {
+        required: false,
+        phone: true,
+        message: 'Please enter a valid phone number'
+      },
+      role: {
+        required: true,
+        message: 'Please select a role'
+      }
+    },
+    initialValues: {
+      name: '',
+      email: '',
+      phone: '',
+      role: 'salesperson'
+    }
   });
   const { user } = useAuth();
 
@@ -202,20 +235,15 @@ export function UserManagement({ onBack }: UserManagementProps) {
     }
   };
 
-  const handleCreateUser = async () => {
+  const handleCreateUser = async (formValues: Record<string, string>) => {
     try {
-      if (!newUser.name || !newUser.email) {
-        alert('Please fill in all required fields (Name and Email)');
-        return;
-      }
-
-      console.log('Creating new user:', newUser);
+      console.log('Creating new user:', formValues);
       
       await SupabaseDatabaseService.createUser({
-        full_name: newUser.name,
-        email: newUser.email,
-        mobile: newUser.phone,
-        role: newUser.role,
+        full_name: formValues.name,
+        email: formValues.email,
+        mobile: formValues.phone,
+        role: formValues.role,
         organization_id: (user as any)?.organization_id || 1
       });
       
@@ -223,12 +251,7 @@ export function UserManagement({ onBack }: UserManagementProps) {
       alert('User created successfully!');
       
       // Reset form
-      setNewUser({
-        name: '',
-        email: '',
-        phone: '',
-        role: 'salesperson'
-      });
+      resetNewUserForm();
       
       // Close modal
       setShowCreateUser(false);
@@ -237,7 +260,7 @@ export function UserManagement({ onBack }: UserManagementProps) {
       refetchUsers();
     } catch (error) {
       console.error('Error creating user:', error);
-      alert('Failed to create user. Please try again.');
+      throw new Error('Failed to create user. Please try again.');
     }
   };
 
@@ -497,59 +520,80 @@ export function UserManagement({ onBack }: UserManagementProps) {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Create New User</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
-                <input
-                  type="text"
-                  value={newUser.name}
-                  onChange={(e) => setNewUser({...newUser, name: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter full name"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                <input
-                  type="email"
-                  value={newUser.email}
-                  onChange={(e) => setNewUser({...newUser, email: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter email address"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                <input
-                  type="tel"
-                  value={newUser.phone}
-                  onChange={(e) => setNewUser({...newUser, phone: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter phone number"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                <select 
-                  value={newUser.role}
-                  onChange={(e) => setNewUser({...newUser, role: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <form onSubmit={handleNewUserSubmit(handleCreateUser)} className="space-y-4">
+              <ValidationSummary errors={newUserErrors} />
+              
+              <ValidatedInput
+                label="Full Name"
+                type="text"
+                value={newUser.name}
+                onChange={handleNewUserChange('name')}
+                onBlur={handleNewUserBlur('name')}
+                error={newUserErrors.name}
+                required
+                placeholder="Enter full name"
+                icon={<Users className="h-4 w-4" />}
+              />
+              
+              <ValidatedInput
+                label="Email Address"
+                type="email"
+                value={newUser.email}
+                onChange={handleNewUserChange('email')}
+                onBlur={handleNewUserBlur('email')}
+                error={newUserErrors.email}
+                required
+                placeholder="Enter email address"
+                icon={<Mail className="h-4 w-4" />}
+              />
+              
+              <ValidatedInput
+                label="Phone Number"
+                type="tel"
+                value={newUser.phone}
+                onChange={handleNewUserChange('phone')}
+                onBlur={handleNewUserBlur('phone')}
+                error={newUserErrors.phone}
+                placeholder="Enter phone number"
+                helpText="Optional - 10-digit Indian mobile number"
+                icon={<Phone className="h-4 w-4" />}
+              />
+              
+              <ValidatedSelect
+                label="Role"
+                value={newUser.role}
+                onChange={handleNewUserChange('role')}
+                onBlur={handleNewUserBlur('role')}
+                error={newUserErrors.role}
+                required
+                options={[
+                  { value: 'salesperson', label: 'Salesperson' },
+                  { value: 'manager', label: 'Manager' },
+                  { value: 'credit-ops', label: 'Credit Operations' },
+                  { value: 'admin', label: 'Admin' }
+                ]}
+                placeholder="Select a role"
+              />
+              
+              <FormActions align="right">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowCreateUser(false);
+                    resetNewUserForm();
+                  }}
                 >
-                  <option value="salesperson">Salesperson</option>
-                  <option value="manager">Manager</option>
-                  <option value="credit-ops">Credit Operations</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-            </div>
-            <div className="flex justify-end space-x-3 mt-6">
-              <Button variant="outline" onClick={() => setShowCreateUser(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleCreateUser}>
-                Create User
-              </Button>
-            </div>
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={isCreatingUser || !isNewUserValid}
+                >
+                  {isCreatingUser ? 'Creating...' : 'Create User'}
+                </Button>
+              </FormActions>
+            </form>
           </div>
         </div>
       )}

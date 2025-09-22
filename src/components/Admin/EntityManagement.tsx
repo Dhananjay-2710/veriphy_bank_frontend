@@ -24,14 +24,7 @@ import {
   useProducts, 
   useSubProducts, 
   useDocumentTypes, 
-  useFiles,
-  useRealtimeRoles,
-  useRealtimePermissions,
-  useRealtimeAuditLogs,
-  useRealtimeProducts,
-  useRealtimeSubProducts,
-  useRealtimeDocumentTypes,
-  useRealtimeFiles
+  useFiles
 } from '../../hooks/useDashboardData';
 
 interface EntityManagementProps {
@@ -52,14 +45,7 @@ export function EntityManagement({ onNavigateToEntity }: EntityManagementProps) 
   const { documentTypes, loading: docTypesLoading, error: docTypesError, refetch: refetchDocumentTypes } = useDocumentTypes(selectedFilters);
   const { files, loading: filesLoading, error: filesError, refetch: refetchFiles } = useFiles(selectedFilters);
 
-  // Real-time subscriptions
-  useRealtimeRoles(refetchRoles);
-  useRealtimePermissions(refetchPermissions);
-  useRealtimeAuditLogs(refetchAuditLogs);
-  useRealtimeProducts(refetchProducts);
-  useRealtimeSubProducts(refetchSubProducts);
-  useRealtimeDocumentTypes(refetchDocumentTypes);
-  useRealtimeFiles(refetchFiles);
+  // Note: Real-time subscriptions are handled automatically by the individual hooks
 
   const tabs = [
     { id: 'roles', label: 'Roles', icon: Users, count: roles.length },

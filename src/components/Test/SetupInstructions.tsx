@@ -53,14 +53,17 @@ export function SetupInstructions() {
           )}
           
           <div className="text-sm text-blue-700 space-y-1">
-            <p><strong>After setup, you can login with:</strong></p>
+            <p><strong>You can login with these existing users (any password works for testing):</strong></p>
             <ul className="list-disc list-inside space-y-1 ml-4">
-              <li>Super Admin: superadmin@veriphy.com / password123</li>
-              <li>Admin: admin@veriphy.com / password123</li>
-              <li>Manager: manager@veriphy.com / password123</li>
-              <li>Salesperson: salesperson@veriphy.com / password123</li>
-              <li>Credit Ops: creditops@veriphy.com / password123</li>
+              <li>Admin User: admin@veriphy.com / any password</li>
+              <li>Manager User: manager@veriphy.com / any password</li>
+              <li>Sales Person: sales@veriphy.com / any password</li>
+              <li>Credit Operations: credit@veriphy.com / any password</li>
+              <li>Compliance Officer: compliance@veriphy.com / any password</li>
             </ul>
+            <p className="text-xs text-blue-600 mt-2">
+              <strong>Note:</strong> Password validation is disabled for testing. In production, proper authentication should be implemented.
+            </p>
           </div>
         </div>
       </CardContent>

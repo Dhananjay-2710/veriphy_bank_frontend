@@ -1,11 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { ArrowLeft, FileText, CheckCircle, XCircle, Clock, AlertTriangle, Eye, Download, MessageCircle, Upload, Filter, Search, Plus, X } from 'lucide-react';
+import { ArrowLeft, FileText, CheckCircle, XCircle, Clock, AlertTriangle, Eye, Download, MessageCircle, Upload, Filter, Search, X } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Document } from '../../types';
 import { useDocuments, useRealtimeDocuments } from '../../hooks/useDashboardData';
-import { getDocumentRequirements } from '../../data/documentRequirements';
 import { SupabaseDatabaseService } from '../../services/supabase-database';
 import { useAuth } from '../../contexts/AuthContextFixed';
 

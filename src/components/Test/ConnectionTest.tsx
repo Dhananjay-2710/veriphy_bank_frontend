@@ -13,7 +13,7 @@ export function ConnectionTest() {
     
     try {
       // Test basic connection
-      const { data, error } = await supabase.from('organizations').select('count').limit(1);
+      const { error } = await supabase.from('organizations').select('count').limit(1);
       
       if (error) {
         setResult(`❌ Connection failed: ${error.message}`);

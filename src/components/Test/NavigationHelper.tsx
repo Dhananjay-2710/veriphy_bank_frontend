@@ -10,8 +10,7 @@ import {
   FileText,
   Home,
   UserPlus,
-  Database,
-  Activity
+  Database
 } from 'lucide-react';
 
 export function NavigationHelper() {

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useParams } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContextFixed';
+import { NavigationProvider } from './contexts/NavigationContext';
 import { LoginPage } from './components/Auth/LoginPage';
 import { SalespersonDashboard } from './components/Dashboard/SalespersonDashboard';
 import { CreditOpsDashboard } from './components/Dashboard/CreditOpsDashboard';
@@ -28,8 +29,20 @@ import { ManagerDashboard } from './components/Dashboard/ManagerDashboard';
 import { ComplianceReports } from './components/Compliance/ComplianceReports';
 import { DashboardLayout } from './components/Layout/DashboardLayout';
 import { SuperAdminDashboardFixed } from './components/Dashboard/SuperAdminDashboardFixed';
-import { SetupInstructions } from './components/Test/SetupInstructions';
-import { SupabaseTest } from './components/Test/SupabaseTest';
+import { SuperAdminSetup } from './components/Admin/SuperAdminSetup';
+
+// New Admin Components
+import { LoanApplicationManagement } from './components/Admin/LoanApplicationManagement';
+import { TaskCategoryManagement } from './components/Admin/TaskCategoryManagement';
+import { ComplianceIssueManagement } from './components/Admin/ComplianceIssueManagement';
+import { UserProfileManagement } from './components/Admin/UserProfileManagement';
+import { WorkflowManagementPage } from './components/Admin/WorkflowManagementPage';
+import { BackgroundProcessingPage } from './components/Admin/BackgroundProcessingPage';
+import { CacheManagementPage } from './components/Admin/CacheManagementPage';
+import { EntityManagement } from './components/Admin/EntityManagement';
+
+// Navigation Constants
+import { ROUTES } from './constants/navigation';
 
 // DocumentManager wrapper to handle URL parameters
 function DocumentManagerWrapper() {
@@ -57,27 +70,36 @@ function AppContent() {
   }
 
   if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full space-y-6">
-          <SetupInstructions />
-          <LoginPage />
-        </div>
-      </div>
-    );
+    return <LoginPage />;
   }
 
   // Dashboard views based on user role
   switch (user?.role) {
+    case 'super_admin':
+      return (
+        <DashboardLayout>
+          <SuperAdminDashboardFixed 
+            onNavigateToUserManagement={() => window.location.href = ROUTES.USER_MANAGEMENT}
+            onNavigateToSystemSettings={() => window.location.href = ROUTES.SYSTEM_SETTINGS}
+            onNavigateToAuditLogs={() => window.location.href = ROUTES.AUDIT_LOGS}
+            onNavigateToAnalytics={() => window.location.href = ROUTES.ANALYTICS}
+            onNavigateToCase={() => {}}
+            onNavigateToFeatureFlags={() => window.location.href = ROUTES.FEATURE_FLAGS}
+            onNavigateToSystemIntegrations={() => window.location.href = ROUTES.SYSTEM_INTEGRATIONS}
+            onNavigateToSystemSettingsNew={() => window.location.href = ROUTES.SYSTEM_SETTINGS_NEW}
+            onNavigateToOrganizationSettings={() => window.location.href = ROUTES.ORGANIZATION_SETTINGS}
+          />
+        </DashboardLayout>
+      );
     case 'salesperson':
       return (
         <DashboardLayout>
           <SalespersonDashboard 
             onNavigateToCase={() => {}}
-            onNavigateToWorkload={() => {}}
-            onNavigateToCases={() => {}}
-            onNavigateToDocumentManager={() => {}}
-            onNavigateToCommunicator={() => {}}
+            onNavigateToWorkload={() => window.location.href = ROUTES.WORKLOAD}
+            onNavigateToCases={() => window.location.href = ROUTES.CASES}
+            onNavigateToDocumentManager={() => window.location.href = ROUTES.DOCUMENT_MANAGER}
+            onNavigateToCommunicator={() => window.location.href = ROUTES.COMMUNICATOR}
           />
         </DashboardLayout>
       );
@@ -86,9 +108,9 @@ function AppContent() {
         <DashboardLayout>
           <ManagerDashboard 
             onNavigateToCase={() => {}}
-            onNavigateToTeam={() => {}}
-            onNavigateToCases={() => {}}
-            onNavigateToAnalytics={() => {}}
+            onNavigateToTeam={() => window.location.href = ROUTES.TEAM}
+            onNavigateToCases={() => window.location.href = ROUTES.CASES}
+            onNavigateToAnalytics={() => window.location.href = ROUTES.ANALYTICS}
           />
         </DashboardLayout>
       );
@@ -97,11 +119,11 @@ function AppContent() {
         <DashboardLayout>
           <CreditOpsDashboard 
             onNavigateToCase={() => {}}
-            onNavigateToApprovalQueue={() => {}}
-            onNavigateToComplianceReports={() => {}}
-            onNavigateToComplianceReview={() => {}}
-            onNavigateToPendingReviews={() => {}}
-            onNavigateToComplianceManagement={() => window.location.href = '/compliance-management'}
+            onNavigateToApprovalQueue={() => window.location.href = ROUTES.APPROVAL_QUEUE}
+            onNavigateToComplianceReports={() => window.location.href = ROUTES.COMPLIANCE_REPORTS}
+            onNavigateToComplianceReview={() => window.location.href = ROUTES.COMPLIANCE_REVIEW}
+            onNavigateToPendingReviews={() => window.location.href = ROUTES.PENDING_REVIEWS}
+            onNavigateToComplianceManagement={() => window.location.href = ROUTES.COMPLIANCE_ISSUE_MANAGEMENT}
           />
         </DashboardLayout>
       );
@@ -110,32 +132,35 @@ function AppContent() {
         <DashboardLayout>
           <AdminDashboard 
             onNavigateToCase={() => {}}
-            onNavigateToUserManagement={() => window.location.href = '/user-management'}
-            onNavigateToSystemSettings={() => window.location.href = '/system-settings'}
-            onNavigateToAuditLogs={() => window.location.href = '/audit-logs'}
-            onNavigateToAnalytics={() => window.location.href = '/analytics'}
+            onNavigateToUserManagement={() => window.location.href = ROUTES.USER_MANAGEMENT}
+            onNavigateToSystemSettings={() => window.location.href = ROUTES.SYSTEM_SETTINGS}
+            onNavigateToAuditLogs={() => window.location.href = ROUTES.AUDIT_LOGS}
+            onNavigateToAnalytics={() => window.location.href = ROUTES.ANALYTICS}
             onNavigateToSystemHealth={() => {}}
-            onNavigateToComplianceManagement={() => window.location.href = '/compliance-management'}
-            onNavigateToFeatureFlags={() => window.location.href = '/feature-flags'}
-            onNavigateToSystemIntegrations={() => window.location.href = '/system-integrations'}
-            onNavigateToSystemSettingsNew={() => window.location.href = '/system-settings-new'}
-            onNavigateToOrganizationSettings={() => window.location.href = '/organization-settings'}
+            onNavigateToComplianceManagement={() => window.location.href = ROUTES.COMPLIANCE_ISSUE_MANAGEMENT}
+            onNavigateToFeatureFlags={() => window.location.href = ROUTES.FEATURE_FLAGS}
+            onNavigateToSystemIntegrations={() => window.location.href = ROUTES.SYSTEM_INTEGRATIONS}
+            onNavigateToSystemSettingsNew={() => window.location.href = ROUTES.SYSTEM_SETTINGS_NEW}
+            onNavigateToOrganizationSettings={() => window.location.href = ROUTES.ORGANIZATION_SETTINGS}
           />
         </DashboardLayout>
       );
-    case 'super_admin':
+    case 'compliance':
       return (
         <DashboardLayout>
-          <SuperAdminDashboardFixed 
-            onNavigateToUserManagement={() => window.location.href = '/user-management'}
-            onNavigateToSystemSettings={() => window.location.href = '/system-settings'}
-            onNavigateToAuditLogs={() => window.location.href = '/audit-logs'}
-            onNavigateToAnalytics={() => window.location.href = '/analytics'}
-            onNavigateToCase={() => {}}
-            onNavigateToFeatureFlags={() => window.location.href = '/feature-flags'}
-            onNavigateToSystemIntegrations={() => window.location.href = '/system-integrations'}
-            onNavigateToSystemSettingsNew={() => window.location.href = '/system-settings-new'}
-            onNavigateToOrganizationSettings={() => window.location.href = '/organization-settings'}
+          <ComplianceIssueManagement 
+            onNavigateToIssue={() => {}}
+            onCreateIssue={() => {}}
+            onEditIssue={() => {}}
+            onDeleteIssue={() => {}}
+          />
+        </DashboardLayout>
+      );
+    case 'auditor':
+      return (
+        <DashboardLayout>
+          <AuditLogs 
+            onBack={() => window.history.back()}
           />
         </DashboardLayout>
       );
@@ -167,10 +192,17 @@ function AppContent() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
+    <BrowserRouter
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true
+      }}
+    >
+      <NavigationProvider>
+        <Routes>
         <Route path="/" element={<AppContent />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/setup" element={<SuperAdminSetup />} />
         
         {/* User Management Routes */}
         <Route
@@ -406,16 +438,93 @@ function App() {
           }
         />
         
-        {/* Test Routes */}
+        {/* New Admin Management Routes */}
         <Route
-          path="/test/supabase"
+          path={ROUTES.LOAN_APPLICATION_MANAGEMENT}
           element={
             <DashboardLayout>
-              <SupabaseTest />
+              <LoanApplicationManagement />
             </DashboardLayout>
           }
         />
-      </Routes>
+        
+        <Route
+          path={ROUTES.TASK_CATEGORY_MANAGEMENT}
+          element={
+            <DashboardLayout>
+              <TaskCategoryManagement />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path={ROUTES.COMPLIANCE_ISSUE_MANAGEMENT}
+          element={
+            <DashboardLayout>
+              <ComplianceIssueManagement 
+                onNavigateToIssue={() => {}}
+                onCreateIssue={() => {}}
+                onEditIssue={() => {}}
+                onDeleteIssue={() => {}}
+              />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path={ROUTES.USER_PROFILE_MANAGEMENT}
+          element={
+            <DashboardLayout>
+              <UserProfileManagement 
+                onNavigateToUser={() => {}}
+                onCreateUser={() => {}}
+                onEditUser={() => {}}
+                onDeleteUser={() => {}}
+                onViewProfile={() => {}}
+              />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path={ROUTES.WORKFLOW_MANAGEMENT}
+          element={
+            <DashboardLayout>
+              <WorkflowManagementPage />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path={ROUTES.BACKGROUND_PROCESSING}
+          element={
+            <DashboardLayout>
+              <BackgroundProcessingPage />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path={ROUTES.CACHE_MANAGEMENT}
+          element={
+            <DashboardLayout>
+              <CacheManagementPage />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path={ROUTES.ENTITY_MANAGEMENT}
+          element={
+            <DashboardLayout>
+              <EntityManagement />
+            </DashboardLayout>
+          }
+        />
+        
+        {/* Test Routes */}
+        </Routes>
+      </NavigationProvider>
     </BrowserRouter>
   );
 }

@@ -1,9 +1,14 @@
-import React, { useState } from 'react';
-import { Shield, Lock, User, UserPlus } from 'lucide-react';
+import { useState } from 'react';
+import { Shield, User, UserPlus, Settings } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContextFixed';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
+import { ValidatedInput, ValidatedPasswordInput, ValidationSummary } from '../ui/FormField';
+import { useFormValidation } from '../../hooks/useFormValidation';
+import { VALIDATION_RULES } from '../../utils/validation';
 import { RegistrationPage } from './RegistrationPage';
+import { SuperAdminRegistration } from './SuperAdminRegistration';
+import { RoleBasedRegistration } from './RoleBasedRegistration';
 import { useNavigate } from 'react-router-dom';
 
 interface RegistrationData {
@@ -15,15 +20,37 @@ interface RegistrationData {
 }
 
 export function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const [showRegistration, setShowRegistration] = useState(false);
+  const [showSuperAdminRegistration, setShowSuperAdminRegistration] = useState(false);
+  const [showRoleBasedRegistration, setShowRoleBasedRegistration] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const navigate = useNavigate();
 
-  const { login } = useAuth();
+  const { login, user } = useAuth();
+
+  // Form validation
+  const {
+    values,
+    errors,
+    isValid,
+    isSubmitting,
+    handleChange,
+    handleBlur,
+    handleSubmit
+  } = useFormValidation({
+    validationRules: {
+      email: VALIDATION_RULES.email,
+      password: {
+        required: true,
+        minLength: 1,
+        message: 'Password is required'
+      }
+    },
+    initialValues: {
+      email: '',
+      password: ''
+    }
+  });
 
   const redirectByRole = (role?: string | null) => {
     console.log('User role:', role);
@@ -31,41 +58,46 @@ export function LoginPage() {
     navigate('/');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
+  const onSubmit = async (formValues: Record<string, string>) => {
     try {
-      const profile = await login(email.trim().toLowerCase(), password); 
+      const profile = await login(formValues.email.trim().toLowerCase(), formValues.password); 
       console.log("Profile after login:", profile);
       console.log("Role after login:", profile.role);
       redirectByRole(profile.role); 
     } catch (err: any) {
       console.error('LoginPage error:', err);
-      setError(err?.message || 'Something went wrong. Please try again.');
-    } finally {
-      setLoading(false);
+      // You could set form-level errors here if needed
+      throw new Error(err?.message || 'Something went wrong. Please try again.');
     }
-
-    // try {
-    //   const user = await login(email.trim().toLowerCase(), password);
-    //   console.log("user after login:", user);
-    //   const role = (user as unknown as { role?: string | null })?.role ?? null;
-    //   redirectByRole(role);
-    // } catch (err: any) {
-    //   console.error('LoginPage error:', err);
-    //   setError(err?.message || 'Something went wrong. Please try again.');
-    // } finally {
-    //   setLoading(false);
-    // }
   };
 
   const handleRegistrationComplete = (data: RegistrationData) => {
     console.log('Registration completed with data:', data);
     setRegistrationSuccess(true);
     setShowRegistration(false);
+    setShowSuperAdminRegistration(false);
+    setShowRoleBasedRegistration(false);
   };
+
+
+  if (showSuperAdminRegistration) {
+    return (
+      <SuperAdminRegistration
+        onBackToLogin={() => setShowSuperAdminRegistration(false)}
+        onRegistrationComplete={handleRegistrationComplete}
+      />
+    );
+  }
+
+  if (showRoleBasedRegistration) {
+    return (
+      <RoleBasedRegistration
+        onBackToLogin={() => setShowRoleBasedRegistration(false)}
+        onRegistrationComplete={handleRegistrationComplete}
+        currentUserRole={user?.role || undefined}
+      />
+    );
+  }
 
   if (showRegistration) {
     return (
@@ -97,51 +129,50 @@ export function LoginPage() {
             <CardTitle className="text-center">Sign In</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              {/* Validation Summary */}
+              <ValidationSummary errors={errors} />
+
               {/* Email */}
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter your email"
-                    required
-                  />
-                </div>
-              </div>
+              <ValidatedInput
+                label="Email Address"
+                type="email"
+                value={values.email}
+                onChange={handleChange('email')}
+                onBlur={handleBlur('email')}
+                error={errors.email}
+                required
+                icon={<User className="h-5 w-5" />}
+                placeholder="Enter your email"
+              />
 
               {/* Password */}
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                  Password
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter your password"
-                    required
-                  />
-                </div>
-              </div>
+              <ValidatedPasswordInput
+                label="Password"
+                value={values.password}
+                onChange={handleChange('password')}
+                onBlur={handleBlur('password')}
+                error={errors.password}
+                required
+                placeholder="Enter your password"
+                showToggle={false}
+              />
 
-              {/* Error */}
-              {error && (
-                <div className="text-red-600 text-sm text-center bg-red-50 p-2 rounded-md">
-                  {error}
+              {/* Test Credentials */}
+              <div className="text-xs text-gray-600 bg-blue-50 p-3 rounded-md border border-blue-200">
+                <p className="font-semibold text-blue-800 mb-2">🧪 Test Credentials (any password works):</p>
+                <div className="space-y-1">
+                  <p>• <strong>Super Admin:</strong> superadmin@veriphy.com <span className="text-red-600 font-bold">(NEW!)</span></p>
+                  <p>• <strong>Admin User:</strong> admin@veriphy.com</p>
+                  <p>• <strong>Manager User:</strong> manager@veriphy.com</p>
+                  <p>• <strong>Sales Person:</strong> sales@veriphy.com</p>
+                  <p>• <strong>Credit Operations:</strong> credit@veriphy.com</p>
+                  <p>• <strong>Compliance Officer:</strong> compliance@veriphy.com</p>
                 </div>
-              )}
+                <p className="text-xs text-blue-600 mt-2">
+                  <strong>Note:</strong> Super Admin has access to system setup wizard and organization management.
+                </p>
+              </div>
 
               {/* Registration success */}
               {registrationSuccess && (
@@ -151,20 +182,65 @@ export function LoginPage() {
               )}
 
               {/* Submit button */}
-              <Button type="submit" className="w-full" size="lg" disabled={loading}>
-                {loading ? 'Signing in...' : 'Sign In'}
+              <Button 
+                type="submit" 
+                className="w-full" 
+                size="lg" 
+                disabled={isSubmitting || !isValid}
+              >
+                {isSubmitting ? 'Signing in...' : 'Sign In'}
               </Button>
 
-              {/* Registration link */}
-              <div className="text-center">
-                <button
-                  type="button"
-                  onClick={() => setShowRegistration(true)}
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center justify-center w-full mt-3"
-                >
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Create New Account
-                </button>
+              {/* Registration options */}
+              <div className="space-y-3">
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowRegistration(true)}
+                    className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center justify-center w-full"
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Create New Account
+                  </button>
+                </div>
+                
+                {/* Super Admin Setup */}
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => window.location.href = '/setup'}
+                    className="text-red-600 hover:text-red-800 text-sm font-medium flex items-center justify-center w-full"
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    Super Admin Setup
+                  </button>
+                </div>
+
+                {/* Super Admin Registration (only if no super admin exists) */}
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowSuperAdminRegistration(true)}
+                    className="text-orange-600 hover:text-orange-800 text-sm font-medium flex items-center justify-center w-full"
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Create Super Admin (Alternative)
+                  </button>
+                </div>
+
+                {/* Role-based Registration (only if user is logged in) */}
+                {user && (
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      onClick={() => setShowRoleBasedRegistration(true)}
+                      className="text-green-600 hover:text-green-800 text-sm font-medium flex items-center justify-center w-full"
+                    >
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Add New User
+                    </button>
+                  </div>
+                )}
               </div>
             </form>
           </CardContent>

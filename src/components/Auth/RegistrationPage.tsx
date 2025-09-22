@@ -15,6 +15,15 @@ import {
 } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/Card";
+import { 
+  ValidatedInput, 
+  ValidatedPasswordInput, 
+  ValidatedSelect, 
+  ValidationSummary,
+  FormSection 
+} from "../ui/FormField";
+import { useFormValidation, usePasswordValidation } from "../../hooks/useFormValidation";
+import { VALIDATION_RULES } from "../../utils/validation";
 import { supabase } from "../../supabase-client";
 
 interface RegistrationData {
@@ -37,80 +46,81 @@ export function RegistrationPage({
   onBackToLogin,
   onRegistrationComplete,
 }: RegistrationPageProps) {
-  const [registrationData, setRegistrationData] = useState<RegistrationData>({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    role: "",
-    password: "",
-  });
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [step, setStep] = useState(1);
   const [emailConfirmRequired, setEmailConfirmRequired] = useState(true);
+
+  // Form validation
+  const {
+    values,
+    errors,
+    isValid,
+    isSubmitting,
+    handleChange,
+    handleBlur,
+    handleSubmit,
+    setSubmitting
+  } = useFormValidation({
+    validationRules: {
+      firstName: VALIDATION_RULES.firstName,
+      lastName: VALIDATION_RULES.lastName,
+      email: VALIDATION_RULES.email,
+      phone: VALIDATION_RULES.phone,
+      role: {
+        required: true,
+        message: 'Please select a role'
+      }
+    },
+    initialValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      role: ""
+    }
+  });
+
+  // Password validation with confirmation
+  const {
+    password,
+    confirmPassword,
+    passwordError,
+    confirmPasswordError,
+    isValid: passwordsValid,
+    handlePasswordChange,
+    handleConfirmPasswordChange,
+    handlePasswordBlur,
+    handleConfirmPasswordBlur,
+    validatePasswords
+  } = usePasswordValidation();
 
   const roles = [
     { value: "salesperson", label: "Salesperson" },
     { value: "manager", label: "Sales Manager" },
     { value: "credit-ops", label: "Credit Operations" },
     { value: "admin", label: "System Administrator" },
-    { value: "super-admin", label: "Super Admin" },
+    { value: "auditor", label: "Auditor" },
+    { value: "compliance", label: "Compliance Officer" },
   ];
 
-  const handleInputChange = (field: keyof RegistrationData, value: string) => {
-    setRegistrationData((prev) => ({ ...prev, [field]: value }));
-    setError("");
-  };
+  const completeRegistration = async (formValues: Record<string, string>) => {
+    // Validate passwords separately
+    if (!validatePasswords()) {
+      return;
+    }
 
-  const validateStep1 = () => {
-    const {
-      firstName,
-      lastName,
-      email,
-      phone,
-      role,
-      password,
-    } = registrationData;
-    if (
-      !firstName ||
-      !lastName ||
-      !email ||
-      !phone ||
-      !role ||
-      !password
-    ) {
-      setError("Please fill in all required fields");
-      return false;
-    }
-    if (!email.includes("@")) {
-      setError("Please enter a valid email address");
-      return false;
-    }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters long");
-      return false;
-    }
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      return false;
-    }
-    return true;
-  };
-
-  const completeRegistration = async () => {
-    if (!validateStep1()) return;
-
-    setLoading(true);
-    setError("");
+    // All form data is valid, proceed with registration
+    const registrationData: RegistrationData = {
+      firstName: formValues.firstName,
+      lastName: formValues.lastName,
+      email: formValues.email,
+      phone: formValues.phone,
+      role: formValues.role,
+      password: password
+    };
 
     try {
       const {
         email,
-        password,
         firstName,
         lastName,
         phone,
@@ -134,28 +144,31 @@ export function RegistrationPage({
 
       if (error) {
         console.error("SignUp error:", error.message);
-        setError(error.message);
-        return;
+        throw new Error(error.message);
       }
 
       // 2. Insert into public.users table
       if (data.user) {
         console.log("Supabase Auth user created:", data.user);
-        const { error: insertError } = await supabase.from("users").insert([
+        
+        // Insert user with proper Supabase schema fields
+        const { data: userData, error: insertError } = await supabase.from("users").insert([
           {
-            auth_id: data.user.id,
-            full_name: firstName + " " + lastName,
+            full_name: `${firstName} ${lastName}`.trim(),
             email: email,
             mobile: phone,
-            role,
+            auth_id: data.user.id, // Link to Supabase Auth user
+            role: role, // Set role directly in users table
+            status: 'active',
           },
-        ]);
+        ]).select().single();
 
         if (insertError) {
           console.error("Insert error:", insertError.message);
-          setError(insertError.message);
-          return;
+          throw new Error(insertError.message);
         }
+
+        console.log("User inserted:", userData);
       }
 
       console.log("✅ User created and synced to public.users:", data);
@@ -175,9 +188,7 @@ export function RegistrationPage({
       }, 2000);
     } catch (err) {
       console.error("Unexpected error:", err);
-      setError("Account creation failed. Please try again.");
-    } finally {
-      setLoading(false);
+      throw new Error("Account creation failed. Please try again.");
     }
   };
 
@@ -214,6 +225,9 @@ export function RegistrationPage({
     );
   }
 
+  // Check if all validations are met
+  const isFormValid = isValid && passwordsValid;
+
   // ✅ Registration Form
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
@@ -240,85 +254,67 @@ export function RegistrationPage({
             </div>
           </CardHeader>
           <CardContent>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                completeRegistration();
-              }}
-              className="space-y-4"
-            >
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    First Name *
-                  </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="text"
-                      value={registrationData.firstName}
-                      onChange={(e) =>
-                        handleInputChange("firstName", e.target.value)
-                      }
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Last Name *
-                  </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="text"
-                      value={registrationData.lastName}
-                      onChange={(e) =>
-                        handleInputChange("lastName", e.target.value)
-                      }
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
+            <form onSubmit={handleSubmit(completeRegistration)} className="space-y-4">
+              {/* Validation Summary */}
+              <ValidationSummary 
+                errors={{
+                  ...errors,
+                  ...(passwordError && { password: passwordError }),
+                  ...(confirmPasswordError && { confirmPassword: confirmPasswordError })
+                }} 
+              />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email Address *
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="email"
-                    value={registrationData.email}
-                    onChange={(e) =>
-                      handleInputChange("email", e.target.value)
-                    }
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  WhatsApp Number *
-                </label>
-                <div className="relative">
-                  <MessageCircle className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
+              <FormSection title="Personal Information">
+                <div className="grid grid-cols-2 gap-4">
+                  <ValidatedInput
+                    label="First Name"
                     type="text"
-                    value={registrationData.phone}
-                    onChange={(e) =>
-                      handleInputChange("phone", e.target.value)
-                    }
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={values.firstName}
+                    onChange={handleChange('firstName')}
+                    onBlur={handleBlur('firstName')}
+                    error={errors.firstName}
                     required
+                    icon={<User className="h-4 w-4" />}
+                    placeholder="Enter first name"
+                  />
+                  
+                  <ValidatedInput
+                    label="Last Name"
+                    type="text"
+                    value={values.lastName}
+                    onChange={handleChange('lastName')}
+                    onBlur={handleBlur('lastName')}
+                    error={errors.lastName}
+                    required
+                    icon={<User className="h-4 w-4" />}
+                    placeholder="Enter last name"
                   />
                 </div>
-              </div>
+
+                <ValidatedInput
+                  label="Email Address"
+                  type="email"
+                  value={values.email}
+                  onChange={handleChange('email')}
+                  onBlur={handleBlur('email')}
+                  error={errors.email}
+                  required
+                  icon={<Mail className="h-4 w-4" />}
+                  placeholder="Enter email address"
+                />
+
+                <ValidatedInput
+                  label="WhatsApp Number"
+                  type="tel"
+                  value={values.phone}
+                  onChange={handleChange('phone')}
+                  onBlur={handleBlur('phone')}
+                  error={errors.phone}
+                  required
+                  icon={<MessageCircle className="h-4 w-4" />}
+                  placeholder="Enter WhatsApp number"
+                  helpText="Enter 10-digit Indian mobile number"
+                />
 
               {/* <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -338,25 +334,20 @@ export function RegistrationPage({
                 </div>
               </div> */}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Role *
-                  </label>
-                  <select
-                    value={registrationData.role}
-                    onChange={(e) => handleInputChange("role", e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="">Select Role</option>
-                    {roles.map((role) => (
-                      <option key={role.value} value={role.value}>
-                        {role.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              </FormSection>
+
+              <FormSection title="Role & Security">
+                <ValidatedSelect
+                  label="Role"
+                  value={values.role}
+                  onChange={handleChange('role')}
+                  onBlur={handleBlur('role')}
+                  error={errors.role}
+                  required
+                  options={roles}
+                  placeholder="Select your role"
+                  helpText="Choose your role in the organization"
+                />
                 {/* <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Employee ID *
@@ -374,73 +365,37 @@ export function RegistrationPage({
                     />
                   </div>
                 </div> */}
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Password *
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={registrationData.password}
-                    onChange={(e) =>
-                      handleInputChange("password", e.target.value)
-                    }
-                    className="w-full pl-10 pr-12 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
+                <ValidatedPasswordInput
+                  label="Password"
+                  value={password}
+                  onChange={handlePasswordChange}
+                  onBlur={handlePasswordBlur}
+                  error={passwordError}
+                  required
+                  placeholder="Enter a strong password"
+                  helpText="Must contain 8+ characters with uppercase, lowercase, number, and special character"
+                />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Confirm Password *
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full pl-10 pr-12 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
+                <ValidatedPasswordInput
+                  label="Confirm Password"
+                  value={confirmPassword}
+                  onChange={handleConfirmPasswordChange}
+                  onBlur={handleConfirmPasswordBlur}
+                  error={confirmPasswordError}
+                  required
+                  placeholder="Confirm your password"
+                />
 
-              {error && (
-                <div className="text-red-600 text-sm text-center bg-red-50 p-2 rounded-md flex items-center justify-center">
-                  <AlertCircle className="h-4 w-4 mr-2" />
-                  {error}
-                </div>
-              )}
+              </FormSection>
 
-              <Button type="submit" className="w-full" size="lg" disabled={loading}>
-                {loading ? "Creating Account..." : "Register"}
+              <Button 
+                type="submit" 
+                className="w-full" 
+                size="lg" 
+                disabled={isSubmitting || !isFormValid}
+              >
+                {isSubmitting ? "Creating Account..." : "Register"}
               </Button>
             </form>
           </CardContent>

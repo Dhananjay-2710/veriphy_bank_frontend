@@ -20,6 +20,7 @@ import {
   mapWorkflowHistoryData,
   mapLoanApplicationData,
   mapLoanProductData,
+  mapTaskCategoryData,
   mapComplianceIssueTypeData,
   mapComplianceIssueData,
   mapComplianceIssueCommentData,
@@ -62,6 +63,344 @@ import {
 // =============================================================================
 
 export class SupabaseDatabaseService {
+  // =============================================================================
+  // ORGANIZATION MANAGEMENT
+  // =============================================================================
+
+  static async getOrganizations() {
+    console.log('Fetching organizations...');
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.ORGANIZATIONS)
+      .select(`
+        id,
+        uuid,
+        name,
+        slug,
+        domain,
+        logo_url,
+        description,
+        address,
+        contact_info,
+        settings,
+        status,
+        subscription_plan,
+        trial_ends_at,
+        subscription_ends_at,
+        max_users,
+        max_loans_per_month,
+        features,
+        created_at,
+        updated_at
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching organizations:', error);
+      return [];
+    }
+
+    return data?.map(org => ({
+      id: org.id.toString(),
+      uuid: org.uuid,
+      name: org.name,
+      slug: org.slug,
+      domain: org.domain,
+      logoUrl: org.logo_url,
+      description: org.description,
+      address: org.address,
+      contactInfo: org.contact_info,
+      settings: org.settings,
+      status: org.status,
+      subscriptionPlan: org.subscription_plan,
+      trialEndsAt: org.trial_ends_at,
+      subscriptionEndsAt: org.subscription_ends_at,
+      maxUsers: org.max_users,
+      maxLoansPerMonth: org.max_loans_per_month,
+      features: org.features,
+      createdAt: org.created_at,
+      updatedAt: org.updated_at
+    })) || [];
+  }
+
+  static async createOrganization(organizationData: {
+    name: string;
+    slug: string;
+    domain?: string;
+    description?: string;
+    address?: any;
+    contactInfo?: any;
+    maxUsers: number;
+    maxLoansPerMonth: number;
+    subscriptionPlan: 'trial' | 'basic' | 'premium' | 'enterprise';
+  }) {
+    console.log('Creating organization:', organizationData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.ORGANIZATIONS)
+      .insert({
+        name: organizationData.name,
+        slug: organizationData.slug,
+        domain: organizationData.domain,
+        description: organizationData.description,
+        address: organizationData.address,
+        contact_info: organizationData.contactInfo,
+        max_users: organizationData.maxUsers,
+        max_loans_per_month: organizationData.maxLoansPerMonth,
+        subscription_plan: organizationData.subscriptionPlan,
+        status: 'trial',
+        trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days trial
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating organization:', error);
+      throw new Error(`Failed to create organization: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  static async updateOrganization(organizationId: string, updates: {
+    name?: string;
+    slug?: string;
+    domain?: string;
+    description?: string;
+    address?: any;
+    contactInfo?: any;
+    maxUsers?: number;
+    maxLoansPerMonth?: number;
+    subscriptionPlan?: 'trial' | 'basic' | 'premium' | 'enterprise';
+    status?: 'trial' | 'active' | 'suspended' | 'cancelled';
+  }) {
+    console.log('Updating organization:', organizationId, updates);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.ORGANIZATIONS)
+      .update({
+        ...updates,
+        contact_info: updates.contactInfo,
+        max_users: updates.maxUsers,
+        max_loans_per_month: updates.maxLoansPerMonth,
+        subscription_plan: updates.subscriptionPlan,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', organizationId)
+      .select();
+
+    if (error) {
+      console.error('Error updating organization:', error);
+      throw new Error(`Failed to update organization: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  static async deleteOrganization(organizationId: string) {
+    console.log('Deleting organization:', organizationId);
+    
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.ORGANIZATIONS)
+      .delete()
+      .eq('id', organizationId);
+
+    if (error) {
+      console.error('Error deleting organization:', error);
+      throw new Error(`Failed to delete organization: ${error.message}`);
+    }
+  }
+
+  // Real-time subscription for organizations
+  static subscribeToOrganizationUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('organization-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.ORGANIZATIONS },
+        callback
+      )
+      .subscribe();
+  }
+
+  // =============================================================================
+  // DEPARTMENT MANAGEMENT
+  // =============================================================================
+
+  static async getDepartments(filters?: {
+    organizationId?: string;
+    departmentType?: string;
+    isActive?: boolean;
+  }) {
+    console.log('Fetching departments with filters:', filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.DEPARTMENTS)
+      .select(`
+        id,
+        name,
+        code,
+        description,
+        department_type,
+        parent_department_id,
+        manager_id,
+        is_active,
+        metadata,
+        created_at,
+        updated_at,
+        organization_id,
+        parent_department:parent_department_id(
+          id,
+          name,
+          code
+        ),
+        manager:manager_id(
+          id,
+          full_name,
+          email
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (filters?.organizationId) {
+      query = query.eq('organization_id', filters.organizationId);
+    }
+    if (filters?.departmentType) {
+      query = query.eq('department_type', filters.departmentType);
+    }
+    if (filters?.isActive !== undefined) {
+      query = query.eq('is_active', filters.isActive);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching departments:', error);
+      return [];
+    }
+
+    return data?.map(dept => ({
+      id: dept.id.toString(),
+      name: dept.name,
+      code: dept.code,
+      description: dept.description,
+      departmentType: dept.department_type,
+      parentDepartmentId: dept.parent_department_id?.toString(),
+      managerId: dept.manager_id?.toString(),
+      isActive: dept.is_active,
+      metadata: dept.metadata,
+      createdAt: dept.created_at,
+      updatedAt: dept.updated_at,
+      organizationId: dept.organization_id?.toString(),
+      parentDepartment: dept.parent_department ? {
+        id: dept.parent_department.id.toString(),
+        name: dept.parent_department.name,
+        code: dept.parent_department.code
+      } : undefined,
+      manager: dept.manager ? {
+        id: dept.manager.id.toString(),
+        full_name: dept.manager.full_name,
+        email: dept.manager.email
+      } : undefined
+    })) || [];
+  }
+
+  static async createDepartment(departmentData: {
+    name: string;
+    code: string;
+    description: string;
+    departmentType: 'sales' | 'credit_ops' | 'compliance' | 'admin' | 'support';
+    parentDepartmentId?: string;
+    managerId?: string;
+    organizationId: string;
+  }) {
+    console.log('Creating department:', departmentData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.DEPARTMENTS)
+      .insert({
+        name: departmentData.name,
+        code: departmentData.code,
+        description: departmentData.description,
+        department_type: departmentData.departmentType,
+        parent_department_id: departmentData.parentDepartmentId ? parseInt(departmentData.parentDepartmentId) : null,
+        manager_id: departmentData.managerId ? parseInt(departmentData.managerId) : null,
+        organization_id: parseInt(departmentData.organizationId),
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating department:', error);
+      throw new Error(`Failed to create department: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  static async updateDepartment(departmentId: string, updates: {
+    name?: string;
+    code?: string;
+    description?: string;
+    departmentType?: 'sales' | 'credit_ops' | 'compliance' | 'admin' | 'support';
+    parentDepartmentId?: string;
+    managerId?: string;
+    organizationId?: string;
+    isActive?: boolean;
+  }) {
+    console.log('Updating department:', departmentId, updates);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.DEPARTMENTS)
+      .update({
+        name: updates.name,
+        code: updates.code,
+        description: updates.description,
+        department_type: updates.departmentType,
+        parent_department_id: updates.parentDepartmentId ? parseInt(updates.parentDepartmentId) : null,
+        manager_id: updates.managerId ? parseInt(updates.managerId) : null,
+        organization_id: updates.organizationId ? parseInt(updates.organizationId) : undefined,
+        is_active: updates.isActive,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', departmentId)
+      .select();
+
+    if (error) {
+      console.error('Error updating department:', error);
+      throw new Error(`Failed to update department: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  static async deleteDepartment(departmentId: string) {
+    console.log('Deleting department:', departmentId);
+    
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.DEPARTMENTS)
+      .delete()
+      .eq('id', departmentId);
+
+    if (error) {
+      console.error('Error deleting department:', error);
+      throw new Error(`Failed to delete department: ${error.message}`);
+    }
+  }
+
+  // Real-time subscription for departments
+  static subscribeToDepartmentUpdates(callback: (payload: any) => void) {
+    return supabase
+      .channel('department-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.DEPARTMENTS },
+        callback
+      )
+      .subscribe();
+  }
+
   // =============================================================================
   // USER MANAGEMENT
   // =============================================================================
@@ -1303,33 +1642,12 @@ export class SupabaseDatabaseService {
       .subscribe();
   }
 
-  static subscribeToDepartmentUpdates(callback: (payload: any) => void) {
-    return supabase
-      .channel('department-updates')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'departments' 
-        }, 
-        callback
-      )
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'users' 
-        }, 
-        callback
-      )
-      .subscribe();
-  }
 
   // =============================================================================
   // WORKLOAD PLANNING (MAPPED TO TASKS)
   // =============================================================================
 
-  static async getWorkloadTasks(userId: string, _date?: string) {
+  static async getWorkloadTasks(userId: string) {
     // First get the user's internal ID from their auth_id
     const { data: userData } = await supabase
       .from('users')
@@ -1441,7 +1759,7 @@ export class SupabaseDatabaseService {
   // TEAM OVERSIGHT (MAPPED TO USERS)
   // =============================================================================
 
-  static async getTeamMembers(_organizationId?: number) {
+  static async getTeamMembers() {
     console.log('Fetching team members...');
     
     const { data, error } = await supabase
@@ -6157,133 +6475,6 @@ export class SupabaseDatabaseService {
   }
 
 
-  // Departments Management
-  static async getDepartments(filters?: { 
-    departmentType?: string; 
-    isActive?: boolean; 
-    parentDepartmentId?: string;
-  }) {
-    console.log('Fetching departments with filters:', filters);
-    
-    let query = supabase
-      .from(SUPABASE_TABLES.DEPARTMENTS)
-      .select(`
-        id,
-        name,
-        code,
-        description,
-        department_type,
-        parent_department_id,
-        manager_id,
-        is_active,
-        metadata,
-        created_at,
-        updated_at,
-        users!left(
-          id,
-          full_name,
-          email
-        )
-      `)
-      .order('created_at', { ascending: false });
-
-    // Apply filters
-    if (filters?.departmentType) {
-      query = query.eq('department_type', filters.departmentType);
-    }
-    if (filters?.isActive !== undefined) {
-      query = query.eq('is_active', filters.isActive);
-    }
-    if (filters?.parentDepartmentId) {
-      query = query.eq('parent_department_id', filters.parentDepartmentId);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching departments:', error);
-      return [];
-    }
-
-    return data?.map(department => ({
-      id: department.id,
-      name: department.name,
-      code: department.code,
-      description: department.description,
-      departmentType: department.department_type,
-      parentDepartmentId: department.parent_department_id,
-      managerId: department.manager_id,
-      isActive: department.is_active,
-      metadata: department.metadata,
-      createdAt: department.created_at,
-      updatedAt: department.updated_at,
-      users: Array.isArray(department.users) ? department.users : (department.users ? [department.users] : []),
-    })) || [];
-  }
-
-  static async createDepartment(departmentData: any) {
-    console.log('Creating department:', departmentData);
-    
-    const { data, error } = await supabase
-      .from(SUPABASE_TABLES.DEPARTMENTS)
-      .insert({
-        ...departmentData,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .select();
-
-    if (error) {
-      console.error('Error creating department:', error);
-      throw new Error(`Failed to create department: ${error.message}`);
-    }
-
-    return data?.[0];
-  }
-
-  static async updateDepartment(departmentId: string, updates: Partial<{
-    name: string;
-    code: string;
-    description: string;
-    departmentType: string;
-    parentDepartmentId: string;
-    managerId: string;
-    isActive: boolean;
-    metadata: any;
-  }>) {
-    console.log('Updating department:', departmentId, updates);
-    
-    const { data, error } = await supabase
-      .from(SUPABASE_TABLES.DEPARTMENTS)
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', departmentId)
-      .select();
-
-    if (error) {
-      console.error('Error updating department:', error);
-      throw new Error(`Failed to update department: ${error.message}`);
-    }
-
-    return data?.[0];
-  }
-
-  static async deleteDepartment(departmentId: string) {
-    console.log('Deleting department:', departmentId);
-    
-    const { error } = await supabase
-      .from(SUPABASE_TABLES.DEPARTMENTS)
-      .delete()
-      .eq('id', departmentId);
-
-    if (error) {
-      console.error('Error deleting department:', error);
-      throw new Error(`Failed to delete department: ${error.message}`);
-    }
-  }
-
   // Employment Types Management
   static async getEmploymentTypes(filters?: { isActive?: boolean }) {
     console.log('Fetching employment types with filters:', filters);
@@ -8352,6 +8543,167 @@ export class SupabaseDatabaseService {
       .channel('auth-audit-log-updates')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: SUPABASE_TABLES.AUTH_AUDIT_LOG },
+        callback
+      )
+      .subscribe();
+  }
+
+  // =============================================================================
+  // TASK CATEGORY MANAGEMENT METHODS
+  // =============================================================================
+
+  static async getTaskCategories(filters?: { 
+    isActive?: boolean; 
+    searchTerm?: string;
+  }) {
+    console.log('Fetching task categories with filters:', filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.TASK_CATEGORIES)
+      .select(`
+        id,
+        name,
+        description,
+        color,
+        icon,
+        is_active,
+        metadata,
+        created_at,
+        updated_at
+      `)
+      .order('name', { ascending: true });
+
+    if (filters?.isActive !== undefined) {
+      query = query.eq('is_active', filters.isActive);
+    }
+
+    if (filters?.searchTerm) {
+      query = query.or(`name.ilike.%${filters.searchTerm}%,description.ilike.%${filters.searchTerm}%`);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching task categories:', error);
+      return [];
+    }
+
+    return data?.map(mapTaskCategoryData) || [];
+  }
+
+  static async getTaskCategoryById(categoryId: string) {
+    console.log('Fetching task category by ID:', categoryId);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.TASK_CATEGORIES)
+      .select(`
+        id,
+        name,
+        description,
+        color,
+        icon,
+        is_active,
+        metadata,
+        created_at,
+        updated_at
+      `)
+      .eq('id', categoryId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching task category:', error);
+      return null;
+    }
+
+    return mapTaskCategoryData(data);
+  }
+
+  static async createTaskCategory(categoryData: {
+    name: string;
+    description: string;
+    color: string;
+    icon: string;
+    isActive?: boolean;
+    metadata?: any;
+  }) {
+    console.log('Creating task category:', categoryData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.TASK_CATEGORIES)
+      .insert({
+        name: categoryData.name,
+        description: categoryData.description,
+        color: categoryData.color,
+        icon: categoryData.icon,
+        is_active: categoryData.isActive ?? true,
+        metadata: categoryData.metadata || {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating task category:', error);
+      throw new Error(`Failed to create task category: ${error.message}`);
+    }
+
+    return mapTaskCategoryData(data?.[0]);
+  }
+
+  static async updateTaskCategory(categoryId: string, updates: Partial<{
+    name: string;
+    description: string;
+    color: string;
+    icon: string;
+    isActive: boolean;
+    metadata: any;
+  }>) {
+    console.log('Updating task category:', categoryId, updates);
+    
+    const updateData: any = {
+      ...updates,
+      updated_at: new Date().toISOString()
+    };
+
+    // Map frontend field names to database field names
+    if (updates.isActive !== undefined) {
+      updateData.is_active = updates.isActive;
+      delete updateData.isActive;
+    }
+
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.TASK_CATEGORIES)
+      .update(updateData)
+      .eq('id', categoryId)
+      .select();
+
+    if (error) {
+      console.error('Error updating task category:', error);
+      throw new Error(`Failed to update task category: ${error.message}`);
+    }
+
+    return mapTaskCategoryData(data?.[0]);
+  }
+
+  static async deleteTaskCategory(categoryId: string) {
+    console.log('Deleting task category:', categoryId);
+    
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.TASK_CATEGORIES)
+      .delete()
+      .eq('id', categoryId);
+
+    if (error) {
+      console.error('Error deleting task category:', error);
+      throw new Error(`Failed to delete task category: ${error.message}`);
+    }
+  }
+
+  static subscribeToTaskCategories(callback: (payload: any) => void) {
+    return supabase
+      .channel('task-categories-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.TASK_CATEGORIES },
         callback
       )
       .subscribe();
