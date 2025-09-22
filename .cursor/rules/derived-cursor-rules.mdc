@@ -13,7 +13,104 @@ The application uses a dual authentication system:
 1.  Supabase Auth users (new signups with proper authentication)
 2.  Database-only users (existing users without Supabase Auth accounts)
 
-The `src/contexts/AuthContextFixed.tsx` file is the main authentication context for the Veriphy Bank frontend application. When importing `AuthContext`, ensure to import from `AuthContextFixed` due to the actual file name. The AuthContext supports registration functionality, including the creation of a `super_admin` user. The super admin is responsible for the initial organization setup using Supabase CRUD APIs. The admin can then configure their organization. The system should support adding one row to every table using CRUD operations in the super admin dashboard to populate the database initially.
+The `src/contexts/AuthContextFixed.tsx` file is the main authentication context for the Veriphy Bank frontend application. When importing `AuthContext`, ensure to import from `AuthContextFixed` due to the actual file name. The AuthContext supports registration functionality, including the creation of a `super_admin` user. The super admin is responsible for the initial organization setup using Supabase CRUD APIs. The admin can then configure their organization. The system should support adding one row to every table using CRUD operations in the super admin dashboard to populate the database initially. The `system_settings` table must exist in the Supabase database. The application must not use fallbacks if the `system_settings` table is missing; instead, the table must be created using the SQL script below.
+
+To create the `system_settings` table in your Supabase database:
+
+1.  Go to your Supabase Dashboard: <https://supabase.com/dashboard>
+2.  Navigate to your project
+3.  Go to **SQL Editor**
+4.  Run the following SQL script to create the table:
+
+```sql
+-- Create system_settings table
+CREATE TABLE IF NOT EXISTS system_settings (
+    id BIGSERIAL PRIMARY KEY,
+    key VARCHAR(100) NOT NULL UNIQUE,
+    value TEXT,
+    description TEXT,
+    category VARCHAR(50) DEFAULT 'general',
+    is_encrypted BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT true
+);
+
+-- Create indexes for performance
+CREATE INDEX IF NOT EXISTS idx_system_settings_key ON system_settings(key);
+CREATE INDEX IF NOT EXISTS idx_system_settings_category ON system_settings(category);
+CREATE INDEX IF NOT EXISTS idx_system_settings_active ON system_settings(is_active);
+```
+
+After creating the table, run this SQL to insert the default settings:
+
+```sql
+-- Insert default system settings
+INSERT INTO system_settings (key, value, description, category) VALUES
+('app_name', 'Veriphy Bank', 'Application name', 'general'),
+('app_version', '1.0.0', 'Application version', 'general'),
+('max_login_attempts', '5', 'Maximum login attempts before account lockout', 'security'),
+('session_timeout_minutes', '30', 'Session timeout in minutes', 'security'),
+('password_min_length', '8', 'Minimum password length', 'security'),
+('password_require_special', 'true', 'Require special characters in password', 'security'),
+('kyc_verification_required', 'true', 'KYC verification required for new accounts', 'security'),
+('transaction_limit_daily', '100000', 'Daily transaction limit in INR', 'business'),
+('transaction_limit_monthly', '1000000', 'Monthly transaction limit in INR', 'business'),
+('whatsapp_enabled', 'true', 'WhatsApp integration enabled', 'integration'),
+('audit_log_retention_days', '2555', 'Audit log retention period in days', 'system'),
+('document_encryption_enabled', 'true', 'Document encryption enabled', 'security'),
+('two_factor_auth_enabled', 'true', 'Two-factor authentication enabled', 'security'),
+('maintenance_mode', 'false', 'System maintenance mode', 'system'),
+('email_notifications_enabled', 'true', 'Email notifications enabled', 'notification'),
+('sms_notifications_enabled', 'true', 'SMS notifications enabled', 'notification'),
+('push_notifications_enabled', 'true', 'Push notifications enabled', 'notification'),
+('auto_logout_minutes', '60', 'Auto logout timeout in minutes', 'security'),
+('password_reset_expiry_hours', '24', 'Password reset link expiry in hours', 'security'),
+('file_upload_max_size_mb', '10', 'Maximum file upload size in MB', 'system'),
+('supported_file_types', 'pdf,jpg,jpeg,png,doc,docx', 'Supported file types for uploads', 'system')
+ON CONFLICT (key) DO NOTHING;
+```
+
+To verify the table was created and data was inserted, run:
+
+```sql
+-- Verify the table was created and data was inserted
+SELECT 'system_settings table created successfully' as status;
+SELECT COUNT(*) as total_settings FROM system_settings;
+SELECT key, value, category FROM system_settings ORDER BY category, key;
+```
+
+The database tables must be populated with data according to the user roles to have a proper functioning flow.
+
+When the database is cleared, all missing database tables (organizations, departments, roles, permissions, etc.) must be created. The organizations table must include the missing code column. All tables must be populated with comprehensive demo data. After database restoration, the application must be tested.
+
+When inserting into the `customers` table, ensure that the `kyc_status` value is a valid enum value. Valid `kyc_status` values:
+- `'pending'` - For customers awaiting KYC verification
+- `'verified'` - For customers with completed KYC
+- `'rejected'` - For customers with rejected KYC
+- `'under_review'` - For customers under KYC review
+
+When inserting into the `customers` table, ensure that the `organization_id` column is included, as it has a NOT NULL constraint. The `customers` table schema contains the following:
+- `id` (auto-generated)
+- `full_name` (required)
+- `kyc_status` (required, defaults to 'pending')
+- `organization_id` (required)
+
+The `customers` table has `mobile` column for phone number, not `phone`. The `customers` table has `dob` column for date of birth, not `date_of_birth`. `user_id` is optional (nullable).
+
+When inserting into the `cases` table, ensure that the `organization_id`, `case_number`, `customer_id`, and `product_id` columns are included, as they have NOT NULL constraints. The `status` column defaults to `'open'`, and the `priority` column defaults to `'medium'`. Valid `status` enum values are `open`, `in_progress`, `closed`, and `rejected`. Valid `priority` enum values are `low`, `medium`, and `high`.
+
+When inserting into the `documents` table, be aware of the following:
+- The schema uses `customer_id` instead of `case_id`.
+- `organization_id` is a required field.
+- Fields like `file_name`, `file_path`, `file_size`, `file_type`, `uploaded_at`, `verified_at`, `reviewed_by`, and `notes` do not exist.
+- The schema has fields like `file_id`, `uploaded_by`, `verified_by`, and `verified_on`.
+
+When inserting into the `notifications` table, be aware of the following:
+- The schema uses `notifiable_id` and `notifiable_type` instead of `user_id`.
+- The schema uses a `data` (JSONB) column instead of `title` and `message`.
+- `organization_id` is optional but recommended.
+- The schema has `read_at` instead of `is_read` and `created_at`.
 
 ## WORKFLOW & RELEASE RULES
 
@@ -88,15 +185,290 @@ To resolve project issues, follow these steps:
     - Ensure variables are correctly declared as `const` instead of `let` where appropriate.
     - Fix lexical declarations in case blocks.
     - Correct parsing errors.
-    - Remove unnecessary escape characters in regex.
+    - Fix unnecessary escape characters in regex.
 
-## TECH STACK
+The following step-by-step plan must be followed to populate all tables with demo data:
+1. Analyze all Supabase tables and their relationships.
+2. Map user roles to their responsibilities and permissions.
+3. Design comprehensive data flow with realistic demo data.
+4. Create SQL scripts to populate all tables with demo data.
+5. Execute the population scripts in Supabase.
+6. Test the application with populated data.
 
-## PROJECT DOCUMENTATION & CONTEXT SYSTEM
+To restore the database after accidentally using the clear database feature in the super admin dashboard, follow these steps:
+1. Create all missing database tables (organizations, departments, roles, permissions, etc.).
+2. Fix the organizations table to include the missing code column.
+3. Populate all tables with comprehensive demo data.
+4. Test the application after database restoration.
 
-## DEBUGGING
+To check if the table structure is fixed:
+## **🔍 METHOD 1: Check Table Structure with DESCRIBE (PostgreSQL)**
 
-Password validation is temporarily disabled for testing, but proper authentication should be implemented in production. If a `ReferenceError: SupabaseTest is not defined` error occurs, ensure all references to `SupabaseTest` (including route definitions) are removed. When encountering `Failed to resolve import "../../contexts/AuthContext"` errors in components like `UserProfileManagement.tsx`, `ComplianceIssueManagement.tsx`, `TaskCategoryManagement.tsx`, and `LoanApplicationManagement.tsx`, update the import statement to `../../contexts/AuthContextFixed`.
-When encountering "You cannot render a <Router> inside another <Router>" errors, ensure there is only one `<BrowserRouter>` component in the entire application.
-When encountering "TypeError: Cannot read properties of null (reading 'totalUsers')" in `SuperAdminDashboardFixed.tsx` or `SalespersonDashboard.tsx`, ensure proper null checks are added when accessing properties of the `stats` object, especially `stats.totalUsers`. A loading state check should also be added to prevent rendering the component when data is not yet available.
-If a `ReferenceError: Building2 is not defined` error occurs in `SuperAdminDashboardFixed.tsx`, ensure `Building2` is imported from `lucide-react`. Also ensure that `Package` is imported from `lucide-react` in the same component.
+Run these queries in your Supabase SQL Editor to check each table structure:
+
+```sql
+-- Check if all required columns exist in each table
+SELECT column_name, data_type, is_nullable, column_default 
+FROM information_schema.columns 
+WHERE table_name = 'organizations' 
+ORDER BY ordinal_position;
+
+SELECT column_name, data_type, is_nullable, column_default 
+FROM information_schema.columns 
+WHERE table_name = 'users' 
+ORDER BY ordinal_position;
+
+SELECT column_name, data_type, is_nullable, column_default 
+FROM information_schema.columns 
+WHERE table_name = 'customers' 
+ORDER BY ordinal_position;
+
+SELECT column_name, data_type, is_nullable, column_default 
+WHERE table_name = 'cases' 
+ORDER BY ordinal_position;
+
+SELECT column_name, data_type, is_nullable, column_default 
+FROM information_schema.columns 
+WHERE table_name = 'notifications' 
+ORDER BY ordinal_position;
+```
+
+## **🔍 METHOD 2: Check All Tables Exist**
+
+```sql
+-- Check if all required tables exist
+SELECT table_name 
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+AND table_name IN (
+  'organizations', 'departments', 'roles', 'permissions', 'role_permissions',
+  'users', 'user_roles', 'products', 'document_types', 'customers', 
+  'cases', 'documents', 'tasks', 'logs', 'notifications', 'system_settings'
+)
+ORDER BY table_name;
+```
+
+## **🔍 METHOD 3: Check Specific Columns Exist**
+
+```sql
+-- Check for specific columns that were missing
+SELECT 
+  table_name,
+  column_name,
+  data_type
+FROM information_schema.columns 
+WHERE table_schema = 'public' 
+AND (
+  (table_name = 'organizations' AND column_name = 'code') OR
+  (table_name = 'departments' AND column_name = 'code') OR
+  (table_name = 'users' AND column_name IN ('full_name', 'role', 'organization_id', 'department_id', 'mobile')) OR
+  (table_name = 'customers' AND column_name IN ('full_name', 'phone', 'email', 'pan_number', 'aadhaar_number')) OR
+  (table_name = 'cases' AND column_name IN ('case_number', 'loan_amount', 'status')) OR
+  (table_name = 'notifications' AND column_name = 'is_read')
+)
+ORDER BY table_name, column_name;
+```
+
+## **🔍 METHOD 4: Test Data Insertion**
+
+Try inserting test data to see if the structure works:
+
+```sql
+-- Test inserting into organizations (should work if structure is correct)
+INSERT INTO organizations (name, code, description, email, phone) 
+VALUES ('Test Org', 'TEST', 'Test Organization', 'test@test.com', '+91-1234567890')
+ON CONFLICT (code) DO NOTHING;
+
+-- Test inserting into users (should work if structure is correct)
+INSERT INTO users (email, password_hash, full_name, mobile, role, organization_id, department_id) 
+VALUES ('test@test.com', 'test123', 'Test User', '+91-1234567890', 'test_role', 1, 1)
+ON CONFLICT (email) DO NOTHING;
+```
+
+## **🔍 METHOD 5: Check Foreign Key Relationships**
+
+```sql
+-- Check foreign key constraints
+SELECT 
+  tc.table_name, 
+  kcu.column_name, 
+  ccu.table_name AS foreign_table_name,
+  ccu.column_name AS foreign_column_name 
+FROM information_schema.table_constraints AS tc 
+JOIN information_schema.key_column_usage AS kcu
+  ON tc.constraint_name = kcu.constraint_name
+  AND tc.table_schema = kcu.table_schema
+JOIN information_schema.constraint_column_usage AS ccu
+  ON ccu.constraint_name = tc.constraint_name
+  AND ccu.table_schema = tc.table_schema
+WHERE tc.constraint_type = 'FOREIGN KEY' 
+AND tc.table_schema = 'public'
+ORDER BY tc.table_name;
+```
+
+## **🔍 METHOD 6: Comprehensive Verification Script**
+
+Here's a complete verification script you can run:
+
+```sql
+-- COMPREHENSIVE TABLE STRUCTURE VERIFICATION
+-- Run this to check if all tables and columns are properly created
+
+DO $$
+DECLARE
+    missing_tables TEXT[] := ARRAY[]::TEXT[];
+    missing_columns TEXT[] := ARRAY[]::TEXT[];
+    table_name TEXT;
+    column_name TEXT;
+    expected_tables TEXT[] := ARRAY[
+        'organizations', 'departments', 'roles', 'permissions', 'role_permissions',
+        'users', 'user_roles', 'products', 'document_types', 'customers', 
+        'cases', 'documents', 'tasks', 'logs', 'notifications', 'system_settings'
+    ];
+    expected_columns JSONB := '{
+        "organizations": ["id", "name", "code", "description", "email", "phone"],
+        "users": ["id", "email", "password_hash", "full_name", "role", "organization_id", "department_id", "mobile"],
+        "customers": ["id", "user_id", "full_name", "phone", "email", "pan_number", "aadhaar_number"],
+        "cases": ["id", "case_number", "customer_id", "assigned_to", "loan_type", "loan_amount", "status"],
+        "notifications": ["id", "user_id", "type", "title", "message", "is_read"]
+    }';
+BEGIN
+    -- Check for missing tables
+    FOREACH table_name IN ARRAY expected_tables
+    LOOP
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.tables 
+            WHERE table_schema = 'public' AND table_name = table_name
+        ) THEN
+            missing_tables := array_append(missing_tables, table_name);
+        END IF;
+    END LOOP;
+    
+    -- Check for missing columns
+    FOR table_name, column_name IN 
+        SELECT key, value 
+        FROM jsonb_each_text(expected_columns)
+    LOOP
+        FOREACH column_name IN ARRAY string_to_array(column_name, ',')
+        LOOP
+            column_name := trim(column_name);
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_schema = 'public' 
+                AND table_name = table_name 
+                AND column_name = column_name
+            ) THEN
+                missing_columns := array_append(missing_columns, table_name || '.' || column_name);
+            END IF;
+        END LOOP;
+    END LOOP;
+    
+    -- Report results
+    IF array_length(missing_tables, 1) IS NULL AND array_length(missing_columns, 1) IS NULL THEN
+        RAISE NOTICE '✅ ALL TABLES AND COLUMNS ARE PROPERLY CREATED!';
+    ELSE
+        IF array_length(missing_tables, 1) > 0 THEN
+            RAISE NOTICE '❌ Missing tables: %', array_to_string(missing_tables, ', ');
+        END IF;
+        IF array_length(missing_columns, 1) > 0 THEN
+            RAISE NOTICE '❌ Missing columns: %', array_to_string(missing_columns, ', ');
+        END IF;
+    END IF;
+END $$;
+```
+
+## **🎯 QUICK CHECK - Run This Simple Query:**
+
+```sql
+-- Quick check - should return 16 tables
+SELECT COUNT(*) as total_tables 
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+AND table_name IN (
+  'organizations', 'departments', 'roles', 'permissions', 'role_permissions',
+  'users', 'user_roles', 'products', 'document_types', 'customers', 
+  'cases', 'documents', 'tasks', 'logs', 'notifications', 'system_settings'
+);
+```
+
+**Expected result: `total_tables: 16`**
+
+## **✅ SUCCESS INDICATORS:**
+
+- ✅ All 16 tables exist
+- ✅ Key columns like `code` in organizations, `full_name` in users exist
+- ✅ Foreign key relationships are properly established
+- ✅ You can insert test data without errors
+- ✅ The application no longer shows "column not found" errors
+
+Run these verification queries and let me know what results you get! 🚀
+
+## SUPER ADMIN UI FUNCTIONAL FLOW ENHANCEMENT
+
+The following components have been enhanced to improve the super admin functional flow:
+
+### 1. Enhanced Super Admin Dashboard
+- Real-time system metrics (CPU, Memory, Disk, Database)
+- Live user & case analytics with your populated data
+- System health monitoring with service status tracking
+- Activity feed showing real-time system events
+- Performance bottleneck analysis with optimization insights
+- Auto-refresh capabilities with configurable intervals
+
+To test the enhanced Super Admin Dashboard:
+1. Start your React app: `npm run dev`
+2. Login as Super Admin (superadmin@veriphy.com)
+3. Navigate to `/super-admin/dashboard`
+4. Observe the real-time system metrics and analytics.
+
+### 2. Workflow Designer & Management
+- Visual workflow creation with drag-and-drop interface
+- Pre-built templates for loan processing, document verification, compliance
+- Workflow analytics showing success rates and processing times
+- SLA management with time-based step tracking
+- Real-time workflow monitoring of active instances
+
+To test the Workflow Designer & Management:
+1. Start your React app: `npm run dev`
+2. Login as Super Admin (superadmin@veriphy.com)
+3. Navigate to `/super-admin/workflow-designer`
+4. Design and manage business workflows.
+
+### 3. Advanced User Management
+- Comprehensive user grid with all 14 users from your database
+- Bulk operations (activate, suspend, reset passwords, etc.)
+- Advanced filtering by role, status, department
+- Real-time status with online/offline indicators
+- Security features with login attempt tracking
+
+To test the Advanced User Management:
+1. Start your React app: `npm run dev`
+2. Login as Super Admin (superadmin@veriphy.com)
+3. Navigate to `/super-admin/users`
+4. Manage users across all organizations.
+
+### 4. System Monitoring Dashboard
+- Real-time performance metrics with visualizations
+- Service health monitoring for critical services
+- Alert management with critical/warning/info levels
+- Application metrics (uptime, response time, sessions)
+- Historical trending and performance analysis
+
+To test the System Monitoring Dashboard:
+1. Start your React app: `npm run dev`
+2. Login as Super Admin (superadmin@veriphy.com)
+3. Navigate to `/super-admin/monitoring`
+4. Observe the real-time performance metrics.
+
+When using the SuperAdminDashboard component, import `useDashboardStats` and not `useDashboardData` from `src/hooks/useDashboardData.ts`. Use the hook as follows:
+```typescript
+import { useDashboardStats } from '../../hooks/useDashboardData';
+
+// Get real data from hooks
+const { 
+ stats: dashboardStats, 
+ loading: casesLoading 
+} = useDashboardStats(user?.id || '', user?.role || 'super_admin');
+```
+
+The Super Admin Dashboard must be completely dynamic and connected to real Supabase data. The Super Admin Dashboard should not have anything useless or static.

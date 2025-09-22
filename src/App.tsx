@@ -41,6 +41,12 @@ import { BackgroundProcessingPage } from './components/Admin/BackgroundProcessin
 import { CacheManagementPage } from './components/Admin/CacheManagementPage';
 import { EntityManagement } from './components/Admin/EntityManagement';
 
+// Enhanced Super Admin Components
+import { SuperAdminDashboard } from './components/Admin/SuperAdminDashboard';
+import { WorkflowDesigner } from './components/Admin/WorkflowDesigner';
+import { AdvancedUserManagement } from './components/Admin/AdvancedUserManagement';
+import { SystemMonitoringDashboard } from './components/Admin/SystemMonitoringDashboard';
+
 // Navigation Constants
 import { ROUTES } from './constants/navigation';
 
@@ -522,6 +528,43 @@ function App() {
           }
         />
         
+        {/* Enhanced Super Admin Routes */}
+        <Route
+          path={ROUTES.SUPER_ADMIN_DASHBOARD}
+          element={
+            <DashboardLayout>
+              <SuperAdminDashboard />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path={ROUTES.WORKFLOW_DESIGNER}
+          element={
+            <DashboardLayout>
+              <WorkflowDesigner />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path={ROUTES.ADVANCED_USER_MANAGEMENT}
+          element={
+            <DashboardLayout>
+              <AdvancedUserManagement />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path={ROUTES.SYSTEM_MONITORING}
+          element={
+            <DashboardLayout>
+              <SystemMonitoringDashboard />
+            </DashboardLayout>
+          }
+        />
+
         {/* Test Routes */}
         </Routes>
       </NavigationProvider>

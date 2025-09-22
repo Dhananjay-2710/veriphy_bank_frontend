@@ -68,7 +68,8 @@ export class SupabaseDatabaseService {
   // =============================================================================
 
   static async getOrganizations() {
-    console.log('Fetching organizations...');
+    console.log('🔍 Fetching organizations from Supabase...');
+    console.log('📊 Using table:', SUPABASE_TABLES.ORGANIZATIONS);
     
     const { data, error } = await supabase
       .from(SUPABASE_TABLES.ORGANIZATIONS)
@@ -96,9 +97,18 @@ export class SupabaseDatabaseService {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching organizations:', error);
+      console.error('❌ Error fetching organizations:', error);
+      console.error('Error details:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
       return [];
     }
+
+    console.log('✅ Organizations fetched successfully:', data?.length || 0, 'organizations');
+    console.log('📋 Raw data:', data);
 
     return data?.map(org => ({
       id: org.id.toString(),
@@ -134,32 +144,44 @@ export class SupabaseDatabaseService {
     maxLoansPerMonth: number;
     subscriptionPlan: 'trial' | 'basic' | 'premium' | 'enterprise';
   }) {
-    console.log('Creating organization:', organizationData);
+    console.log('🚀 Creating organization:', organizationData);
+    console.log('📊 Using table:', SUPABASE_TABLES.ORGANIZATIONS);
+    
+    const insertData = {
+      name: organizationData.name,
+      slug: organizationData.slug,
+      domain: organizationData.domain,
+      description: organizationData.description,
+      address: organizationData.address,
+      contact_info: organizationData.contactInfo,
+      max_users: organizationData.maxUsers,
+      max_loans_per_month: organizationData.maxLoansPerMonth,
+      subscription_plan: organizationData.subscriptionPlan,
+      status: 'trial',
+      trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days trial
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    console.log('📝 Insert data:', insertData);
     
     const { data, error } = await supabase
       .from(SUPABASE_TABLES.ORGANIZATIONS)
-      .insert({
-        name: organizationData.name,
-        slug: organizationData.slug,
-        domain: organizationData.domain,
-        description: organizationData.description,
-        address: organizationData.address,
-        contact_info: organizationData.contactInfo,
-        max_users: organizationData.maxUsers,
-        max_loans_per_month: organizationData.maxLoansPerMonth,
-        subscription_plan: organizationData.subscriptionPlan,
-        status: 'trial',
-        trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days trial
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
+      .insert(insertData)
       .select();
 
     if (error) {
-      console.error('Error creating organization:', error);
+      console.error('❌ Error creating organization:', error);
+      console.error('Error details:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
       throw new Error(`Failed to create organization: ${error.message}`);
     }
 
+    console.log('✅ Organization created successfully:', data);
     return data?.[0];
   }
 

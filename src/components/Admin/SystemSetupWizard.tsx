@@ -17,7 +17,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { OrganizationManagement } from './OrganizationManagement';
+import { OrganizationSetup } from './OrganizationSetup';
 import { DepartmentManagement } from './DepartmentManagement';
 import { ProductManagement } from './ProductManagement';
 import { SupabaseDatabaseService } from '../../services/supabase-database';
@@ -61,7 +61,7 @@ export function SystemSetupWizard() {
       title: 'Organization Setup',
       description: 'Create and configure organizations for multi-tenant support',
       icon: Building2,
-      component: OrganizationManagement,
+      component: OrganizationSetup,
       required: true,
       completed: false
     },
@@ -155,6 +155,19 @@ export function SystemSetupWizard() {
     setCurrentStepIndex(stepIndex);
   };
 
+  // Handle step completion
+  const handleStepComplete = (stepId: string) => {
+    console.log(`✅ Step completed: ${stepId}`);
+    // Refresh progress to update completion status
+    checkSetupProgress();
+  };
+
+  // Handle next step from current step
+  const handleNextStep = () => {
+    console.log('➡️ Moving to next step');
+    goToNextStep();
+  };
+
   // Get step status
   const getStepStatus = (stepId: string) => {
     return setupProgress.stepStatus[stepId] || 'pending';
@@ -192,6 +205,33 @@ export function SystemSetupWizard() {
 
   const currentStep = setupSteps[currentStepIndex];
   const CurrentComponent = currentStep.component;
+
+  // Render component with proper props
+  const renderCurrentStepComponent = () => {
+    const stepId = currentStep.id;
+    
+    switch (stepId) {
+      case 'organizations':
+        return (
+          <OrganizationSetup 
+            onComplete={() => handleStepComplete(stepId)}
+            onNext={handleNextStep}
+          />
+        );
+      case 'departments':
+        return (
+          <DepartmentManagement />
+        );
+      case 'products':
+        return (
+          <ProductManagement />
+        );
+      case 'workflows':
+        return <WorkflowSetup />;
+      default:
+        return <CurrentComponent />;
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -276,7 +316,7 @@ export function SystemSetupWizard() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <CurrentComponent />
+          {renderCurrentStepComponent()}
         </CardContent>
       </Card>
 

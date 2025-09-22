@@ -4832,7 +4832,104 @@ Now let me check if there are any other similar issues in the file by searching 
 
 ---
 
+Let me check if there are any other TypeScript errors by running a build:
 
+
+---
+
+```bash
+npm run build
+```
+
+```
+pm run build                                                                    
+
+> vite-react-typescript-starter@0.0.0 build
+> vite build
+
+vite v5.4.20 building for production...
+✓ 1611 modules transformed.
+dist/index.html                     0.49 kB │ gzip:   0.33 kB
+dist/assets/index-BvzZ-u_r.css     34.99 kB │ gzip:   6.14 kB
+dist/assets/index-BQJRjAEC.js   1,033.22 kB │ gzip: 212.89 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks                              
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.     
+✓ built in 11.17s
+```
+
+---
+
+Great! The build is successful, which means the TypeScript errors have been resolved. Let me also check for any linting issues:
+
+
+---
+
+
+
+---
+
+Perfect! Let me also run a TypeScript check to make sure there are no remaining type errors:
+
+
+---
+
+```bash
+npx tsc --noEmit
+```
+
+```
+px tsc --noEmit
+```
+
+---
+
+Excellent! No TypeScript errors found. Let me provide a summary of the fixes:
+
+## ✅ **TypeScript Parameter Errors Fixed Successfully!**
+
+### �� **Issues Resolved:**
+
+1. **Line 269**: `Expected 1 arguments, but got 2`
+   - **Problem**: `getWorkloadTasks(userId, date)` was called with 2 arguments
+   - **Solution**: Removed the `date` parameter → `getWorkloadTasks(userId)`
+
+2. **Line 300**: `Expected 0 arguments, but got 1`
+   - **Problem**: `getTeamMembers(organizationId)` was called with 1 argument
+   - **Solution**: Removed the `organizationId` parameter → `getTeamMembers()`
+
+### ��️ **Root Cause:**
+The function calls in `useDashboardData.ts` were using incorrect parameter counts that didn't match the actual function signatures in `SupabaseDatabaseService`.
+
+### 📊 **Technical Details:**
+
+**Before (Causing Errors):**
+```typescript
+// Line 269 - Too many arguments
+const result = await SupabaseDatabaseService.getWorkloadTasks(userId, date);
+
+// Line 300 - Too many arguments  
+const result = await SupabaseDatabaseService.getTeamMembers(organizationId);
+```
+
+**After (Fixed):**
+```typescript
+// Line 269 - Correct number of arguments
+const result = await SupabaseDatabaseService.getWorkloadTasks(userId);
+
+// Line 300 - Correct number of arguments
+const result = await SupabaseDatabaseService.getTeamMembers();
+```
+
+### �� **Result:**
+- ✅ **TypeScript Compilation:** No errors
+- ✅ **Build:** Successful
+- ✅ **Linting:** No issues
+- ✅ **Function Calls:** All parameters match signatures
+
+The application should now compile and run without any TypeScript parameter mismatch errors!
 
 ---
 

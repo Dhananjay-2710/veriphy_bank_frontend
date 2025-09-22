@@ -20,7 +20,11 @@ import {
   AlertTriangle,
   UserCheck,
   Zap,
-  FileType
+  FileType,
+  Activity,
+  GitBranch,
+  Monitor,
+  UserCog
 } from 'lucide-react';
 
 // =============================================================================
@@ -83,6 +87,12 @@ export const ROUTES = {
   BACKGROUND_PROCESSING: '/admin/background-processing',
   CACHE_MANAGEMENT: '/admin/cache-management',
   ENTITY_MANAGEMENT: '/admin/entities',
+  
+  // Enhanced Super Admin Routes
+  SUPER_ADMIN_DASHBOARD: '/super-admin/dashboard',
+  WORKFLOW_DESIGNER: '/super-admin/workflow-designer',
+  ADVANCED_USER_MANAGEMENT: '/super-admin/users',
+  SYSTEM_MONITORING: '/super-admin/monitoring',
 } as const;
 
 // =============================================================================
@@ -110,19 +120,39 @@ export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
   'super-admin': [
     {
       id: 'dashboard',
-      label: 'Master Dashboard',
-      icon: Home,
-      path: ROUTES.DASHBOARD,
+      label: 'Super Admin Dashboard',
+      icon: Activity,
+      path: ROUTES.SUPER_ADMIN_DASHBOARD,
       roles: ['super-admin'],
-      description: 'Overview of all organizations and system health'
+      description: 'Real-time system overview and analytics',
+      isNew: true
+    },
+    {
+      id: 'system-monitoring',
+      label: 'System Monitoring',
+      icon: Monitor,
+      path: ROUTES.SYSTEM_MONITORING,
+      roles: ['super-admin'],
+      description: 'Real-time system performance monitoring',
+      isNew: true
     },
     {
       id: 'user-management',
-      label: 'User Management',
-      icon: Users,
-      path: ROUTES.USER_MANAGEMENT,
-      roles: ['super-admin', 'admin'],
-      description: 'Manage users across all organizations'
+      label: 'Advanced User Management',
+      icon: UserCog,
+      path: ROUTES.ADVANCED_USER_MANAGEMENT,
+      roles: ['super-admin'],
+      description: 'Advanced user management with bulk operations',
+      isNew: true
+    },
+    {
+      id: 'workflow-designer',
+      label: 'Workflow Designer',
+      icon: GitBranch,
+      path: ROUTES.WORKFLOW_DESIGNER,
+      roles: ['super-admin'],
+      description: 'Design and manage business workflows',
+      isNew: true
     },
     {
       id: 'organizations',
