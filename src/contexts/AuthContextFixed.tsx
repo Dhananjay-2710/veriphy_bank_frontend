@@ -391,20 +391,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        // Then try to get Supabase session
-        const { data, error } = await supabase.auth.getUser();
-        if (error) {
-          console.warn('Supabase auth error:', error);
-        }
+        // Then try to get Supabase session (with timeout)
+        const authPromise = supabase.auth.getUser();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Auth timeout')), 3000)
+        );
 
-        if (data?.user) {
-          console.log('Found Supabase user:', data.user.email);
-          const profile = await fetchProfile(data.user);
-          if (mounted) {
-            setUser(profile);
+        try {
+          const { data, error } = await Promise.race([authPromise, timeoutPromise]) as any;
+          if (error) {
+            console.warn('Supabase auth error:', error);
           }
-        } else {
-          console.log('No authenticated user found');
+
+          if (data?.user) {
+            console.log('Found Supabase user:', data.user.email);
+            const profile = await fetchProfile(data.user);
+            if (mounted) {
+              setUser(profile);
+            }
+          } else {
+            console.log('No authenticated user found');
+            if (mounted) setUser(null);
+          }
+        } catch (timeoutError) {
+          console.warn('Auth initialization timeout, continuing without auth');
           if (mounted) setUser(null);
         }
       } catch (error) {

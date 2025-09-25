@@ -1,7 +1,11 @@
-import { BrowserRouter, Routes, Route, useNavigate, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useParams } from "react-router-dom";
+import { Suspense } from 'react';
 import { useAuth } from './contexts/AuthContextFixed';
-import { NavigationProvider } from './contexts/NavigationContext';
+import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 import { LoginPage } from './components/Auth/LoginPage';
+import { DashboardLayout } from './components/Layout/DashboardLayout';
+import { FullWidthLayout } from './components/Layout/FullWidthLayout';
+import { PageLoadingSpinner, LoadingSpinner } from './components/ui/LoadingSpinner';
 import { SalespersonDashboard } from './components/Dashboard/SalespersonDashboard';
 import { CreditOpsDashboard } from './components/Dashboard/CreditOpsDashboard';
 import { CasePage } from './components/Case/CasePage';
@@ -27,8 +31,6 @@ import { SystemSettingsPage } from './components/Admin/SystemSettingsPage';
 import { OrganizationSettingsPage } from './components/Admin/OrganizationSettingsPage';
 import { ManagerDashboard } from './components/Dashboard/ManagerDashboard';
 import { ComplianceReports } from './components/Compliance/ComplianceReports';
-import { DashboardLayout } from './components/Layout/DashboardLayout';
-import { FullWidthLayout } from './components/Layout/FullWidthLayout';
 import { TeamManagement } from './components/Team/TeamManagement';
 import { AnalyticsDashboard } from './components/Analytics/AnalyticsDashboard';
 // import { SuperAdminDashboardFixed } from './components/Dashboard/SuperAdminDashboardFixed';
@@ -69,32 +71,236 @@ function DocumentManagerWrapper() {
   const { caseId } = useParams<{ caseId: string }>();
   const { navigateDirect } = useNavigation();
   return (
-    <DocumentManager 
-      caseId={caseId} 
-      onBack={() => navigateDirect(-1)} 
+    <Suspense fallback={<LoadingSpinner />}>
+      <DocumentManager 
+        caseId={caseId} 
+        onBack={() => navigateDirect('/')} 
+      />
+    </Suspense>
+  );
+}
+
+// Wrapper components for routes that need navigation
+function TeamOversightWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <TeamOversight 
+      onBack={() => navigateDirect('/')} 
+      onNavigateToCase={(caseId: string) => navigateDirect(`/case/${caseId}`)}
     />
+  );
+}
+
+function ApprovalQueueWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <ApprovalQueue 
+      onBack={() => navigateDirect('/')} 
+      onNavigateToCase={(caseId: string) => navigateDirect(`/case/${caseId}`)}
+    />
+  );
+}
+
+function SystemHealthMonitorWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <SystemHealthMonitor 
+      onBack={() => navigateDirect('/')} 
+    />
+  );
+}
+
+function CasesListPageWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <CasesListPage 
+      onBack={() => navigateDirect('/')} 
+      onNavigateToCase={(caseId: string) => navigateDirect(`/case/${caseId}`)}
+    />
+  );
+}
+
+function WorkloadPlannerWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <WorkloadPlanner onBack={() => navigateDirect('/')} />
+  );
+}
+
+function WorkloadManagementPageWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <WorkloadManagementPage 
+      onBack={() => navigateDirect('/')} 
+      onNavigateToCases={() => navigateDirect('/cases')}
+      onNavigateToTasks={() => navigateDirect('/workload')}
+    />
+  );
+}
+
+function ApprovalQueuePageWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <ApprovalQueuePage 
+      onBack={() => navigateDirect('/')} 
+      onNavigateToCases={() => navigateDirect('/cases')}
+      onNavigateToDocuments={() => navigateDirect('/document-manager')}
+    />
+  );
+}
+
+function DocumentManagerWrapper2() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <DocumentManager onBack={() => navigateDirect('/')} />
+  );
+}
+
+function CommunicatorPageWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <CommunicatorPage onBack={() => navigateDirect('/')} />
+  );
+}
+
+function ComplianceReviewWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <ComplianceReview 
+      onBack={() => navigateDirect('/')} 
+      onNavigateToCase={(caseId: string) => navigateDirect(`/case/${caseId}`)}
+    />
+  );
+}
+
+function PendingReviewsWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <PendingReviews 
+      onBack={() => navigateDirect('/')} 
+      onNavigateToCase={(caseId: string) => navigateDirect(`/case/${caseId}`)}
+    />
+  );
+}
+
+function ComplianceReportsWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <ComplianceReports onBack={() => navigateDirect('/')} />
+  );
+}
+
+function CasePageWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <CasePage 
+      caseId={window.location.pathname.split('/')[2]} 
+      onBack={() => navigateDirect('/')} 
+    />
+  );
+}
+
+function TeamManagementWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <TeamManagement 
+      onBack={() => navigateDirect('/')} 
+      onNavigateToMember={(memberId: string) => navigateDirect(`/team-member/${memberId}`)}
+    />
+  );
+}
+
+function AnalyticsDashboardWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <AnalyticsDashboard 
+      onBack={() => navigateDirect('/')} 
+    />
+  );
+}
+
+function WorkflowManagementWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <WorkflowManagement onBack={() => navigateDirect('/')} />
+  );
+}
+
+function NotificationCenterWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <NotificationCenter onBack={() => navigateDirect('/')} />
+  );
+}
+
+function AdvancedAnalyticsWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <AdvancedAnalytics onBack={() => navigateDirect('/')} />
+  );
+}
+
+function SecurityComplianceWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <SecurityCompliance onBack={() => navigateDirect('/')} />
+  );
+}
+
+function PerformanceOptimizationWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <PerformanceOptimization onBack={() => navigateDirect('/')} />
+  );
+}
+
+function FeatureFlagsPageWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <FeatureFlagsPage onNavigateToSettings={() => navigateDirect('/system-settings')} />
+  );
+}
+
+function SystemIntegrationsPageWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <SystemIntegrationsPage onNavigateToSettings={() => navigateDirect('/system-settings')} />
+  );
+}
+
+function SystemSettingsPageWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <SystemSettingsPage onNavigateToIntegrations={() => navigateDirect('/system-integrations')} />
+  );
+}
+
+function OrganizationSettingsPageWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <OrganizationSettingsPage onNavigateToSystemSettings={() => navigateDirect('/system-settings-new')} />
   );
 }
 
 // Route wrapper components that provide navigation context
 function UserManagementWrapper() {
   const { navigateDirect } = useNavigation();
-  return <UserManagement onBack={() => navigateDirect(-1)} />;
+  return <UserManagement onBack={() => navigateDirect('/')} />;
 }
 
 function SystemSettingsWrapper() {
   const { navigateDirect } = useNavigation();
-  return <SystemSettings onBack={() => navigateDirect(-1)} />;
+  return <SystemSettings onBack={() => navigateDirect('/')} />;
 }
 
 function AuditLogsWrapper() {
   const { navigateDirect } = useNavigation();
-  return <AuditLogs onBack={() => navigateDirect(-1)} />;
+  return <AuditLogs onBack={() => navigateDirect('/')} />;
 }
 
 function AnalyticsWrapper() {
   const { navigateDirect } = useNavigation();
-  return <Analytics onBack={() => navigateDirect(-1)} />;
+  return <Analytics onBack={() => navigateDirect('/')} />;
 }
 
 function AppContent() {
@@ -198,7 +404,7 @@ function AppContent() {
       return (
         <DashboardLayout>
           <AuditLogs 
-            onBack={() => navigateDirect(-1)}
+            onBack={() => navigateDirect('/')}
           />
         </DashboardLayout>
       );
@@ -287,7 +493,9 @@ function App() {
           path="/feature-flags"
           element={
             <DashboardLayout>
-              <FeatureFlagsPage onNavigateToSettings={() => navigate('/system-settings')} />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <FeatureFlagsPageWrapper />
+              </Suspense>
             </DashboardLayout>
           }
         />
@@ -297,7 +505,9 @@ function App() {
           path="/system-integrations"
           element={
             <DashboardLayout>
-              <SystemIntegrationsPage onNavigateToSettings={() => navigate('/system-settings')} />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <SystemIntegrationsPageWrapper />
+              </Suspense>
             </DashboardLayout>
           }
         />
@@ -307,7 +517,9 @@ function App() {
           path="/system-settings-new"
           element={
             <DashboardLayout>
-              <SystemSettingsPage onNavigateToIntegrations={() => navigate('/system-integrations')} />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <SystemSettingsPageWrapper />
+              </Suspense>
             </DashboardLayout>
           }
         />
@@ -317,7 +529,9 @@ function App() {
           path="/organization-settings"
           element={
             <DashboardLayout>
-              <OrganizationSettingsPage onNavigateToSystemSettings={() => navigate('/system-settings-new')} />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <OrganizationSettingsPageWrapper />
+              </Suspense>
             </DashboardLayout>
           }
         />
@@ -327,10 +541,9 @@ function App() {
           path="/team"
           element={
             <DashboardLayout>
-              <TeamOversight 
-                onBack={() => navigate(-1)} 
-                onNavigateToCase={(caseId: string) => navigate(`/case/${caseId}`)}
-              />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <TeamOversightWrapper />
+              </Suspense>
             </DashboardLayout>
           }
         />
@@ -340,10 +553,9 @@ function App() {
           path="/team-management"
           element={
             <DashboardLayout>
-              <TeamManagement 
-                onBack={() => navigate(-1)} 
-                onNavigateToMember={(memberId: string) => navigate(`/team-member/${memberId}`)}
-              />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <TeamManagementWrapper />
+              </Suspense>
             </DashboardLayout>
           }
         />
@@ -353,9 +565,9 @@ function App() {
           path="/analytics-dashboard"
           element={
             <DashboardLayout>
-              <AnalyticsDashboard 
-                onBack={() => navigate(-1)} 
-              />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <AnalyticsDashboardWrapper />
+              </Suspense>
             </DashboardLayout>
           }
         />
@@ -365,10 +577,9 @@ function App() {
           path="/approval-queue"
           element={
             <DashboardLayout>
-              <ApprovalQueue 
-                onBack={() => navigate(-1)} 
-                onNavigateToCase={(caseId: string) => navigate(`/case/${caseId}`)}
-              />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <ApprovalQueueWrapper />
+              </Suspense>
             </DashboardLayout>
           }
         />
@@ -378,9 +589,9 @@ function App() {
           path="/system-health"
           element={
             <DashboardLayout>
-              <SystemHealthMonitor 
-                onBack={() => navigate(-1)} 
-              />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <SystemHealthMonitorWrapper />
+              </Suspense>
             </DashboardLayout>
           }
         />
@@ -390,10 +601,9 @@ function App() {
           path="/cases"
           element={
             <DashboardLayout>
-              <CasesListPage 
-                onBack={() => navigate(-1)} 
-                onNavigateToCase={(caseId: string) => navigate(`/case/${caseId}`)}
-              />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <CasesListPageWrapper />
+              </Suspense>
             </DashboardLayout>
           }
         />
@@ -403,7 +613,9 @@ function App() {
           path="/workload"
           element={
             <DashboardLayout>
-              <WorkloadPlanner onBack={() => navigate(-1)} />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <WorkloadPlannerWrapper />
+              </Suspense>
             </DashboardLayout>
           }
         />
@@ -413,11 +625,9 @@ function App() {
           path="/workload-management"
           element={
             <DashboardLayout>
-              <WorkloadManagementPage 
-                onBack={() => navigate(-1)} 
-                onNavigateToCases={() => navigate('/cases')}
-                onNavigateToTasks={() => navigate('/workload')}
-              />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <WorkloadManagementPageWrapper />
+              </Suspense>
             </DashboardLayout>
           }
         />
@@ -427,11 +637,9 @@ function App() {
           path="/approval-queue-new"
           element={
             <DashboardLayout>
-              <ApprovalQueuePage 
-                onBack={() => navigate(-1)} 
-                onNavigateToCases={() => navigate('/cases')}
-                onNavigateToDocuments={() => navigate('/document-manager')}
-              />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <ApprovalQueuePageWrapper />
+              </Suspense>
             </DashboardLayout>
           }
         />
@@ -441,7 +649,9 @@ function App() {
           path="/document-manager"
           element={
             <DashboardLayout>
-              <DocumentManager onBack={() => navigate(-1)} />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <DocumentManagerWrapper2 />
+              </Suspense>
             </DashboardLayout>
           }
         />
@@ -459,7 +669,9 @@ function App() {
           path="/communicator"
           element={
             <DashboardLayout>
-              <CommunicatorPage onBack={() => navigate(-1)} />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <CommunicatorPageWrapper />
+              </Suspense>
             </DashboardLayout>
           }
         />
@@ -469,10 +681,9 @@ function App() {
           path="/compliance-review"
           element={
             <DashboardLayout>
-              <ComplianceReview 
-                onBack={() => navigate(-1)} 
-                onNavigateToCase={(caseId: string) => navigate(`/case/${caseId}`)}
-              />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <ComplianceReviewWrapper />
+              </Suspense>
             </DashboardLayout>
           }
         />
@@ -482,10 +693,9 @@ function App() {
           path="/pending-reviews"
           element={
             <DashboardLayout>
-              <PendingReviews 
-                onBack={() => navigate(-1)} 
-                onNavigateToCase={(caseId: string) => navigate(`/case/${caseId}`)}
-              />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <PendingReviewsWrapper />
+              </Suspense>
             </DashboardLayout>
           }
         />
@@ -495,7 +705,9 @@ function App() {
           path="/compliance-reports"
           element={
             <DashboardLayout>
-              <ComplianceReports onBack={() => navigate(-1)} />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <ComplianceReportsWrapper />
+              </Suspense>
             </DashboardLayout>
           }
         />
@@ -505,10 +717,9 @@ function App() {
           path="/case/:caseId"
           element={
             <DashboardLayout>
-              <CasePage 
-                caseId={window.location.pathname.split('/')[2]} 
-                onBack={() => navigate(-1)} 
-              />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <CasePageWrapper />
+              </Suspense>
             </DashboardLayout>
           }
         />
@@ -694,7 +905,9 @@ function App() {
           path="/super-admin/workflow-management"
           element={
             <FullWidthLayout>
-              <WorkflowManagement onBack={() => navigate(-1)} />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <WorkflowManagementWrapper />
+              </Suspense>
             </FullWidthLayout>
           }
         />
@@ -703,7 +916,9 @@ function App() {
           path="/super-admin/notifications"
           element={
             <FullWidthLayout>
-              <NotificationCenter onBack={() => navigate(-1)} />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <NotificationCenterWrapper />
+              </Suspense>
             </FullWidthLayout>
           }
         />
@@ -712,7 +927,9 @@ function App() {
           path="/super-admin/advanced-analytics"
           element={
             <FullWidthLayout>
-              <AdvancedAnalytics onBack={() => navigate(-1)} />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <AdvancedAnalyticsWrapper />
+              </Suspense>
             </FullWidthLayout>
           }
         />
@@ -721,7 +938,9 @@ function App() {
           path="/super-admin/security-compliance"
           element={
             <FullWidthLayout>
-              <SecurityCompliance onBack={() => navigate(-1)} />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <SecurityComplianceWrapper />
+              </Suspense>
             </FullWidthLayout>
           }
         />
@@ -730,7 +949,9 @@ function App() {
           path="/super-admin/performance-optimization"
           element={
             <FullWidthLayout>
-              <PerformanceOptimization onBack={() => navigate(-1)} />
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <PerformanceOptimizationWrapper />
+              </Suspense>
             </FullWidthLayout>
           }
         />

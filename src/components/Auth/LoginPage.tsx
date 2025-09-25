@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { useState, Suspense, lazy } from 'react';
 import { Shield, User, UserPlus, Settings } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContextFixed';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
-import { ValidatedInput, ValidatedPasswordInput, ValidationSummary } from '../ui/FormField';
-import { useFormValidation } from '../../hooks/useFormValidation';
-import { VALIDATION_RULES } from '../../utils/validation';
-import { RegistrationPage } from './RegistrationPage';
-import { SuperAdminRegistration } from './SuperAdminRegistration';
-import { RoleBasedRegistration } from './RoleBasedRegistration';
 import { useNavigate } from 'react-router-dom';
-import { UserDebugger } from '../Debug/UserDebugger';
+
+// Lazy load heavy components
+const RegistrationPage = lazy(() => import('./RegistrationPage').then(m => ({ default: m.RegistrationPage })));
+const SuperAdminRegistration = lazy(() => import('./SuperAdminRegistration').then(m => ({ default: m.SuperAdminRegistration })));
+const RoleBasedRegistration = lazy(() => import('./RoleBasedRegistration').then(m => ({ default: m.RoleBasedRegistration })));
+
+// Lazy load the UserDebugger component
+const UserDebugger = lazy(() => import('../Debug/UserDebugger').then(m => ({ default: m.UserDebugger })));
 
 interface RegistrationData {
   firstName: string;
@@ -25,33 +26,14 @@ export function LoginPage() {
   const [showSuperAdminRegistration, setShowSuperAdminRegistration] = useState(false);
   const [showRoleBasedRegistration, setShowRoleBasedRegistration] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const [showDebugger, setShowDebugger] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   const { login, user } = useAuth();
-
-  // Form validation
-  const {
-    values,
-    errors,
-    isValid,
-    isSubmitting,
-    handleChange,
-    handleBlur,
-    handleSubmit
-  } = useFormValidation({
-    validationRules: {
-      email: VALIDATION_RULES.email,
-      password: {
-        required: true,
-        minLength: 1,
-        message: 'Password is required'
-      }
-    },
-    initialValues: {
-      email: '',
-      password: ''
-    }
-  });
 
   const redirectByRole = (role?: string | null) => {
     console.log('User role:', role);
@@ -59,16 +41,26 @@ export function LoginPage() {
     navigate('/');
   };
 
-  const onSubmit = async (formValues: Record<string, string>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter both email and password');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+
     try {
-      const profile = await login(formValues.email.trim().toLowerCase(), formValues.password); 
+      const profile = await login(email.trim().toLowerCase(), password); 
       console.log("Profile after login:", profile);
       console.log("Role after login:", profile.role);
       redirectByRole(profile.role); 
     } catch (err: any) {
       console.error('LoginPage error:', err);
-      // You could set form-level errors here if needed
-      throw new Error(err?.message || 'Something went wrong. Please try again.');
+      setError(err?.message || 'Something went wrong. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -83,29 +75,35 @@ export function LoginPage() {
 
   if (showSuperAdminRegistration) {
     return (
-      <SuperAdminRegistration
-        onBackToLogin={() => setShowSuperAdminRegistration(false)}
-        onRegistrationComplete={handleRegistrationComplete}
-      />
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>}>
+        <SuperAdminRegistration
+          onBackToLogin={() => setShowSuperAdminRegistration(false)}
+          onRegistrationComplete={handleRegistrationComplete}
+        />
+      </Suspense>
     );
   }
 
   if (showRoleBasedRegistration) {
     return (
-      <RoleBasedRegistration
-        onBackToLogin={() => setShowRoleBasedRegistration(false)}
-        onRegistrationComplete={handleRegistrationComplete}
-        currentUserRole={user?.role || undefined}
-      />
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>}>
+        <RoleBasedRegistration
+          onBackToLogin={() => setShowRoleBasedRegistration(false)}
+          onRegistrationComplete={handleRegistrationComplete}
+          currentUserRole={user?.role || undefined}
+        />
+      </Suspense>
     );
   }
 
   if (showRegistration) {
     return (
-      <RegistrationPage
-        onBackToLogin={() => setShowRegistration(false)}
-        onRegistrationComplete={handleRegistrationComplete}
-      />
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>}>
+        <RegistrationPage
+          onBackToLogin={() => setShowRegistration(false)}
+          onRegistrationComplete={handleRegistrationComplete}
+        />
+      </Suspense>
     );
   }
 
@@ -130,34 +128,50 @@ export function LoginPage() {
             <CardTitle className="text-center">Sign In</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              {/* Validation Summary */}
-              <ValidationSummary errors={errors} />
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Error Display */}
+              {error && (
+                <div className="text-red-600 text-sm text-center bg-red-50 p-2 rounded-md">
+                  {error}
+                </div>
+              )}
 
               {/* Email */}
-              <ValidatedInput
-                label="Email Address"
-                type="email"
-                value={values.email}
-                onChange={handleChange('email')}
-                onBlur={handleBlur('email')}
-                error={errors.email}
-                required
-                icon={<User className="h-5 w-5" />}
-                placeholder="Enter your email"
-              />
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <User className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter your email"
+                    required
+                  />
+                </div>
+              </div>
 
               {/* Password */}
-              <ValidatedPasswordInput
-                label="Password"
-                value={values.password}
-                onChange={handleChange('password')}
-                onBlur={handleBlur('password')}
-                error={errors.password}
-                required
-                placeholder="Enter your password"
-                showToggle={false}
-              />
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                  Password
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter your password"
+                  required
+                />
+              </div>
 
               {/* Test Credentials */}
               <div className="text-xs text-gray-600 bg-blue-50 p-3 rounded-md border border-blue-200">
@@ -187,7 +201,7 @@ export function LoginPage() {
                 type="submit" 
                 className="w-full" 
                 size="lg" 
-                disabled={isSubmitting || !isValid}
+                disabled={isSubmitting || !email.trim() || !password.trim()}
               >
                 {isSubmitting ? 'Signing in...' : 'Sign In'}
               </Button>
@@ -247,8 +261,30 @@ export function LoginPage() {
           </CardContent>
         </Card>
 
-        {/* User Debugger - Shows available users for login */}
-        <UserDebugger />
+        {/* User Debugger - Shows available users for login (lazy loaded) */}
+        {showDebugger && (
+          <Suspense fallback={
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-3"></div>
+                <span className="text-blue-800 font-medium">Loading user debugger...</span>
+              </div>
+            </div>
+          }>
+            <UserDebugger />
+          </Suspense>
+        )}
+
+        {/* Debug Toggle Button */}
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={() => setShowDebugger(!showDebugger)}
+            className="text-xs text-gray-500 hover:text-gray-700 underline"
+          >
+            {showDebugger ? 'Hide' : 'Show'} User Debugger
+          </button>
+        </div>
 
         {/* Footer */}
         <div className="text-center text-xs text-gray-500">
