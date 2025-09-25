@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Search, Filter, FileText, Clock, AlertTriangle, Eye, Phone, MessageCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Search, Filter, FileText, Clock, AlertTriangle, Eye, Phone, MessageCircle, RefreshCw, Plus } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { useCases } from '../../hooks/useDashboardData';
 import { useAuth } from '../../contexts/AuthContextFixed';
+import { SupabaseDatabaseService } from '../../services/supabase-database';
+import { NewCaseForm } from '../Case/NewCaseForm';
 
 interface CasesListPageProps {
   onBack: () => void;
@@ -15,9 +17,42 @@ export function CasesListPage({ onBack, onNavigateToCase }: CasesListPageProps) 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [sortBy, setSortBy] = useState('priority');
+  const [showNewCaseForm, setShowNewCaseForm] = useState(false);
+  const [casesData, setCasesData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   
-  // Fetch cases from Supabase
+  // Fetch cases using the new Supabase service
+  const fetchCases = async () => {
+    if (!user?.organizationId) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const filters = {
+        organizationId: user.organizationId,
+        assignedTo: user.id,
+        ...(filterStatus !== 'all' && { status: filterStatus })
+      };
+      
+      const fetchedCases = await SupabaseDatabaseService.getCasesWithDetails(filters);
+      setCasesData(fetchedCases);
+    } catch (err) {
+      console.error('Error fetching cases:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch cases');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load cases on mount and when filters change
+  useEffect(() => {
+    fetchCases();
+  }, [user?.organizationId, user?.id, filterStatus]);
+
+  // Legacy hook for backward compatibility (remove when not needed)
   const { cases, loading: casesLoading, error: casesError, refetch } = useCases({
     assignedTo: user?.id,
     status: filterStatus === 'all' ? undefined : filterStatus
@@ -27,6 +62,29 @@ export function CasesListPage({ onBack, onNavigateToCase }: CasesListPageProps) 
     // Navigate to WhatsApp conversation for this customer
     console.log(`Opening WhatsApp conversation with ${customerName} (${phone}) for case ${caseId}`);
     onNavigateToCase(caseId);
+  };
+
+  const handleNewCase = () => {
+    setShowNewCaseForm(true);
+  };
+
+  const handleCaseCreated = (caseData: any) => {
+    console.log('New case created:', caseData);
+    fetchCases(); // Refresh the list
+  };
+
+  const handleStatusUpdate = async (caseId: string, newStatus: string) => {
+    try {
+      await SupabaseDatabaseService.updateCaseStatus(caseId, newStatus);
+      fetchCases(); // Refresh the list
+    } catch (err) {
+      console.error('Error updating case status:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update case status');
+    }
+  };
+
+  const handleRefresh = () => {
+    fetchCases();
   };
 
   // Helper functions
@@ -59,22 +117,32 @@ export function CasesListPage({ onBack, onNavigateToCase }: CasesListPageProps) 
     }
   };
 
+  // Use the new Supabase data or fallback to legacy data
+  const dataToUse = casesData.length > 0 ? casesData : cases;
+  const isUsingNewData = casesData.length > 0;
+
   // Transform Supabase cases to match the expected format
-  const allCases = cases.map(case_ => ({
+  const allCases = dataToUse.map(case_ => ({
     id: case_.id,
-    caseNumber: case_.caseNumber,
-    customer: case_.customer.name,
-    phone: case_.customer.phone,
-    loanType: case_.customer.loanType,
-    amount: `₹${(case_.customer.loanAmount / 100000).toFixed(0)}L`,
+    caseNumber: isUsingNewData ? case_.caseNumber : case_.caseNumber,
+    customer: isUsingNewData ? case_.customer?.name || 'Unknown' : case_.customer.name,
+    phone: isUsingNewData ? case_.customer?.phone || '' : case_.customer.phone,
+    loanType: isUsingNewData ? case_.loanType : case_.customer.loanType,
+    amount: isUsingNewData ? 
+      `₹${(case_.loanAmount / 100000).toFixed(0)}L` : 
+      `₹${(case_.customer.loanAmount / 100000).toFixed(0)}L`,
     status: case_.status,
     priority: case_.priority,
-    lastActivity: getTimeAgo(case_.updatedAt),
-    documentsComplete: calculateDocumentCompleteness(case_.documents),
-    assignedTo: 'You',
-    createdDate: case_.createdAt.split('T')[0],
+    lastActivity: getTimeAgo(case_.updatedAt || case_.createdAt),
+    documentsComplete: calculateDocumentCompleteness(case_.documents || []),
+    assignedTo: isUsingNewData ? 
+      (case_.assignedUser?.name || 'Unassigned') : 
+      'You',
+    createdDate: (case_.createdAt || '').split('T')[0],
     nextAction: getNextAction(case_.status),
-    riskProfile: case_.customer.riskProfile
+    riskProfile: isUsingNewData ? 
+      case_.customer?.riskProfile || 'medium' : 
+      case_.customer.riskProfile
   }));
 
   const filteredCases = allCases.filter(case_ => {
@@ -154,7 +222,7 @@ export function CasesListPage({ onBack, onNavigateToCase }: CasesListPageProps) 
   };
 
   // Show loading state
-  if (casesLoading) {
+  if (loading || casesLoading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -178,7 +246,7 @@ export function CasesListPage({ onBack, onNavigateToCase }: CasesListPageProps) 
   }
 
   // Show error state
-  if (casesError) {
+  if (error || casesError) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -223,8 +291,13 @@ export function CasesListPage({ onBack, onNavigateToCase }: CasesListPageProps) 
           </div>
         </div>
         <div className="flex items-center space-x-3">
-          <Button variant="outline" onClick={refetch} disabled={casesLoading}>
+          <Button variant="outline" onClick={handleRefresh} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
+          </Button>
+          <Button onClick={handleNewCase}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Case
           </Button>
           <div className="text-sm text-gray-600">
             {filteredCases.length} of {allCases.length} cases
@@ -372,6 +445,14 @@ export function CasesListPage({ onBack, onNavigateToCase }: CasesListPageProps) 
             <p className="text-gray-600">Try adjusting your search terms or filters.</p>
           </CardContent>
         </Card>
+      )}
+
+      {/* New Case Form Modal */}
+      {showNewCaseForm && (
+        <NewCaseForm
+          onClose={() => setShowNewCaseForm(false)}
+          onCaseCreated={handleCaseCreated}
+        />
       )}
     </div>
   );

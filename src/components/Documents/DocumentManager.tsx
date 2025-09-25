@@ -7,6 +7,7 @@ import { Document } from '../../types';
 import { useDocuments, useRealtimeDocuments } from '../../hooks/useDashboardData';
 import { SupabaseDatabaseService } from '../../services/supabase-database';
 import { useAuth } from '../../contexts/AuthContextFixed';
+import { DocumentWorkflowIntegration } from './DocumentWorkflowIntegration';
 
 interface DocumentManagerProps {
   caseId?: string;
@@ -28,6 +29,7 @@ export function DocumentManager({ caseId, onBack, onSendMessage }: DocumentManag
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [documentTypes, setDocumentTypes] = useState<any[]>([]);
   const [selectedDocumentType, setSelectedDocumentType] = useState('');
+  const [activeTab, setActiveTab] = useState('documents');
 
   // Get real documents data from database
   const { documents, loading: documentsLoading, error: documentsError, refetch } = useDocuments(caseId || '');
@@ -422,7 +424,56 @@ export function DocumentManager({ caseId, onBack, onSendMessage }: DocumentManag
         </div>
       </div>
 
-      {/* Status Overview */}
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('documents')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'documents'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <FileText className="h-4 w-4 mr-2 inline" />
+            Document List
+          </button>
+          <button
+            onClick={() => setActiveTab('workflow')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'workflow'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <CheckCircle className="h-4 w-4 mr-2 inline" />
+            Document Workflow
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'workflow' && caseId && (
+        <DocumentWorkflowIntegration
+          caseId={caseId}
+          onDocumentVerified={(documentId) => {
+            console.log('Document verified:', documentId);
+            refetch(); // Refresh the document list
+          }}
+          onDocumentRejected={(documentId, reason) => {
+            console.log('Document rejected:', documentId, reason);
+            refetch(); // Refresh the document list
+          }}
+          onRequestAdditionalDocuments={(documentTypes) => {
+            console.log('Requesting additional documents:', documentTypes);
+            // Could trigger a message to customer
+          }}
+        />
+      )}
+
+      {activeTab === 'documents' && (
+        <>
+          {/* Status Overview */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {Object.entries(statusCounts).map(([status, count]) => (
           <Card 
@@ -675,6 +726,8 @@ export function DocumentManager({ caseId, onBack, onSendMessage }: DocumentManag
             </CardContent>
           </Card>
         </div>
+      )}
+        </>
       )}
     </div>
   );

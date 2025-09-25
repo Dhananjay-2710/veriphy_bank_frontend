@@ -91,7 +91,7 @@ export function UserProfile({ user, onClose, onEdit, onSuspend, onActivate, onDe
         <div className="flex items-center justify-between p-6 border-b">
           <div className="flex items-center space-x-4">
             <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-              {user.name.split(' ').map(n => n[0]).join('')}
+              {user.name ? user.name.split(' ').map(n => n[0]).join('') : 'U'}
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900">{user.name}</h2>

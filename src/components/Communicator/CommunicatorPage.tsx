@@ -226,7 +226,7 @@ export function CommunicatorPage({ onBack }: CommunicatorPageProps) {
                 <div className="flex items-center space-x-3">
                   <div className="relative">
                     <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center text-white font-semibold">
-                      {customer.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                      {customer.name ? customer.name.split(' ').map(n => n[0]).join('').slice(0, 2) : 'C'}
                     </div>
                     <div className="absolute -bottom-1 -right-1">
                       {getStatusIndicator(customer.status)}

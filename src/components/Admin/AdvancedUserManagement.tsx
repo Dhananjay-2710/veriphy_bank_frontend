@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Users, 
   Search, 
@@ -10,28 +10,19 @@ import {
   Unlock, 
   Mail, 
   Phone, 
-  MapPin, 
   Calendar,
-  Shield,
-  Eye,
-  UserCheck,
-  UserX,
-  Download,
-  Upload,
-  RotateCcw,
   Key,
   AlertTriangle,
-  CheckCircle,
   Clock,
   Activity,
-  Settings,
-  MoreVertical
+  RefreshCw,
+  UserCheck,
+  UserX,
+  Download
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
-import { Badge } from '../ui/Badge';
+import { Card, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { useAuth } from '../../contexts/AuthContextFixed';
-import { SupabaseDatabaseService } from '../../services/supabase-database';
+import { useAdvancedUserManagement } from '../../hooks/useDashboardData';
 
 interface User {
   id: string;
@@ -56,16 +47,6 @@ interface User {
   locked_until?: string;
 }
 
-interface UserStats {
-  totalUsers: number;
-  activeUsers: number;
-  onlineUsers: number;
-  newUsersToday: number;
-  suspendedUsers: number;
-  pendingVerification: number;
-  roleDistribution: { [role: string]: number };
-  departmentDistribution: { [department: string]: number };
-}
 
 interface BulkAction {
   type: 'activate' | 'deactivate' | 'suspend' | 'delete' | 'reset_password' | 'send_notification';
@@ -95,164 +76,33 @@ const USER_ROLES = [
 ];
 
 export function AdvancedUserManagement() {
-  const { user: currentUser } = useAuth();
-  const [users, setUsers] = useState<User[]>([]);
-  const [userStats, setUserStats] = useState<UserStats | null>(null);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [showBulkActions, setShowBulkActions] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [showUserModal, setShowUserModal] = useState(false);
 
-  useEffect(() => {
-    loadUsers();
-    loadUserStats();
-  }, []);
-
-  const loadUsers = async () => {
-    try {
-      setLoading(true);
-      // In a real app, this would fetch from Supabase
-      const mockUsers: User[] = [
-        {
-          id: '40',
-          email: 'superadmin@veriphy.com',
-          full_name: 'Super Admin',
-          mobile: '+91-9999999999',
-          role: 'super_admin',
-          department_id: 1,
-          department_name: 'Administration',
-          organization_id: 1,
-          organization_name: 'Veriphy Bank',
-          status: 'active',
-          last_login_at: '2024-01-22T10:30:00Z',
-          created_at: '2024-01-01T00:00:00Z',
-          updated_at: '2024-01-22T10:30:00Z',
-          email_verified_at: '2024-01-01T00:00:00Z',
-          employment_type: 'permanent',
-          is_online: true,
-          login_attempts: 0,
-          permissions: ['all']
-        },
-        {
-          id: '41',
-          email: 'priya.sharma@veriphy.com',
-          full_name: 'Priya Sharma',
-          mobile: '+91-9876543210',
-          role: 'manager',
-          department_id: 2,
-          department_name: 'Sales',
-          organization_id: 1,
-          organization_name: 'Veriphy Bank',
-          status: 'active',
-          last_login_at: '2024-01-22T09:15:00Z',
-          created_at: '2024-01-15T00:00:00Z',
-          updated_at: '2024-01-22T09:15:00Z',
-          email_verified_at: '2024-01-15T00:00:00Z',
-          employment_type: 'permanent',
-          is_online: true,
-          login_attempts: 0
-        },
-        {
-          id: '42',
-          email: 'rajesh.kumar@veriphy.com',
-          full_name: 'Rajesh Kumar',
-          mobile: '+91-9876543211',
-          role: 'credit_ops',
-          department_id: 3,
-          department_name: 'Credit Operations',
-          organization_id: 1,
-          organization_name: 'Veriphy Bank',
-          status: 'active',
-          last_login_at: '2024-01-21T14:20:00Z',
-          created_at: '2024-01-15T00:00:00Z',
-          updated_at: '2024-01-21T14:20:00Z',
-          email_verified_at: '2024-01-15T00:00:00Z',
-          employment_type: 'permanent',
-          is_online: false,
-          login_attempts: 0
-        },
-        {
-          id: '43',
-          email: 'sneha.singh@veriphy.com',
-          full_name: 'Sneha Singh',
-          mobile: '+91-9876543212',
-          role: 'salesperson',
-          department_id: 2,
-          department_name: 'Sales',
-          organization_id: 1,
-          organization_name: 'Veriphy Bank',
-          status: 'active',
-          last_login_at: '2024-01-22T08:45:00Z',
-          created_at: '2024-01-15T00:00:00Z',
-          updated_at: '2024-01-22T08:45:00Z',
-          email_verified_at: '2024-01-15T00:00:00Z',
-          employment_type: 'permanent',
-          is_online: true,
-          login_attempts: 0
-        },
-        {
-          id: '44',
-          email: 'amit.patel@veriphy.com',
-          full_name: 'Amit Patel',
-          mobile: '+91-9876543213',
-          role: 'compliance',
-          department_id: 4,
-          department_name: 'Compliance',
-          organization_id: 1,
-          organization_name: 'Veriphy Bank',
-          status: 'suspended',
-          last_login_at: '2024-01-20T16:30:00Z',
-          created_at: '2024-01-15T00:00:00Z',
-          updated_at: '2024-01-20T16:30:00Z',
-          email_verified_at: '2024-01-15T00:00:00Z',
-          employment_type: 'contract',
-          is_online: false,
-          login_attempts: 3
-        }
-      ];
-      setUsers(mockUsers);
-    } finally {
-      setLoading(false);
+  // Use the real hook with filters
+  const {
+    users,
+    userStats,
+    loading,
+    error,
+    refetch,
+    actions: {
+      bulkUpdateStatus,
+      bulkDeleteUsers,
+      resetUserPassword,
+      updateUserStatus,
+      sendNotificationToUsers
     }
-  };
-
-  const loadUserStats = async () => {
-    try {
-      // Calculate stats from the users data
-      const stats: UserStats = {
-        totalUsers: 14,
-        activeUsers: 12,
-        onlineUsers: 8,
-        newUsersToday: 2,
-        suspendedUsers: 1,
-        pendingVerification: 1,
-        roleDistribution: {
-          'super_admin': 1,
-          'admin': 1,
-          'manager': 3,
-          'credit_ops': 4,
-          'salesperson': 3,
-          'compliance': 1,
-          'auditor': 1
-        },
-        departmentDistribution: {
-          'Administration': 2,
-          'Sales': 5,
-          'Credit Operations': 4,
-          'Compliance': 2,
-          'IT': 1
-        }
-      };
-      setUserStats(stats);
-    } catch (error) {
-      console.error('Error loading user stats:', error);
-    }
-  };
+  } = useAdvancedUserManagement({
+    searchTerm: searchTerm || undefined,
+    role: selectedRole !== 'all' ? selectedRole : undefined,
+    status: selectedStatus !== 'all' ? selectedStatus : undefined,
+    limit: 50
+  });
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -289,66 +139,82 @@ export function AdvancedUserManagement() {
     }
 
     try {
-      // In a real app, this would make API calls
-      console.log(`Performing ${action.type} on users:`, selectedUsers);
+      let result;
       
-      // Update local state based on action
       switch (action.type) {
         case 'activate':
-          setUsers(users.map(user => 
-            selectedUsers.includes(user.id) 
-              ? { ...user, status: 'active' as const }
-              : user
-          ));
+          result = await bulkUpdateStatus(selectedUsers, 'active');
           break;
         case 'deactivate':
-          setUsers(users.map(user => 
-            selectedUsers.includes(user.id) 
-              ? { ...user, status: 'inactive' as const }
-              : user
-          ));
+          result = await bulkUpdateStatus(selectedUsers, 'inactive');
           break;
         case 'suspend':
-          setUsers(users.map(user => 
-            selectedUsers.includes(user.id) 
-              ? { ...user, status: 'suspended' as const }
-              : user
-          ));
+          result = await bulkUpdateStatus(selectedUsers, 'suspended');
           break;
         case 'delete':
-          setUsers(users.filter(user => !selectedUsers.includes(user.id)));
+          result = await bulkDeleteUsers(selectedUsers);
           break;
+        case 'send_notification':
+          result = await sendNotificationToUsers(selectedUsers, {
+            title: 'Bulk Notification',
+            message: 'This is a bulk notification sent to selected users.',
+            type: 'info'
+          });
+          break;
+        case 'reset_password':
+          // Reset password for each user individually
+          const resetResults = await Promise.all(
+            selectedUsers.map(userId => resetUserPassword(userId))
+          );
+          result = { success: resetResults.every(r => r.success) };
+          break;
+      }
+      
+      if (result?.success) {
+        alert(`Successfully performed ${action.label.toLowerCase()}`);
+      } else {
+        alert(`Failed to perform ${action.label.toLowerCase()}: ${result?.error || 'Unknown error'}`);
       }
       
       setSelectedUsers([]);
       setShowBulkActions(false);
     } catch (error) {
       console.error('Error performing bulk action:', error);
+      alert(`Error performing ${action.label.toLowerCase()}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   const toggleUserStatus = async (userId: string) => {
     try {
-      setUsers(users.map(user => 
-        user.id === userId 
-          ? { 
-              ...user, 
-              status: user.status === 'active' ? 'inactive' : 'active' as const
-            }
-          : user
-      ));
+      const user = users.find(u => u.id === userId);
+      if (!user) return;
+      
+      const newStatus = user.status === 'active' ? 'inactive' : 'active';
+      const result = await updateUserStatus(userId, newStatus);
+      
+      if (result.success) {
+        console.log(`User status updated to ${newStatus}`);
+      } else {
+        alert(`Failed to update user status: ${result.error}`);
+      }
     } catch (error) {
       console.error('Error toggling user status:', error);
+      alert(`Error toggling user status: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
-  const resetUserPassword = async (userId: string) => {
+  const handleResetUserPassword = async (userId: string) => {
     try {
-      // In a real app, this would send a password reset email
-      console.log('Password reset for user:', userId);
-      alert('Password reset email sent successfully!');
+      const result = await resetUserPassword(userId);
+      
+      if (result.success) {
+        alert('Password reset initiated successfully!');
+      } else {
+        alert(`Failed to reset password: ${result.error}`);
+      }
     } catch (error) {
       console.error('Error resetting password:', error);
+      alert(`Error resetting password: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -400,6 +266,24 @@ export function AdvancedUserManagement() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 mb-4">
+            <AlertTriangle className="h-12 w-12 mx-auto mb-2" />
+            <p className="text-lg font-semibold">Error Loading Users</p>
+            <p className="text-sm text-gray-600 mt-2">{error}</p>
+          </div>
+          <Button onClick={refetch}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -409,6 +293,10 @@ export function AdvancedUserManagement() {
           <p className="text-gray-600">Manage users, roles, and permissions</p>
         </div>
         <div className="flex space-x-3">
+          <Button variant="outline" onClick={refetch}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
           <Button variant="outline">
             <Download className="h-4 w-4 mr-2" />
             Export
@@ -639,17 +527,17 @@ export function AdvancedUserManagement() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <Badge className={getRoleBadgeColor(user.role)}>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(user.role)}`}>
                         {user.role.replace('_', ' ').toUpperCase()}
-                      </Badge>
+                      </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {user.department_name || 'Not assigned'}
                     </td>
                     <td className="px-6 py-4">
-                      <Badge className={getStatusBadgeColor(user.status)}>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(user.status)}`}>
                         {user.status}
-                      </Badge>
+                      </span>
                       {user.login_attempts && user.login_attempts > 0 && (
                         <div className="text-xs text-red-600 mt-1">
                           {user.login_attempts} failed attempts
@@ -664,7 +552,7 @@ export function AdvancedUserManagement() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setEditingUser(user)}
+                          onClick={() => console.log('Edit user:', user.id)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -679,7 +567,7 @@ export function AdvancedUserManagement() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => resetUserPassword(user.id)}
+                          onClick={() => handleResetUserPassword(user.id)}
                           className="text-blue-600"
                         >
                           <Key className="h-4 w-4" />

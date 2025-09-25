@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { SupabaseDatabaseService } from '../../services/supabase-database';
 import { useComplianceIssues } from '../../hooks/useDashboardData';
+import { useAuth } from '../../contexts/AuthContextFixed';
 
 interface ComplianceReviewProps {
   onBack: () => void;
@@ -12,6 +13,7 @@ interface ComplianceReviewProps {
 }
 
 export function ComplianceReview({ onBack, onNavigateToCase }: ComplianceReviewProps) {
+  const { user } = useAuth();
   const [selectedFilter, setSelectedFilter] = useState('all');
   
   // Use real compliance issues data from hook
@@ -23,73 +25,8 @@ export function ComplianceReview({ onBack, onNavigateToCase }: ComplianceReviewP
   const [error, setError] = useState<string | null>(null);
   const [processingAction, setProcessingAction] = useState<string | null>(null);
 
-  // Use mock data as fallback if no real data
-  const complianceIssues = complianceIssuesData.length > 0 ? complianceIssuesData : [
-    {
-      id: 'comp-001',
-      caseId: 'case-001',
-      customer: 'Ramesh & Sunita Gupta',
-      phone: '+91-9876543210',
-      loanType: 'Home Loan',
-      amount: '₹50L',
-      issueType: 'document_mismatch',
-      severity: 'high',
-      description: 'Income declared in application does not match bank statements',
-      flaggedBy: 'System Auto-Check',
-      flaggedAt: '2025-01-09T14:30:00Z',
-      status: 'open',
-      assignedTo: 'Anita Patel',
-      dueDate: '2025-01-10T18:00:00Z'
-    },
-    {
-      id: 'comp-002',
-      caseId: 'case-004',
-      customer: 'Deepak Agarwal',
-      phone: '+91-9876543213',
-      loanType: 'Business Loan',
-      amount: '₹25L',
-      issueType: 'kyc_verification',
-      severity: 'medium',
-      description: 'Business address verification pending from field team',
-      flaggedBy: 'KYC Team',
-      flaggedAt: '2025-01-09T11:15:00Z',
-      status: 'in_progress',
-      assignedTo: 'Anita Patel',
-      dueDate: '2025-01-11T12:00:00Z'
-    },
-    {
-      id: 'comp-003',
-      caseId: 'case-006',
-      customer: 'Rohit Sharma',
-      phone: '+91-9876543215',
-      loanType: 'Personal Loan',
-      amount: '₹3L',
-      issueType: 'credit_score',
-      severity: 'low',
-      description: 'Credit score dropped by 15 points since application',
-      flaggedBy: 'Credit Bureau API',
-      flaggedAt: '2025-01-09T09:45:00Z',
-      status: 'resolved',
-      assignedTo: 'Anita Patel',
-      resolvedAt: '2025-01-09T16:20:00Z'
-    },
-    {
-      id: 'comp-004',
-      caseId: 'case-007',
-      customer: 'Kavya Menon',
-      phone: '+91-9876543214',
-      loanType: 'Home Loan',
-      amount: '₹35L',
-      issueType: 'regulatory_check',
-      severity: 'high',
-      description: 'Customer appears on PEP (Politically Exposed Person) list',
-      flaggedBy: 'AML System',
-      flaggedAt: '2025-01-08T16:30:00Z',
-      status: 'escalated',
-      assignedTo: 'Senior Compliance Officer',
-      dueDate: '2025-01-10T10:00:00Z'
-    }
-  ];
+  // Use live data from Supabase
+  const complianceIssues = complianceIssuesData || [];
 
   const handleResolveIssue = async (issueId: string) => {
     try {
@@ -97,7 +34,7 @@ export function ComplianceReview({ onBack, onNavigateToCase }: ComplianceReviewP
       console.log('Resolving compliance issue:', issueId);
       
       await SupabaseDatabaseService.resolveComplianceIssue(issueId, {
-        resolvedBy: 'current_user_id', // This should come from auth context
+        resolvedBy: user?.id || '', // Get from auth context
         resolvedAt: new Date().toISOString(),
         resolutionNotes: 'Issue resolved via compliance review'
       });
@@ -106,10 +43,12 @@ export function ComplianceReview({ onBack, onNavigateToCase }: ComplianceReviewP
       refetchIssues();
       
       // Show success message
-      alert('Compliance issue resolved successfully!');
+      console.log('Compliance issue resolved successfully!');
+      // TODO: Replace with proper toast notification
     } catch (err) {
       console.error('Error resolving compliance issue:', err);
-      alert('Failed to resolve issue. Please try again.');
+      console.error('Failed to resolve issue. Please try again.');
+      // TODO: Replace with proper error toast notification
     } finally {
       setProcessingAction(null);
     }
@@ -121,7 +60,7 @@ export function ComplianceReview({ onBack, onNavigateToCase }: ComplianceReviewP
       console.log('Escalating compliance issue:', issueId);
       
       await SupabaseDatabaseService.escalateComplianceIssue(issueId, {
-        escalatedBy: 'current_user_id', // This should come from auth context
+        escalatedBy: user?.id || '', // Get from auth context
         escalatedAt: new Date().toISOString(),
         escalationReason: 'Escalated via compliance review'
       });
@@ -130,10 +69,12 @@ export function ComplianceReview({ onBack, onNavigateToCase }: ComplianceReviewP
       refetchIssues();
       
       // Show success message
-      alert('Compliance issue escalated successfully!');
+      console.log('Compliance issue escalated successfully!');
+      // TODO: Replace with proper toast notification
     } catch (err) {
       console.error('Error escalating compliance issue:', err);
-      alert('Failed to escalate issue. Please try again.');
+      console.error('Failed to escalate issue. Please try again.');
+      // TODO: Replace with proper error toast notification
     } finally {
       setProcessingAction(null);
     }

@@ -1,10 +1,28 @@
-import React from 'react';
-import { Users, TrendingUp, FileText, Clock, BarChart3, UserPlus, RefreshCw, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+  Users, 
+  TrendingUp, 
+  FileText, 
+  Clock, 
+  BarChart3, 
+  UserPlus, 
+  RefreshCw, 
+  AlertTriangle,
+  Target,
+  Award,
+  Eye,
+  Edit,
+  CheckCircle,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus
+} from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../contexts/AuthContextFixed';
 import { useDashboardStats, useCases, useTeamMembers } from '../../hooks/useDashboardData';
+import { SupabaseDatabaseService } from '../../services/supabase-database';
 
 interface ManagerDashboardProps {
   onNavigateToTeam: () => void;
@@ -20,11 +38,81 @@ export function ManagerDashboard({
   onNavigateToAnalytics 
 }: ManagerDashboardProps) {
   const { user } = useAuth();
+  const [teamData, setTeamData] = useState<any[]>([]);
+  const [teamStats, setTeamStats] = useState<any>({});
+  const [highPriorityCases, setHighPriorityCases] = useState<any[]>([]);
+  const [loadingTeam, setLoadingTeam] = useState(false);
   
   // Get real data from Supabase
   const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useDashboardStats(user?.id || '', user?.role || '');
   const { cases, loading: casesLoading, error: casesError, refetch: refetchCases } = useCases();
   const { teamMembers, loading: teamLoading, error: teamError, refetch: refetchTeam } = useTeamMembers();
+
+  // Fetch team performance data
+  const fetchTeamData = async () => {
+    if (!user?.organizationId) return;
+    
+    setLoadingTeam(true);
+    try {
+      // Get all team members in the organization
+      const teamUsers = await SupabaseDatabaseService.getUsers(user.organizationId);
+      const salesTeam = teamUsers.filter(u => u.role === 'salesperson');
+      
+      // Get cases for each team member
+      const teamWithCases = await Promise.all(
+        salesTeam.map(async (member) => {
+          const memberCases = await SupabaseDatabaseService.getCasesWithDetails({
+            organizationId: user.organizationId,
+            assignedTo: member.id
+          });
+          
+          return {
+            ...member,
+            activeCases: memberCases.filter(c => c.status === 'in-progress').length,
+            completedCases: memberCases.filter(c => c.status === 'approved').length,
+            totalCases: memberCases.length,
+            efficiency: memberCases.length > 0 ? 
+              Math.round((memberCases.filter(c => c.status === 'approved').length / memberCases.length) * 100) : 0,
+            status: memberCases.filter(c => c.status === 'in-progress').length > 5 ? 'busy' : 
+                   memberCases.filter(c => c.status === 'in-progress').length > 0 ? 'active' : 'available'
+          };
+        })
+      );
+      
+      setTeamData(teamWithCases);
+      
+      // Calculate team stats
+      const totalActiveCases = teamWithCases.reduce((sum, member) => sum + member.activeCases, 0);
+      const totalCompleted = teamWithCases.reduce((sum, member) => sum + member.completedCases, 0);
+      const avgEfficiency = teamWithCases.length > 0 ? 
+        Math.round(teamWithCases.reduce((sum, member) => sum + member.efficiency, 0) / teamWithCases.length) : 0;
+      
+      setTeamStats({
+        totalMembers: teamWithCases.length,
+        totalActiveCases,
+        totalCompleted,
+        avgEfficiency,
+        topPerformer: teamWithCases.reduce((top, member) => 
+          member.efficiency > top.efficiency ? member : top, teamWithCases[0] || {})
+      });
+      
+      // Get high priority cases
+      const allCases = await SupabaseDatabaseService.getCasesWithDetails({
+        organizationId: user.organizationId,
+        priority: 'high'
+      });
+      setHighPriorityCases(allCases.slice(0, 3));
+      
+    } catch (error) {
+      console.error('Error fetching team data:', error);
+    } finally {
+      setLoadingTeam(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTeamData();
+  }, [user?.organizationId]);
   const handleKPIClick = (kpiType: string) => {
     switch (kpiType) {
       case 'team-cases':
@@ -54,48 +142,53 @@ export function ManagerDashboard({
   const kpis = [
     { 
       label: 'Team Cases', 
-      value: stats?.totalCases?.toString() || cases?.length?.toString() || '0', 
+      value: teamStats.totalActiveCases?.toString() || stats?.totalCases?.toString() || '0', 
       change: '+12%', 
       trend: 'up' as const, 
       icon: FileText, 
       type: 'team-cases', 
-      details: `Active: ${cases?.filter(c => c.status === 'in-progress').length || 0} | Completed: ${cases?.filter(c => c.status === 'approved').length || 0} | Pending: ${cases?.filter(c => c.status === 'review').length || 0} | Overdue: ${cases?.filter(c => c.status === 'overdue').length || 0}` 
+      details: `Active: ${teamStats.totalActiveCases || 0} | Completed: ${teamStats.totalCompleted || 0} | Total: ${teamData.reduce((sum, member) => sum + member.totalCases, 0)} | High Priority: ${highPriorityCases.length}` 
     },
     { 
-      label: 'Avg. Processing Time', 
-      value: '2.3 days', 
-      change: '-15%', 
-      trend: 'down' as const, 
-      icon: Clock, 
+      label: 'Team Efficiency', 
+      value: `${teamStats.avgEfficiency || 0}%`, 
+      change: '+5%', 
+      trend: 'up' as const, 
+      icon: Target, 
       type: 'processing-time', 
-      details: 'Home Loans: 3.2 days | Personal: 1.8 days | Business: 4.1 days | Car: 2.0 days' 
+      details: `Avg: ${teamStats.avgEfficiency || 0}% | Top: ${teamStats.topPerformer?.efficiency || 0}% (${teamStats.topPerformer?.full_name || 'N/A'}) | Range: ${teamData.length > 0 ? Math.min(...teamData.map(m => m.efficiency)) : 0}% - ${teamData.length > 0 ? Math.max(...teamData.map(m => m.efficiency)) : 0}%` 
     },
     { 
       label: 'Approval Rate', 
-      value: '89%', 
+      value: `${teamStats.avgEfficiency || 0}%`, 
       change: '+5%', 
       trend: 'up' as const, 
       icon: TrendingUp, 
       type: 'approval-rate', 
-      details: `Approved: ${cases?.filter(c => c.status === 'approved').length || 0} | Rejected: ${cases?.filter(c => c.status === 'rejected').length || 0} | Pending: ${cases?.filter(c => c.status === 'review').length || 0} | Success Rate: 89%` 
+      details: `Team Avg: ${teamStats.avgEfficiency || 0}% | Completed: ${teamStats.totalCompleted || 0} | Active: ${teamStats.totalActiveCases || 0} | Success Rate: ${teamStats.avgEfficiency || 0}%` 
     },
     { 
       label: 'Team Members', 
-      value: teamMembers?.length?.toString() || '0', 
+      value: teamStats.totalMembers?.toString() || teamData.length.toString() || '0', 
       change: '+2', 
       trend: 'up' as const, 
       icon: Users, 
       type: 'team-members', 
-      details: `Active: ${teamMembers?.length || 0} | New Hires: 2 | Avg Efficiency: 91% | Top Performer: ${teamMembers?.[0]?.name || 'N/A'} (94%)` 
+      details: `Active: ${teamStats.totalMembers || 0} | Busy: ${teamData.filter(m => m.status === 'busy').length} | Available: ${teamData.filter(m => m.status === 'available').length} | Top: ${teamStats.topPerformer?.full_name || 'N/A'}` 
     }
   ];
 
-  const teamPerformance = [
-    { name: 'Priya Sharma', cases: 8, completed: 15, efficiency: '94%', status: 'active' },
-    { name: 'Vikram Joshi', cases: 6, completed: 12, efficiency: '91%', status: 'active' },
-    { name: 'Meera Nair', cases: 10, completed: 18, efficiency: '87%', status: 'busy' },
-    { name: 'Arjun Reddy', cases: 4, completed: 8, efficiency: '85%', status: 'available' }
-  ];
+  // Use real team data from Supabase
+  const teamPerformance = teamData.map(member => ({
+    name: member.full_name || 'Unknown Member',
+    cases: member.activeCases,
+    completed: member.completedCases,
+    efficiency: `${member.efficiency}%`,
+    status: member.status,
+    id: member.id,
+    email: member.email,
+    totalCases: member.totalCases
+  }));
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -117,7 +210,7 @@ export function ManagerDashboard({
   };
 
   // Show loading state
-  if (statsLoading || casesLoading || teamLoading) {
+  if (statsLoading || casesLoading || teamLoading || loadingTeam) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -159,7 +252,7 @@ export function ManagerDashboard({
           <p className="text-gray-600">Team oversight and performance monitoring</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={() => { refetchStats(); refetchCases(); refetchTeam(); }}>
+          <Button variant="outline" onClick={() => { refetchStats(); refetchCases(); refetchTeam(); fetchTeamData(); }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -259,23 +352,43 @@ export function ManagerDashboard({
           </div>
         </CardHeader>
         <CardContent>
-          <div 
-            className="p-4 border border-red-200 bg-red-50 rounded-lg cursor-pointer hover:bg-red-100 transition-colors"
-            onClick={() => onNavigateToCase('case-001')}
-            title="Click to view case details"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-medium text-gray-900">Ramesh & Sunita Gupta</h3>
-                <p className="text-sm text-gray-600">Home Loan • ₹50L • Self-employed</p>
-                <p className="text-xs text-gray-500 mt-1">Missing: GST Returns, Property Documents</p>
-                <p className="text-xs text-red-600">Click to review</p>
+          <div className="space-y-3">
+            {highPriorityCases.length > 0 ? (
+              highPriorityCases.map((case_, index) => (
+                <div 
+                  key={case_.id || index}
+                  className="p-4 border border-red-200 bg-red-50 rounded-lg cursor-pointer hover:bg-red-100 transition-colors"
+                  onClick={() => onNavigateToCase(case_.id)}
+                  title="Click to view case details"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium text-gray-900">
+                        {case_.customer?.name || 'Unknown Customer'}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {case_.loanType} • ₹{case_.loanAmount ? (case_.loanAmount / 100000).toFixed(0) + 'L' : 'N/A'} • {case_.customer?.employmentType || 'N/A'}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Status: {case_.status} • Case: {case_.caseNumber}
+                      </p>
+                      <p className="text-xs text-red-600">Click to review</p>
+                    </div>
+                    <div className="text-right">
+                      <Badge variant="error" size="sm">High Priority</Badge>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Assigned to {case_.assignedUser?.name || 'Unassigned'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-4 border border-gray-200 bg-gray-50 rounded-lg text-center">
+                <p className="text-gray-500">No high priority cases at the moment</p>
+                <p className="text-xs text-gray-400 mt-1">All cases are being handled efficiently</p>
               </div>
-              <div className="text-right">
-                <Badge variant="error" size="sm">High Priority</Badge>
-                <p className="text-xs text-gray-500 mt-1">Assigned to Priya</p>
-              </div>
-            </div>
+            )}
           </div>
         </CardContent>
       </Card>

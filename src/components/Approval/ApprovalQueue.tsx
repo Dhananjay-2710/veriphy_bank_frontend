@@ -1,161 +1,296 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, CheckCircle, XCircle, Eye, AlertTriangle, Clock, FileText, RefreshCw } from 'lucide-react';
+import {
+  Clock,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Eye,
+  Filter,
+  Search,
+  RefreshCw,
+  ArrowLeft,
+  Download,
+  MessageSquare,
+  FileText,
+  Shield,
+  TrendingUp,
+  Timer,
+  Flag,
+  CheckSquare,
+  XSquare
+} from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
-import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
+import { useAuth } from '../../contexts/AuthContextFixed';
 import { SupabaseDatabaseService } from '../../services/supabase-database';
-import { useApprovalQueue } from '../../hooks/useDashboardData';
 
 interface ApprovalQueueProps {
   onBack: () => void;
   onNavigateToCase: (caseId: string) => void;
 }
 
+interface ApprovalCase {
+  id: string;
+  caseNumber: string;
+  customer: {
+    name: string;
+    email: string;
+    phone: string;
+    panNumber?: string;
+    aadhaarNumber?: string;
+  };
+  loanType: string;
+  loanAmount: number;
+  priority: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  assignedTo?: string;
+  assignedUser?: {
+    name: string;
+    email: string;
+  };
+  documents?: any[];
+  riskScore?: number;
+  complianceFlags?: string[];
+}
+
 export function ApprovalQueue({ onBack, onNavigateToCase }: ApprovalQueueProps) {
-  // Use real approval queue data from hook
-  const { data: queueData, loading: queueLoading, error: queueError, refetch: refetchQueue } = useApprovalQueue();
-  
-  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+  const [cases, setCases] = useState<ApprovalCase[]>([]);
+  const [filteredCases, setFilteredCases] = useState<ApprovalCase[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [processingAction, setProcessingAction] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterPriority, setFilterPriority] = useState('all');
+  const [processing, setProcessing] = useState<string | null>(null);
+  const [selectedCases, setSelectedCases] = useState<string[]>([]);
 
-  // Use mock data as fallback if no real data
-  const queue = queueData.length > 0 ? queueData : [
-    {
-      id: 'case-001',
-      customer: 'Ramesh & Sunita Gupta',
-      phone: '+91-9876543210',
-      loanType: 'Home Loan',
-      amount: '₹50L',
-      risk: 'medium',
-      completeness: 85,
-      waitTime: '2 hours',
-      flags: ['Missing GST', 'High Amount'],
-      priority: 'high',
-      submittedBy: 'Priya Sharma'
-    },
-    {
-      id: 'case-004',
-      customer: 'Deepak Agarwal',
-      phone: '+91-9876543213',
-      loanType: 'Business Loan',
-      amount: '₹25L',
-      risk: 'high',
-      completeness: 100,
-      waitTime: '6 hours',
-      flags: ['High Risk Profile'],
-      priority: 'high',
-      submittedBy: 'Vikram Joshi'
-    },
-    {
-      id: 'case-005',
-      customer: 'Kavya Menon',
-      phone: '+91-9876543214',
-      loanType: 'Personal Loan',
-      amount: '₹3L',
-      risk: 'low',
-      completeness: 100,
-      waitTime: '1 day',
-      flags: [],
-      priority: 'medium',
-      submittedBy: 'Meera Nair'
-    },
-    {
-      id: 'case-006',
-      customer: 'Rohit Sharma',
-      phone: '+91-9876543215',
-      loanType: 'Car Loan',
-      amount: '₹8L',
-      risk: 'low',
-      completeness: 95,
-      waitTime: '3 hours',
-      flags: ['Minor Income Discrepancy'],
-      priority: 'low',
-      submittedBy: 'Arjun Reddy'
-    }
-  ];
-
-  const handleApprove = async (caseId: string) => {
+  const fetchApprovalQueue = async () => {
+    if (!user?.organizationId) return;
+    
+    setLoading(true);
+    setError(null);
     try {
-      setProcessingAction(caseId);
-      console.log('Approving case:', caseId);
-      
-      await SupabaseDatabaseService.approveCase(caseId, {
-        approvedBy: 'current_user_id', // This should come from auth context
-        approvedAt: new Date().toISOString(),
-        notes: 'Approved via approval queue'
+      // Get all cases pending approval/review
+      const allCases = await SupabaseDatabaseService.getCasesWithDetails({
+        organizationId: user.organizationId,
+        status: 'review'
       });
       
-      // Refresh the queue
-      refetchQueue();
+      // Also get cases with compliance issues
+      const complianceCases = await SupabaseDatabaseService.getCasesWithDetails({
+        organizationId: user.organizationId,
+        status: 'compliance-issue'
+      });
       
-      // Show success message
-      alert('Case approved successfully!');
+      // Combine and sort by priority and creation date
+      const combinedCases = [...allCases, ...complianceCases].sort((a, b) => {
+        // Sort by priority first (high > medium > low)
+        const priorityOrder = { 'high': 3, 'medium': 2, 'low': 1 };
+        const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] || 2;
+        const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] || 2;
+        
+        if (aPriority !== bPriority) {
+          return bPriority - aPriority;
+        }
+        
+        // Then by creation date (newest first)
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+      
+      setCases(combinedCases);
+      setFilteredCases(combinedCases);
+      
+    } catch (err) {
+      console.error('Error fetching approval queue:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch approval queue');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchApprovalQueue();
+  }, [user?.organizationId]);
+
+  // Filter cases based on search and filters
+  useEffect(() => {
+    let filtered = cases;
+
+    // Search filter
+    if (searchTerm) {
+      filtered = filtered.filter(case_ => 
+        case_.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        case_.caseNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        case_.customer?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        case_.loanType?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Status filter
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(case_ => case_.status === filterStatus);
+    }
+
+    // Priority filter
+    if (filterPriority !== 'all') {
+      filtered = filtered.filter(case_ => case_.priority === filterPriority);
+    }
+
+    setFilteredCases(filtered);
+  }, [cases, searchTerm, filterStatus, filterPriority]);
+
+  const handleApprove = async (caseId: string) => {
+    setProcessing(caseId);
+    try {
+      await SupabaseDatabaseService.updateCaseStatus(caseId, 'approved');
+      await fetchApprovalQueue();
     } catch (err) {
       console.error('Error approving case:', err);
-      alert('Failed to approve case. Please try again.');
+      setError('Failed to approve case');
     } finally {
-      setProcessingAction(null);
+      setProcessing(null);
     }
   };
 
   const handleReject = async (caseId: string) => {
+    setProcessing(caseId);
     try {
-      setProcessingAction(caseId);
-      console.log('Rejecting case:', caseId);
-      
-      await SupabaseDatabaseService.rejectCase(caseId, {
-        rejectedBy: 'current_user_id', // This should come from auth context
-        rejectedAt: new Date().toISOString(),
-        reason: 'Rejected via approval queue'
-      });
-      
-      // Refresh the queue
-      refetchQueue();
-      
-      // Show success message
-      alert('Case rejected successfully!');
+      await SupabaseDatabaseService.updateCaseStatus(caseId, 'rejected');
+      await fetchApprovalQueue();
     } catch (err) {
       console.error('Error rejecting case:', err);
-      alert('Failed to reject case. Please try again.');
+      setError('Failed to reject case');
     } finally {
-      setProcessingAction(null);
+      setProcessing(null);
     }
   };
 
-  const handleCustomerDoubleClick = (customer: string, phone: string, caseId: string) => {
-    console.log(`Opening WhatsApp conversation with ${customer} (${phone}) for case ${caseId}`);
-    onNavigateToCase(caseId);
+  const handleBulkApprove = async () => {
+    setProcessing('bulk');
+    try {
+      await Promise.all(
+        selectedCases.map(caseId => 
+          SupabaseDatabaseService.updateCaseStatus(caseId, 'approved')
+        )
+      );
+      setSelectedCases([]);
+      await fetchApprovalQueue();
+    } catch (err) {
+      console.error('Error bulk approving cases:', err);
+      setError('Failed to approve cases');
+    } finally {
+      setProcessing(null);
+    }
   };
 
-  const getRiskBadge = (risk: string) => {
-    switch (risk) {
-      case 'high':
-        return <Badge variant="error" size="sm">High Risk</Badge>;
-      case 'medium':
-        return <Badge variant="warning" size="sm">Medium Risk</Badge>;
-      case 'low':
-        return <Badge variant="success" size="sm">Low Risk</Badge>;
-      default:
-        return <Badge size="sm">{risk}</Badge>;
+  const handleBulkReject = async () => {
+    setProcessing('bulk');
+    try {
+      await Promise.all(
+        selectedCases.map(caseId => 
+          SupabaseDatabaseService.updateCaseStatus(caseId, 'rejected')
+        )
+      );
+      setSelectedCases([]);
+      await fetchApprovalQueue();
+    } catch (err) {
+      console.error('Error bulk rejecting cases:', err);
+      setError('Failed to reject cases');
+    } finally {
+      setProcessing(null);
     }
+  };
+
+  const toggleCaseSelection = (caseId: string) => {
+    setSelectedCases(prev => 
+      prev.includes(caseId) 
+        ? prev.filter(id => id !== caseId)
+        : [...prev, caseId]
+    );
+  };
+
+  const getWaitTime = (createdAt: string) => {
+    const now = new Date();
+    const created = new Date(createdAt);
+    const diffInHours = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return 'Less than 1 hour';
+    if (diffInHours < 24) return `${diffInHours} hours`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    return `${diffInDays} day${diffInDays > 1 ? 's' : ''}`;
   };
 
   const getPriorityBadge = (priority: string) => {
     switch (priority) {
       case 'high':
-        return <Badge variant="error" size="sm">High</Badge>;
+        return <Badge variant="error" size="sm">High Priority</Badge>;
       case 'medium':
-        return <Badge variant="warning" size="sm">Medium</Badge>;
+        return <Badge variant="warning" size="sm">Medium Priority</Badge>;
       case 'low':
-        return <Badge variant="info" size="sm">Low</Badge>;
+        return <Badge variant="info" size="sm">Low Priority</Badge>;
       default:
         return <Badge size="sm">{priority}</Badge>;
     }
   };
 
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'review':
+        return <Badge variant="warning" size="sm">Under Review</Badge>;
+      case 'compliance-issue':
+        return <Badge variant="error" size="sm">Compliance Issue</Badge>;
+      case 'approved':
+        return <Badge variant="success" size="sm">Approved</Badge>;
+      case 'rejected':
+        return <Badge variant="error" size="sm">Rejected</Badge>;
+      default:
+        return <Badge size="sm">{status}</Badge>;
+    }
+  };
+
+  const getRiskScoreColor = (riskScore?: number) => {
+    if (!riskScore) return 'text-gray-500';
+    if (riskScore >= 80) return 'text-red-600';
+    if (riskScore >= 60) return 'text-yellow-600';
+    return 'text-green-600';
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading approval queue...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 mb-4">
+            <AlertTriangle className="h-12 w-12 mx-auto mb-2" />
+            <p className="text-lg font-semibold">Error Loading Approval Queue</p>
+            <p className="text-sm text-gray-600 mt-2">{error}</p>
+          </div>
+          <Button onClick={fetchApprovalQueue}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Button variant="outline" onClick={onBack}>
@@ -164,165 +299,248 @@ export function ApprovalQueue({ onBack, onNavigateToCase }: ApprovalQueueProps) 
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Approval Queue</h1>
-            <p className="text-gray-600">Review and approve loan applications</p>
+            <p className="text-gray-600">Review and approve pending loan applications</p>
           </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm" onClick={refetchQueue} disabled={queueLoading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${queueLoading ? 'animate-spin' : ''}`} />
+        <div className="flex space-x-3">
+          <Button variant="outline" onClick={fetchApprovalQueue}>
+            <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <div className="flex items-center space-x-2 text-sm text-gray-600">
-            <Clock className="h-4 w-4" />
-            <span>{queue.length} cases pending review</span>
-          </div>
+          <Button variant="outline">
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
         </div>
       </div>
 
-      {/* Error Message */}
-      {(error || queueError) && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <div className="flex">
-            <AlertTriangle className="h-5 w-5 text-red-400 mr-3" />
-            <div className="text-sm text-red-700">{error || queueError}</div>
-          </div>
-        </div>
-      )}
-
-      {/* Loading State */}
-      {queueLoading && (
-        <div className="flex items-center justify-center py-8">
-          <RefreshCw className="h-6 w-6 animate-spin mr-2" />
-          <span>Loading approval queue...</span>
-        </div>
-      )}
-
-      {/* Queue Stats */}
+      {/* Queue Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
-          <CardContent className="text-center">
-            <div className="text-2xl font-bold text-red-600">2</div>
-            <p className="text-sm text-gray-600">High Priority</p>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-2xl font-bold text-gray-900">{filteredCases.length}</p>
+                <p className="text-sm text-gray-600">Total Pending</p>
+              </div>
+              <Clock className="h-8 w-8 text-blue-600" />
+            </div>
           </CardContent>
         </Card>
+        
         <Card>
-          <CardContent className="text-center">
-            <div className="text-2xl font-bold text-yellow-600">4.2h</div>
-            <p className="text-sm text-gray-600">Avg. Wait Time</p>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-2xl font-bold text-gray-900">
+                  {filteredCases.filter(c => c.priority === 'high').length}
+                </p>
+                <p className="text-sm text-gray-600">High Priority</p>
+              </div>
+              <Flag className="h-8 w-8 text-red-600" />
+            </div>
           </CardContent>
         </Card>
+        
         <Card>
-          <CardContent className="text-center">
-            <div className="text-2xl font-bold text-green-600">94%</div>
-            <p className="text-sm text-gray-600">Complete Cases</p>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-2xl font-bold text-gray-900">
+                  {filteredCases.filter(c => c.status === 'compliance-issue').length}
+                </p>
+                <p className="text-sm text-gray-600">Compliance Issues</p>
+              </div>
+              <Shield className="h-8 w-8 text-orange-600" />
+            </div>
           </CardContent>
         </Card>
+        
         <Card>
-          <CardContent className="text-center">
-            <div className="text-2xl font-bold text-blue-600">8</div>
-            <p className="text-sm text-gray-600">Today's Reviews</p>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-2xl font-bold text-gray-900">
+                  {filteredCases.length > 0 ? 
+                    Math.round(filteredCases.reduce((sum, c) => sum + (c.riskScore || 0), 0) / filteredCases.length) : 0
+                  }
+                </p>
+                <p className="text-sm text-gray-600">Avg Risk Score</p>
+              </div>
+              <TrendingUp className="h-8 w-8 text-purple-600" />
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Approval Queue */}
+      {/* Search and Filters */}
       <Card>
         <CardHeader>
-          <CardTitle>Cases Awaiting Review</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Approval Queue</CardTitle>
+            {selectedCases.length > 0 && (
+              <div className="flex space-x-2">
+                <Button
+                  size="sm"
+                  onClick={handleBulkApprove}
+                  disabled={processing === 'bulk'}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <CheckSquare className="h-4 w-4 mr-1" />
+                  Approve Selected ({selectedCases.length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant="error"
+                  onClick={handleBulkReject}
+                  disabled={processing === 'bulk'}
+                >
+                  <XSquare className="h-4 w-4 mr-1" />
+                  Reject Selected
+                </Button>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search cases by customer name, case number, or email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All Status</option>
+                <option value="review">Under Review</option>
+                <option value="compliance-issue">Compliance Issue</option>
+              </select>
+              <select
+                value={filterPriority}
+                onChange={(e) => setFilterPriority(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All Priority</option>
+                <option value="high">High Priority</option>
+                <option value="medium">Medium Priority</option>
+                <option value="low">Low Priority</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Cases List */}
           <div className="space-y-4">
-            {queue.map((case_) => (
+            {filteredCases.map((case_) => (
               <div 
                 key={case_.id}
-                className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+                className={`p-4 border rounded-lg transition-colors ${
+                  selectedCases.includes(case_.id) 
+                    ? 'border-blue-500 bg-blue-50' 
+                    : 'border-gray-200 hover:bg-gray-50'
+                }`}
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <div className="flex items-center space-x-3 mb-2">
-                      <h3 
-                        className="text-lg font-medium text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
-                        onDoubleClick={() => handleCustomerDoubleClick(case_.customer, case_.phone, case_.id)}
-                        title="Double-click to open WhatsApp conversation"
-                      >
-                        {case_.customer}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedCases.includes(case_.id)}
+                      onChange={() => toggleCaseSelection(case_.id)}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <div>
+                      <h3 className="font-medium text-gray-900">
+                        {case_.customer?.name || 'Unknown Customer'}
                       </h3>
-                      {getPriorityBadge(case_.priority)}
-                      {getRiskBadge(case_.risk)}
+                      <p className="text-sm text-gray-600">
+                        {case_.loanType} • ₹{case_.loanAmount ? (case_.loanAmount / 100000).toFixed(0) + 'L' : 'N/A'} • Case: {case_.caseNumber}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {case_.customer?.email || 'N/A'} • {case_.customer?.phone || 'N/A'}
+                      </p>
                     </div>
-                    <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
-                      <span>{case_.loanType}</span>
-                      <span>{case_.amount}</span>
-                      <span>{case_.phone}</span>
-                      <span>Submitted by: {case_.submittedBy}</span>
-                      <span className="text-blue-500 text-xs">Double-click name for WhatsApp</span>
-                    </div>
-                    <div className="flex items-center space-x-2 text-xs text-gray-500">
-                      <Clock className="h-3 w-3" />
-                      <span>Waiting for {case_.waitTime}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Progress and Flags */}
-                <div className="mb-4">
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-gray-600">Document Completeness</span>
-                    <span className="font-medium">{case_.completeness}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${case_.completeness}%` }}
-                    ></div>
                   </div>
                   
-                  {case_.flags.length > 0 && (
-                    <div className="flex items-center space-x-2">
-                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                      <span className="text-sm text-gray-700">Compliance Flags:</span>
-                      <div className="flex space-x-1">
-                        {case_.flags.map((flag, idx) => (
-                          <Badge key={idx} variant="warning" size="sm">{flag}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <div className="flex items-center space-x-3">
+                    {getPriorityBadge(case_.priority)}
+                    {getStatusBadge(case_.status)}
+                    <span className="text-xs text-gray-500">Wait: {getWaitTime(case_.createdAt)}</span>
+                  </div>
                 </div>
-
-                {/* Action Buttons */}
+                
                 <div className="flex items-center justify-between">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => onNavigateToCase(case_.id)}
-                    className="flex-1 mr-2"
-                  >
-                    <Eye className="h-4 w-4 mr-2" />
-                    Review Case
-                  </Button>
-                  <div className="flex space-x-2">
-                    <Button 
-                      variant="success" 
+                  <div className="flex items-center space-x-6">
+                    <div>
+                      <p className="text-xs text-gray-500">Risk Score</p>
+                      <p className={`text-sm font-semibold ${getRiskScoreColor(case_.riskScore)}`}>
+                        {case_.riskScore || 'N/A'}
+                      </p>
+                    </div>
+                    
+                    {case_.assignedUser && (
+                      <div>
+                        <p className="text-xs text-gray-500">Assigned To</p>
+                        <p className="text-sm font-medium">{case_.assignedUser.name}</p>
+                      </div>
+                    )}
+                    
+                    <div>
+                      <p className="text-xs text-gray-500">Documents</p>
+                      <p className="text-sm font-medium">{case_.documents?.length || 0} uploaded</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onNavigateToCase(case_.id)}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      Review
+                    </Button>
+                    
+                    <Button
                       size="sm"
                       onClick={() => handleApprove(case_.id)}
-                      disabled={processingAction === case_.id}
+                      disabled={processing === case_.id}
+                      className="bg-green-600 hover:bg-green-700 text-white"
                     >
                       <CheckCircle className="h-4 w-4 mr-1" />
-                      {processingAction === case_.id ? 'Processing...' : 'Approve'}
+                      Approve
                     </Button>
-                    <Button 
-                      variant="error" 
+                    
+                    <Button
                       size="sm"
+                      variant="error"
                       onClick={() => handleReject(case_.id)}
-                      disabled={processingAction === case_.id}
+                      disabled={processing === case_.id}
                     >
                       <XCircle className="h-4 w-4 mr-1" />
-                      {processingAction === case_.id ? 'Processing...' : 'Reject'}
+                      Reject
                     </Button>
                   </div>
                 </div>
               </div>
             ))}
+            
+            {filteredCases.length === 0 && (
+              <div className="text-center py-8">
+                <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-4" />
+                <p className="text-gray-500">No cases found</p>
+                <p className="text-sm text-gray-400">Try adjusting your search or filters</p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

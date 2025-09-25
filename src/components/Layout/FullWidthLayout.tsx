@@ -5,13 +5,17 @@ import { Button } from "../ui/Button";
 import { useAuth } from "../../contexts/AuthContextFixed";
 import { 
   Users, 
-  Settings, 
   Activity, 
   Database, 
   BarChart3,
   Monitor,
-  Shield,
-  Workflow
+  Workflow,
+  Home,
+  Bell,
+  Zap,
+  TrendingUp,
+  Lock,
+  Gauge
 } from "lucide-react";
 
 interface FullWidthLayoutProps {
@@ -28,6 +32,12 @@ export function FullWidthLayout({
   const { user } = useAuth();
 
   const quickActions = [
+    {
+      label: "Home",
+      icon: Home,
+      href: "/super-admin/",
+      description: "Return to Super Admin Dashboard"
+    },
     {
       label: "User Management",
       icon: Users,
@@ -47,22 +57,52 @@ export function FullWidthLayout({
       description: "Design business workflows"
     },
     {
+      label: "Workflow Management",
+      icon: Zap,
+      href: "/super-admin/workflow-management",
+      description: "Manage automated workflows"
+    },
+    {
+      label: "Notifications",
+      icon: Bell,
+      href: "/super-admin/notifications",
+      description: "Notification center and alerts"
+    },
+    {
+      label: "Advanced Analytics",
+      icon: TrendingUp,
+      href: "/super-admin/advanced-analytics",
+      description: "Advanced analytics and insights"
+    },
+    {
       label: "Analytics",
       icon: BarChart3,
-      href: "/analytics",
+      href: "/super-admin/analytics",
       description: "System analytics and reports"
     },
     {
       label: "Audit Logs",
       icon: Activity,
-      href: "/audit-logs",
+      href: "/super-admin/audit-logs",
       description: "System audit trails"
     },
     {
       label: "Database",
       icon: Database,
-      href: "#database",
+      href: "/super-admin/database",
       description: "Database management tools"
+    },
+    {
+      label: "Security & Compliance",
+      icon: Lock,
+      href: "/super-admin/security-compliance",
+      description: "Security monitoring and compliance"
+    },
+    {
+      label: "Performance Optimization",
+      icon: Gauge,
+      href: "/super-admin/performance-optimization",
+      description: "Performance monitoring and optimization"
     }
   ];
 

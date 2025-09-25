@@ -1,10 +1,31 @@
-import React from 'react';
-import { CheckCircle, Clock, AlertTriangle, Shield, FileCheck, Eye, FileText, BarChart3, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+  CheckCircle, 
+  Clock, 
+  AlertTriangle, 
+  Shield, 
+  FileCheck, 
+  Eye, 
+  FileText, 
+  BarChart3, 
+  RefreshCw,
+  TrendingUp,
+  Target,
+  Award,
+  Users,
+  Timer,
+  Flag,
+  CheckSquare,
+  XCircle,
+  MessageSquare,
+  Download
+} from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../contexts/AuthContextFixed';
 import { useDashboardStats, useCases, useApprovalQueue } from '../../hooks/useDashboardData';
+import { SupabaseDatabaseService } from '../../services/supabase-database';
 
 interface CreditOpsDashboardProps {
   onNavigateToCase: (caseId: string) => void;
@@ -24,11 +45,79 @@ export function CreditOpsDashboard({
   onNavigateToComplianceManagement
 }: CreditOpsDashboardProps) {
   const { user } = useAuth();
+  const [approvalData, setApprovalData] = useState<any[]>([]);
+  const [complianceFlags, setComplianceFlags] = useState<any[]>([]);
+  const [processingStats, setProcessingStats] = useState<any>({});
+  const [loadingApproval, setLoadingApproval] = useState(false);
   
   // Get real data from Supabase
   const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useDashboardStats(user?.id || '', user?.role || '');
   const { cases, loading: casesLoading, error: casesError, refetch: refetchCases } = useCases();
-  const { approvalQueue, loading: approvalLoading, error: approvalError, refetch: refetchApproval } = useApprovalQueue();
+  const { data: approvalQueue, loading: approvalLoading, error: approvalError, refetch: refetchApproval } = useApprovalQueue();
+
+  // Fetch real approval queue data
+  const fetchApprovalData = async () => {
+    if (!user?.organizationId) return;
+    
+    setLoadingApproval(true);
+    try {
+      // Get cases pending approval/review
+      const pendingCases = await SupabaseDatabaseService.getCasesWithDetails({
+        organizationId: user.organizationId,
+        status: 'review'
+      });
+      
+      // Get cases with compliance issues (using on-hold status for compliance issues)
+      const complianceCases = await SupabaseDatabaseService.getCasesWithDetails({
+        organizationId: user.organizationId,
+        status: 'on-hold'
+      });
+      
+      // Calculate processing statistics
+      const allCases = await SupabaseDatabaseService.getCasesWithDetails({
+        organizationId: user.organizationId
+      });
+      
+      const approvedToday = allCases.filter(c => {
+        const today = new Date().toISOString().split('T')[0];
+        return c.status === 'approved' && c.updatedAt.startsWith(today);
+      });
+      
+      const totalReviewed = allCases.filter(c => 
+        c.status === 'approved' || c.status === 'rejected'
+      );
+      
+      const avgProcessingTime = allCases
+        .filter(c => c.status === 'approved')
+        .map(c => {
+          const created = new Date(c.createdAt);
+          const updated = new Date(c.updatedAt);
+          return Math.ceil((updated.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+        });
+      
+      setApprovalData(pendingCases.slice(0, 5)); // Show top 5 pending
+      setComplianceFlags(complianceCases.slice(0, 3)); // Show top 3 compliance issues
+      setProcessingStats({
+        pendingReviews: pendingCases.length,
+        approvedToday: approvedToday.length,
+        complianceFlags: complianceCases.length,
+        totalReviewed: totalReviewed.length,
+        avgProcessingTime: avgProcessingTime.length > 0 ? 
+          Math.round(avgProcessingTime.reduce((sum, time) => sum + time, 0) / avgProcessingTime.length) : 0,
+        approvalRate: totalReviewed.length > 0 ? 
+          Math.round((allCases.filter(c => c.status === 'approved').length / totalReviewed.length) * 100) : 0
+      });
+      
+    } catch (error) {
+      console.error('Error fetching approval data:', error);
+    } finally {
+      setLoadingApproval(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchApprovalData();
+  }, [user?.organizationId]);
   const handleStatDoubleClick = (statType: string) => {
     switch (statType) {
       case 'pending-reviews':
@@ -61,70 +150,67 @@ export function CreditOpsDashboard({
   const dashboardStats = [
     { 
       label: 'Pending Reviews', 
-      value: approvalQueue?.length?.toString() || '0', 
+      value: processingStats.pendingReviews?.toString() || approvalQueue?.length?.toString() || '0', 
       icon: Clock, 
       color: 'yellow', 
       type: 'pending-reviews', 
-      details: `Final Approval: ${approvalQueue?.filter(a => a.priority === 'high').length || 0}, Credit Assessment: ${approvalQueue?.filter(a => a.priority === 'medium').length || 0}, Document Verification: ${approvalQueue?.filter(a => a.priority === 'low').length || 0}, Risk Assessment: 4` 
+      details: `Final Approval: ${approvalData.filter(a => a.priority === 'high').length || 0}, Credit Assessment: ${approvalData.filter(a => a.priority === 'medium').length || 0}, Document Verification: ${approvalData.filter(a => a.priority === 'low').length || 0}, Avg Wait: ${processingStats.avgProcessingTime || 0} days` 
     },
     { 
       label: 'Approved Today', 
-      value: cases?.filter(c => c.status === 'approved').length?.toString() || '0', 
+      value: processingStats.approvedToday?.toString() || cases?.filter(c => c.status === 'approved').length?.toString() || '0', 
       icon: CheckCircle, 
       color: 'green', 
       type: 'approved-today', 
-      details: `Home Loans: ${cases?.filter(c => c.status === 'approved' && c.product?.name?.includes('Home')).length || 0}, Personal Loans: ${cases?.filter(c => c.status === 'approved' && c.product?.name?.includes('Personal')).length || 0}, Business Loans: ${cases?.filter(c => c.status === 'approved' && c.product?.name?.includes('Business')).length || 0}` 
+      details: `Home Loans: ${cases?.filter(c => c.status === 'approved' && c.loanType?.includes('Home')).length || 0}, Personal Loans: ${cases?.filter(c => c.status === 'approved' && c.loanType?.includes('Personal')).length || 0}, Business Loans: ${cases?.filter(c => c.status === 'approved' && c.loanType?.includes('Business')).length || 0}` 
     },
     { 
       label: 'Compliance Flags', 
-      value: cases?.filter(c => c.status === 'compliance-issue').length?.toString() || '0', 
+      value: processingStats.complianceFlags?.toString() || complianceFlags.length.toString() || '0', 
       icon: AlertTriangle, 
       color: 'red', 
       type: 'compliance-flags', 
-      details: `AML Alert: 1, Document Mismatch: 1, Credit Score Issue: 1` 
+      details: `High Priority: ${complianceFlags.filter(c => c.priority === 'high').length}, Medium: ${complianceFlags.filter(c => c.priority === 'medium').length}, Low: ${complianceFlags.filter(c => c.priority === 'low').length}` 
     },
     { 
-      label: 'Total Reviewed', 
-      value: cases?.filter(c => c.status === 'approved' || c.status === 'rejected').length?.toString() || '0', 
-      icon: Shield, 
+      label: 'Approval Rate', 
+      value: `${processingStats.approvalRate || 0}%`, 
+      icon: Target, 
       color: 'blue', 
       type: 'total-reviewed', 
-      details: `This Month: ${cases?.filter(c => c.status === 'approved' || c.status === 'rejected').length || 0} | Approved: ${cases?.filter(c => c.status === 'approved').length || 0} | Rejected: ${cases?.filter(c => c.status === 'rejected').length || 0} | Success Rate: 91%` 
+      details: `Total Reviewed: ${processingStats.totalReviewed || 0} | Approved: ${cases?.filter(c => c.status === 'approved').length || 0} | Rejected: ${cases?.filter(c => c.status === 'rejected').length || 0} | Success Rate: ${processingStats.approvalRate || 0}%` 
     }
   ];
 
-  const mockApprovalQueue = [
-    {
-      id: 'case-001',
-      customer: 'Ramesh & Sunita Gupta',
-      loanType: 'Home Loan',
-      amount: '₹50L',
-      risk: 'medium',
-      completeness: 85,
-      waitTime: '2 hours',
-      flags: ['Missing GST', 'High Loan Amount']
-    },
-    {
-      id: 'case-004',
-      customer: 'Deepak Agarwal',
-      loanType: 'Business Loan',
-      amount: '₹25L',
-      risk: 'high',
-      completeness: 100,
-      waitTime: '6 hours',
-      flags: ['High Risk Profile']
-    },
-    {
-      id: 'case-005',
-      customer: 'Kavya Menon',
-      loanType: 'Personal Loan',
-      amount: '₹3L',
-      risk: 'low',
-      completeness: 100,
-      waitTime: '1 day',
-      flags: []
+  // Quick approval actions
+  const handleQuickApprove = async (caseId: string) => {
+    try {
+      await SupabaseDatabaseService.updateCaseStatus(caseId, 'approved');
+      await fetchApprovalData(); // Refresh data
+    } catch (error) {
+      console.error('Error approving case:', error);
     }
-  ];
+  };
+
+  const handleQuickReject = async (caseId: string) => {
+    try {
+      await SupabaseDatabaseService.updateCaseStatus(caseId, 'rejected');
+      await fetchApprovalData(); // Refresh data
+    } catch (error) {
+      console.error('Error rejecting case:', error);
+    }
+  };
+
+  const getWaitTime = (createdAt: string) => {
+    const now = new Date();
+    const created = new Date(createdAt);
+    const diffInHours = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return 'Less than 1 hour';
+    if (diffInHours < 24) return `${diffInHours} hours`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    return `${diffInDays} day${diffInDays > 1 ? 's' : ''}`;
+  };
 
   const getRiskBadge = (risk: string) => {
     switch (risk) {
@@ -140,7 +226,7 @@ export function CreditOpsDashboard({
   };
 
   // Show loading state
-  if (statsLoading || casesLoading || approvalLoading) {
+  if (statsLoading || casesLoading || approvalLoading || loadingApproval) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -182,7 +268,7 @@ export function CreditOpsDashboard({
           <p className="text-gray-600">Review and approve loan applications</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={() => { refetchStats(); refetchCases(); refetchApproval(); }}>
+          <Button variant="outline" onClick={() => { refetchStats(); refetchCases(); refetchApproval(); fetchApprovalData(); }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -250,59 +336,94 @@ export function CreditOpsDashboard({
           <div className="flex items-center justify-between">
             <CardTitle>Priority Review Queue</CardTitle>
             <Button variant="outline" size="sm" onClick={onNavigateToApprovalQueue}>
-              View All ({approvalQueue.length})
+              View All ({approvalQueue?.length || 0})
             </Button>
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {approvalQueue.map((case_) => (
-              <div 
-                key={case_.id}
-                className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer"
-                onClick={() => onNavigateToCase(case_.id)}
-                onDoubleClick={() => handleCaseDoubleClick(case_.id, case_.customer, '+91-9876543210')}
-                title="Click or double-click to view case details"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h3 className="font-medium text-gray-900">{case_.customer}</h3>
-                    <p className="text-sm text-gray-600">{case_.loanType} • {case_.amount}</p>
-                    <p className="text-xs text-blue-500">Click to review • Double-click for WhatsApp chat</p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    {getRiskBadge(case_.risk)}
-                    <span className="text-xs text-gray-500">Wait: {case_.waitTime}</span>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 mr-4">
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="text-gray-600">Completeness</span>
-                      <span className="font-medium">{case_.completeness}%</span>
+            {approvalData.length > 0 ? (
+              approvalData.map((case_) => (
+                <div 
+                  key={case_.id}
+                  className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex-1">
+                      <h3 className="font-medium text-gray-900">
+                        {case_.customer?.name || 'Unknown Customer'}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {case_.loanType} • ₹{case_.loanAmount ? (case_.loanAmount / 100000).toFixed(0) + 'L' : 'N/A'} • Case: {case_.caseNumber}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {case_.customer?.email || 'N/A'} • {case_.customer?.phone || 'N/A'}
+                      </p>
+                      <p className="text-xs text-blue-500">Wait: {getWaitTime(case_.createdAt)}</p>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${case_.completeness}%` }}
-                      ></div>
+                    <div className="flex items-center space-x-2">
+                      {getRiskBadge(case_.priority || 'medium')}
+                      <span className="text-xs text-gray-500">Priority: {case_.priority || 'medium'}</span>
                     </div>
                   </div>
                   
-                  {case_.flags.length > 0 && (
-                    <div className="text-right">
-                      <p className="text-xs text-gray-500 mb-1">Compliance Flags:</p>
-                      <div className="space-y-1">
-                        {case_.flags.map((flag, idx) => (
-                          <Badge key={idx} variant="warning" size="sm">{flag}</Badge>
-                        ))}
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 mr-4">
+                      <div className="flex items-center justify-between text-sm mb-1">
+                        <span className="text-gray-600">Status</span>
+                        <span className="font-medium">{case_.status}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full transition-all duration-300 ${
+                            case_.status === 'review' ? 'bg-yellow-500' : 
+                            case_.status === 'approved' ? 'bg-green-500' : 
+                            'bg-red-500'
+                          }`}
+                          style={{ width: case_.status === 'review' ? '75%' : '100%' }}
+                        ></div>
                       </div>
                     </div>
-                  )}
+                    
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onNavigateToCase(case_.id)}
+                        className="flex items-center"
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        Review
+                      </Button>
+                      
+                      <Button
+                        size="sm"
+                        onClick={() => handleQuickApprove(case_.id)}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        <CheckSquare className="h-4 w-4 mr-1" />
+                        Approve
+                      </Button>
+                      
+                      <Button
+                        size="sm"
+                        variant="error"
+                        onClick={() => handleQuickReject(case_.id)}
+                      >
+                        <XCircle className="h-4 w-4 mr-1" />
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
                 </div>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-4" />
+                <p className="text-gray-500">No pending reviews at the moment</p>
+                <p className="text-sm text-gray-400">All cases are being processed efficiently</p>
               </div>
-            ))}
+            )}
           </div>
         </CardContent>
       </Card>

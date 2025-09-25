@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Clock, CheckCircle, AlertTriangle, Calendar, Plus, TrendingUp, Target, Award, Users, RefreshCw } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
@@ -5,6 +6,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../contexts/AuthContextFixed';
 import { useDashboardStats, useCases } from '../../hooks/useDashboardData';
+import { NewCaseForm } from '../Case/NewCaseForm';
 
 interface SalespersonDashboardProps {
   onNavigateToCase: (caseId: string) => void;
@@ -23,6 +25,7 @@ export function SalespersonDashboard({
 }: SalespersonDashboardProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [showNewCaseForm, setShowNewCaseForm] = useState(false);
   const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useDashboardStats(user?.id || '', user?.role || '');
   const { cases, loading: casesLoading, error: casesError, refetch: refetchCases } = useCases({
     assignedTo: user?.id,
@@ -101,6 +104,17 @@ export function SalespersonDashboard({
     refetchCases();
   };
 
+  const handleNewCase = () => {
+    setShowNewCaseForm(true);
+  };
+
+  const handleCaseCreated = (caseData: any) => {
+    console.log('New case created:', caseData);
+    // Refresh dashboard data
+    handleRefresh();
+    // You could also show a success notification here
+  };
+
   if (statsError || casesError) {
     return (
       <div className="space-y-6">
@@ -136,7 +150,7 @@ export function SalespersonDashboard({
       icon: FileText, 
       color: 'blue', 
       type: 'active-cases', 
-      details: `Home Loans: ${cases.filter(c => c.customer.loanType.includes('Home')).length}, Personal Loans: ${cases.filter(c => c.customer.loanType.includes('Personal')).length}, Car Loans: ${cases.filter(c => c.customer.loanType.includes('Car')).length}, Business Loans: ${cases.filter(c => c.customer.loanType.includes('Business')).length}` 
+      details: `Home Loans: ${cases.filter(c => c.customer?.loanType?.includes('Home')).length}, Personal Loans: ${cases.filter(c => c.customer?.loanType?.includes('Personal')).length}, Car Loans: ${cases.filter(c => c.customer?.loanType?.includes('Car')).length}, Business Loans: ${cases.filter(c => c.customer?.loanType?.includes('Business')).length}` 
     },
     { 
       label: 'Pending Documents', 
@@ -207,21 +221,7 @@ export function SalespersonDashboard({
     }
   ];
 
-  // Generate recent activities from cases data
-  const recentActivities = cases.slice(0, 4).map((case_, index) => {
-    const activityTypes = ['document_received', 'case_updated', 'follow_up', 'document_pending'];
-    const statuses = ['success', 'pending', 'warning'];
-    
-    return {
-      id: `activity-${index + 1}`,
-      type: activityTypes[index % activityTypes.length],
-      customer: case_.customer.name,
-      action: getActivityAction(case_, activityTypes[index % activityTypes.length]),
-      time: getTimeAgo(case_.updatedAt),
-      status: statuses[index % statuses.length]
-    };
-  });
-
+  // Helper functions (defined before use)
   const getActivityAction = (case_: any, type: string) => {
     switch (type) {
       case 'document_received':
@@ -247,6 +247,21 @@ export function SalespersonDashboard({
     const diffInDays = Math.floor(diffInHours / 24);
     return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
   };
+
+  // Generate recent activities from cases data
+  const recentActivities = cases.slice(0, 4).map((case_, index) => {
+    const activityTypes = ['document_received', 'case_updated', 'follow_up', 'document_pending'];
+    const statuses = ['success', 'pending', 'warning'];
+    
+    return {
+      id: `activity-${index + 1}`,
+      type: activityTypes[index % activityTypes.length],
+      customer: case_.customer?.name || 'Unknown Customer',
+      action: getActivityAction(case_, activityTypes[index % activityTypes.length]),
+      time: getTimeAgo(case_.updatedAt || case_.createdAt),
+      status: statuses[index % statuses.length]
+    };
+  });
 
   const getNextAction = (status: string) => {
     switch (status) {
@@ -307,7 +322,7 @@ export function SalespersonDashboard({
             <FileText className="h-4 w-4 mr-2" />
             View All Cases
           </Button>
-          <Button>
+          <Button onClick={handleNewCase}>
             <Plus className="h-4 w-4 mr-2" />
             New Case
           </Button>
@@ -521,6 +536,14 @@ export function SalespersonDashboard({
           </div>
         </CardContent>
       </Card>
+
+      {/* New Case Form Modal */}
+      {showNewCaseForm && (
+        <NewCaseForm
+          onClose={() => setShowNewCaseForm(false)}
+          onCaseCreated={handleCaseCreated}
+        />
+      )}
     </div>
   );
 }

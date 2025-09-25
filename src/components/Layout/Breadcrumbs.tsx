@@ -37,7 +37,7 @@ export function Breadcrumbs({
         const Icon = breadcrumb.icon;
         
         return (
-          <React.Fragment key={breadcrumb.path}>
+          <React.Fragment key={`breadcrumb-${index}-${breadcrumb.path}`}>
             {index === 0 && showHome ? (
               <Link
                 to={breadcrumb.path}

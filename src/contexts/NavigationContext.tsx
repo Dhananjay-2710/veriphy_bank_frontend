@@ -108,6 +108,7 @@ interface NavigationContextType {
   
   // Actions
   navigateTo: (path: string) => void;
+  navigateDirect: (path: string, options?: any) => void;
   goBack: () => void;
   canGoBack: () => boolean;
   isRouteAccessible: (path: string) => boolean;
@@ -165,6 +166,11 @@ export function NavigationProvider({ children }: NavigationProviderProps) {
       console.warn(`Access denied to route: ${path}`);
     }
   }, [navigate, user?.role]);
+
+  // Expose the navigate function directly for components that need it
+  const navigateDirect = useCallback((path: string, options?: any) => {
+    navigate(path, options);
+  }, [navigate]);
 
   const goBack = useCallback(() => {
     dispatch({ type: 'GO_BACK' });
@@ -226,6 +232,7 @@ export function NavigationProvider({ children }: NavigationProviderProps) {
     
     // Actions
     navigateTo,
+    navigateDirect,
     goBack,
     canGoBack,
     isRouteAccessible: isRouteAccessibleForUser,

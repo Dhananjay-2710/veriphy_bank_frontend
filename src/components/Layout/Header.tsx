@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContextFixed';
 import { Button } from '../ui/Button';
 import { supabase } from '../../supabase-client';
 import { useNavigate } from 'react-router-dom';
+import { GlobalSearch } from '../Search/GlobalSearch';
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -34,6 +35,14 @@ export function Header() {
               <p className="text-xs text-gray-500">Happy Bank of India</p>
             </div>
           </div>
+        </div>
+
+        {/* Center Section - Global Search */}
+        <div className="flex-1 max-w-md mx-8">
+          <GlobalSearch 
+            placeholder="Search cases, users, documents..."
+            className="w-full"
+          />
         </div>
 
         {/* Right Section */}

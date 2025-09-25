@@ -10,6 +10,7 @@ import { RegistrationPage } from './RegistrationPage';
 import { SuperAdminRegistration } from './SuperAdminRegistration';
 import { RoleBasedRegistration } from './RoleBasedRegistration';
 import { useNavigate } from 'react-router-dom';
+import { UserDebugger } from '../Debug/UserDebugger';
 
 interface RegistrationData {
   firstName: string;
@@ -245,6 +246,9 @@ export function LoginPage() {
             </form>
           </CardContent>
         </Card>
+
+        {/* User Debugger - Shows available users for login */}
+        <UserDebugger />
 
         {/* Footer */}
         <div className="text-center text-xs text-gray-500">

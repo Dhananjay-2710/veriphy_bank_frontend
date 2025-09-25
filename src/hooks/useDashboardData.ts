@@ -2945,3 +2945,256 @@ export function useCacheInvalidationLogs(organizationId?: string, limit: number 
 
   return { data, loading, error, refetch };
 }
+
+// =============================================================================
+// ADVANCED USER MANAGEMENT HOOKS
+// =============================================================================
+
+// Hook for advanced user management with real-time updates
+export function useAdvancedUserManagement(filters?: {
+  searchTerm?: string;
+  role?: string;
+  status?: string;
+  organizationId?: number;
+  departmentId?: number;
+  limit?: number;
+  offset?: number;
+}) {
+  const [users, setUsers] = useState<any[]>([]);
+  const [userStats, setUserStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Create stable filter object using useMemo
+  const stableFilters = useMemo(() => filters || {}, [
+    filters?.searchTerm,
+    filters?.role,
+    filters?.status,
+    filters?.organizationId,
+    filters?.departmentId,
+    filters?.limit,
+    filters?.offset
+  ]);
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await SupabaseDatabaseService.getAllUsersForSuperAdmin(stableFilters);
+      setUsers(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch users');
+    } finally {
+      setLoading(false);
+    }
+  }, [stableFilters]);
+
+  const fetchUserStats = useCallback(async () => {
+    try {
+      const stats = await SupabaseDatabaseService.getUserStatisticsForSuperAdmin();
+      setUserStats(stats);
+    } catch (err) {
+      console.error('Error fetching user stats:', err);
+    }
+  }, []);
+
+  const refetch = useCallback(() => {
+    fetchUsers();
+    fetchUserStats();
+  }, [fetchUsers, fetchUserStats]);
+
+  // Bulk actions
+  const bulkUpdateStatus = useCallback(async (userIds: string[], status: 'active' | 'inactive' | 'suspended') => {
+    try {
+      await SupabaseDatabaseService.bulkUpdateUserStatus(userIds, status);
+      await fetchUsers(); // Refresh data
+      return { success: true };
+    } catch (error) {
+      console.error('Error bulk updating user status:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }, [fetchUsers]);
+
+  const bulkDeleteUsers = useCallback(async (userIds: string[]) => {
+    try {
+      await SupabaseDatabaseService.deleteUsers(userIds);
+      await fetchUsers(); // Refresh data
+      return { success: true };
+    } catch (error) {
+      console.error('Error bulk deleting users:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }, [fetchUsers]);
+
+  const resetUserPassword = useCallback(async (userId: string) => {
+    try {
+      const result = await SupabaseDatabaseService.resetUserPassword(userId);
+      return { success: true, message: result.message };
+    } catch (error) {
+      console.error('Error resetting user password:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }, []);
+
+  const updateUserStatus = useCallback(async (userId: string, status: 'active' | 'inactive' | 'suspended') => {
+    try {
+      await SupabaseDatabaseService.updateUserStatus(userId, status);
+      await fetchUsers(); // Refresh data
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }, [fetchUsers]);
+
+  const sendNotificationToUsers = useCallback(async (userIds: string[], notification: {
+    title: string;
+    message: string;
+    type?: string;
+  }) => {
+    try {
+      await SupabaseDatabaseService.sendNotificationToUsers(userIds, notification);
+      return { success: true };
+    } catch (error) {
+      console.error('Error sending notification:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }, []);
+
+  const createUser = useCallback(async (userData: {
+    email: string;
+    full_name: string;
+    mobile?: string;
+    role: string;
+    department_id?: number;
+    organization_id?: number;
+    employment_type?: string;
+  }) => {
+    try {
+      await SupabaseDatabaseService.createUser(userData);
+      await fetchUsers(); // Refresh data
+      await fetchUserStats(); // Refresh stats
+      return { success: true };
+    } catch (error) {
+      console.error('Error creating user:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }, [fetchUsers, fetchUserStats]);
+
+  const updateUser = useCallback(async (userId: string, updates: {
+    full_name?: string;
+    mobile?: string;
+    role?: string;
+    department_id?: number;
+    organization_id?: number;
+    employment_type?: string;
+    status?: string;
+  }) => {
+    try {
+      await SupabaseDatabaseService.updateUser(userId, updates);
+      await fetchUsers(); // Refresh data
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating user:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }, [fetchUsers]);
+
+  useEffect(() => {
+    fetchUsers();
+    fetchUserStats();
+  }, [fetchUsers, fetchUserStats]);
+
+  // Set up real-time subscription for user updates
+  useEffect(() => {
+    let subscription: any;
+    
+    const setupSubscription = () => {
+      subscription = SupabaseDatabaseService.subscribeToUserUpdates((payload) => {
+        console.log('User real-time update:', payload);
+        // Add a small delay to prevent rapid successive calls
+        setTimeout(() => {
+          fetchUsers();
+          fetchUserStats();
+        }, 500);
+      });
+    };
+
+    setupSubscription();
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
+  }, []); // Empty dependency array to avoid re-creating subscription
+
+  return {
+    users,
+    userStats,
+    loading,
+    error,
+    refetch,
+    actions: {
+      bulkUpdateStatus,
+      bulkDeleteUsers,
+      resetUserPassword,
+      updateUserStatus,
+      sendNotificationToUsers,
+      createUser,
+      updateUser
+    }
+  };
+}
+
+// Hook for getting user statistics only
+export function useUserStatistics() {
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await SupabaseDatabaseService.getUserStatisticsForSuperAdmin();
+      setStats(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch user statistics');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const refetch = useCallback(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  // Set up real-time subscription
+  useEffect(() => {
+    let subscription: any;
+    
+    const setupSubscription = () => {
+      subscription = SupabaseDatabaseService.subscribeToUserUpdates((payload) => {
+        console.log('User stats real-time update:', payload);
+        setTimeout(() => {
+          fetchStats();
+        }, 500);
+      });
+    };
+
+    setupSubscription();
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
+  }, []);
+
+  return { stats, loading, error, refetch };
+}

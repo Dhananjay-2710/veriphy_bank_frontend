@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { 
   Users, 
   FileText, 
-  Settings, 
   Database,
   TrendingUp,
   AlertTriangle,
@@ -22,12 +20,14 @@ import {
   ChevronRight,
   Server,
   Gauge,
-  Sparkles
+  Sparkles,
+  Workflow
 } from 'lucide-react';
 // Card components are not used in the new design
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../contexts/AuthContextFixed';
+import { useNavigation } from '../../contexts/NavigationContext';
 import { 
   useTeamMembers, 
   useCases, 
@@ -35,6 +35,7 @@ import {
   useSystemHealth,
   useAuditLogs
 } from '../../hooks/useDashboardData';
+import { WorkflowProcessor } from './WorkflowProcessor';
 import { SupabaseDatabaseService } from '../../services/supabase-database';
 import { ROUTES } from '../../constants/navigation';
 
@@ -80,7 +81,7 @@ interface DashboardStats {
 
 export function SuperAdminDashboard() {
   const { user } = useAuth();
-  const navigate = useNavigate();
+  const { navigateTo, navigateDirect } = useNavigation();
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month' | 'quarter'>('today');
   const [refreshing, setRefreshing] = useState(false);
   const [realTimeMetrics, setRealTimeMetrics] = useState<RealTimeMetrics | null>(null);
@@ -107,7 +108,7 @@ export function SuperAdminDashboard() {
     tasks, 
     loading: tasksLoading, 
     refetch: refetchTasks 
-  } = useTasks(user?.id || '');
+  } = useTasks(user?.id || '40'); // Fallback to super admin ID
 
   const { 
     loading: systemLoading 
@@ -152,7 +153,7 @@ export function SuperAdminDashboard() {
           return new Date(t.due_date) < new Date();
         }).length,
         systemHealth: calculateSystemHealth(cases, tasks, usersData),
-        responseTime: Math.random() * 100 + 50, // This would come from monitoring
+        responseTime: await getSystemResponseTime(), // Get real response time from monitoring
         uptime: Date.now() - new Date('2024-01-01').getTime() // System uptime
       };
 
@@ -201,6 +202,19 @@ export function SuperAdminDashboard() {
     }, {});
   };
 
+  const getSystemResponseTime = async (): Promise<number> => {
+    try {
+      // Get real response time from system monitoring
+      const startTime = Date.now();
+      await SupabaseDatabaseService.getUsers(); // Simple query to measure response
+      const responseTime = Date.now() - startTime;
+      return responseTime;
+    } catch (error) {
+      console.error('Error measuring response time:', error);
+      return 100; // Fallback value
+    }
+  };
+
   const calculateSystemHealth = (cases: any[], tasks: any[], _users: any[]): 'excellent' | 'good' | 'warning' | 'critical' => {
     const overdueTasksCount = tasks.filter((t: any) => t.due_date && new Date(t.due_date) < new Date()).length;
     const pendingCasesCount = cases.filter((c: any) => c.status === 'open').length;
@@ -232,35 +246,113 @@ export function SuperAdminDashboard() {
     ]);
   };
 
-  // Navigation handlers
+  // Dynamic Navigation handlers with contextual flows
   const handleManageUsers = () => {
-    navigate(ROUTES.ADVANCED_USER_MANAGEMENT);
+    console.log('🚀 Navigating to User Management with context:', {
+      totalUsers: realTimeMetrics?.totalUsers,
+      activeUsers: realTimeMetrics?.activeUsers,
+      onlineUsers: realTimeMetrics?.onlineUsers
+    });
+    navigateDirect(ROUTES.ADVANCED_USER_MANAGEMENT);
   };
 
   const handleSystemSettings = () => {
-    navigate(ROUTES.SYSTEM_SETTINGS);
+    console.log('🚀 Navigating to System Settings');
+    navigateDirect(ROUTES.SYSTEM_SETTINGS);
   };
 
   const handleDatabaseHealth = () => {
-    navigate(ROUTES.SYSTEM_MONITORING);
+    console.log('🚀 Navigating to System Monitoring with health status:', realTimeMetrics?.systemHealth);
+    navigateDirect(ROUTES.SYSTEM_MONITORING);
   };
 
-  // Navigation handler for workflow designer (can be used for future features)
-  // const handleWorkflowDesigner = () => {
-  //   navigate(ROUTES.WORKFLOW_DESIGNER);
-  // };
+  const handleWorkflowDesigner = () => {
+    console.log('🚀 Navigating to Workflow Designer');
+    navigateDirect(ROUTES.WORKFLOW_DESIGNER);
+  };
+
+  const handleAnalytics = () => {
+    console.log('🚀 Navigating to Analytics with dashboard context');
+    navigateDirect(ROUTES.ANALYTICS);
+  };
+
+  const handleAuditLogs = () => {
+    console.log('🚀 Navigating to Audit Logs');
+    navigateDirect(ROUTES.AUDIT_LOGS);
+  };
+
+  // Dynamic context-aware navigations
+  const handleCasesOverview = (status?: string) => {
+    console.log('🚀 Navigating to Cases with filter:', status);
+    const url = status ? `/cases?status=${status}` : '/cases';
+    navigateDirect(url);
+  };
+
+  const handleTasksOverview = (priority?: string) => {
+    console.log('🚀 Navigating to Tasks with priority:', priority);
+    const url = priority ? `/tasks?priority=${priority}` : '/tasks';
+    navigateDirect(url);
+  };
+
+  const handleDocumentsOverview = (status?: string) => {
+    console.log('🚀 Navigating to Documents with status:', status);
+    const url = status ? `/documents?status=${status}` : '/documents';
+    navigateDirect(url);
+  };
+
+  // Quick action handlers
+  const handleQuickUserCreate = () => {
+    console.log('🚀 Quick action: Create new user');
+    navigateDirect('/user-management?action=create');
+  };
+
+  const handleQuickCaseCreate = () => {
+    console.log('🚀 Quick action: Create new case');
+    navigateDirect('/cases?action=create');
+  };
+
+  const handleQuickSystemCheck = async () => {
+    console.log('🚀 Quick action: System health check');
+    setRefreshing(true);
+    // Trigger system health check
+    await processRealTimeMetrics();
+    setTimeout(() => setRefreshing(false), 2000);
+  };
 
   const handleExportReports = () => {
+    console.log('🚀 Opening export modal');
     setShowExportModal(true);
   };
 
   const handleViewAllActivity = () => {
-    // Navigate to audit logs or activity page
-    navigate('/super-admin/activity-logs');
+    console.log('🚀 Navigating to comprehensive activity logs');
+    navigateDirect('/audit-logs');
   };
 
   const handleAlerts = () => {
+    console.log('🚀 Opening alerts modal');
     setShowAlertModal(true);
+  };
+
+  // Dynamic drill-down handlers
+  const handleDrillDownUsers = (type: 'active' | 'online' | 'inactive') => {
+    console.log('🚀 Drilling down into users:', type);
+    navigateDirect(`/advanced-user-management?filter=${type}`);
+  };
+
+  const handleDrillDownCases = (status: 'open' | 'in_progress' | 'completed' | 'rejected') => {
+    console.log('🚀 Drilling down into cases:', status);
+    navigateDirect(`/cases?status=${status}`);
+  };
+
+  const handleDrillDownDocuments = (status: 'verified' | 'pending' | 'rejected') => {
+    console.log('🚀 Drilling down into documents:', status);
+    navigateDirect(`/documents?status=${status}`);
+  };
+
+  const handleDrillDownTasks = (status: 'open' | 'overdue' | 'completed') => {
+    console.log('🚀 Drilling down into tasks:', status);
+    navigateDirect(`/tasks?status=${status}`);
   };
 
   const handleExportData = async (format: 'csv' | 'excel' | 'pdf') => {
@@ -294,11 +386,13 @@ export function SuperAdminDashboard() {
       setRefreshing(false);
       
       // Show success notification
-      alert(`Data exported as ${format.toUpperCase()} successfully!`);
+      console.log(`Data exported as ${format.toUpperCase()} successfully!`);
+      // TODO: Replace with proper toast notification
     } catch (error) {
       console.error('Export failed:', error);
       setRefreshing(false);
-      alert('Export failed. Please try again.');
+      console.error('Export failed. Please try again.');
+      // TODO: Replace with proper error toast notification
     }
   };
 
@@ -532,13 +626,31 @@ export function SuperAdminDashboard() {
                 <p className="text-sm font-medium text-gray-600 mb-1">Total Users</p>
                 <p className="text-3xl font-bold text-gray-900 mb-3">{realTimeMetrics?.totalUsers || 0}</p>
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
+                  <div 
+                    className="flex items-center justify-between text-sm cursor-pointer hover:bg-blue-50 p-2 rounded -m-2 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDrillDownUsers('active');
+                    }}
+                  >
                     <span className="text-gray-600">Active</span>
-                    <span className="font-medium text-green-600">{realTimeMetrics?.activeUsers || 0}</span>
+                    <span className="font-medium text-green-600 flex items-center">
+                      {realTimeMetrics?.activeUsers || 0}
+                      <ChevronRight className="h-3 w-3 ml-1 opacity-50" />
+                    </span>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
+                  <div 
+                    className="flex items-center justify-between text-sm cursor-pointer hover:bg-blue-50 p-2 rounded -m-2 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDrillDownUsers('online');
+                    }}
+                  >
                     <span className="text-gray-600">Online</span>
-                    <span className="font-medium text-blue-600">{realTimeMetrics?.onlineUsers || 0}</span>
+                    <span className="font-medium text-blue-600 flex items-center">
+                      {realTimeMetrics?.onlineUsers || 0}
+                      <ChevronRight className="h-3 w-3 ml-1 opacity-50" />
+                    </span>
                   </div>
                 </div>
               </div>
@@ -547,7 +659,7 @@ export function SuperAdminDashboard() {
 
           {/* Cases Metric Card */}
           <div 
-            onClick={() => navigate('/cases')}
+            onClick={() => handleCasesOverview()}
             className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
           >
             <div className="absolute top-0 right-0 w-24 h-24 transform translate-x-8 -translate-y-8">
@@ -567,13 +679,31 @@ export function SuperAdminDashboard() {
                 <p className="text-sm font-medium text-gray-600 mb-1">Total Cases</p>
                 <p className="text-3xl font-bold text-gray-900 mb-3">{realTimeMetrics?.totalCases || 0}</p>
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
+                  <div 
+                    className="flex items-center justify-between text-sm cursor-pointer hover:bg-green-50 p-2 rounded -m-2 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDrillDownCases('open');
+                    }}
+                  >
                     <span className="text-gray-600">Open</span>
-                    <span className="font-medium text-yellow-600">{realTimeMetrics?.openCases || 0}</span>
+                    <span className="font-medium text-yellow-600 flex items-center">
+                      {realTimeMetrics?.openCases || 0}
+                      <ChevronRight className="h-3 w-3 ml-1 opacity-50" />
+                    </span>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
+                  <div 
+                    className="flex items-center justify-between text-sm cursor-pointer hover:bg-green-50 p-2 rounded -m-2 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDrillDownCases('in_progress');
+                    }}
+                  >
                     <span className="text-gray-600">In Progress</span>
-                    <span className="font-medium text-blue-600">{realTimeMetrics?.inProgressCases || 0}</span>
+                    <span className="font-medium text-blue-600 flex items-center">
+                      {realTimeMetrics?.inProgressCases || 0}
+                      <ChevronRight className="h-3 w-3 ml-1 opacity-50" />
+                    </span>
                   </div>
                 </div>
               </div>
@@ -582,7 +712,7 @@ export function SuperAdminDashboard() {
 
           {/* Documents Metric Card */}
           <div 
-            onClick={() => navigate('/document-manager')}
+            onClick={() => handleDocumentsOverview()}
             className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
           >
             <div className="absolute top-0 right-0 w-24 h-24 transform translate-x-8 -translate-y-8">
@@ -602,13 +732,31 @@ export function SuperAdminDashboard() {
                 <p className="text-sm font-medium text-gray-600 mb-1">Documents</p>
                 <p className="text-3xl font-bold text-gray-900 mb-3">{realTimeMetrics?.totalDocuments || 0}</p>
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
+                  <div 
+                    className="flex items-center justify-between text-sm cursor-pointer hover:bg-purple-50 p-2 rounded -m-2 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDrillDownDocuments('verified');
+                    }}
+                  >
                     <span className="text-gray-600">Verified</span>
-                    <span className="font-medium text-green-600">{realTimeMetrics?.verifiedDocuments || 0}</span>
+                    <span className="font-medium text-green-600 flex items-center">
+                      {realTimeMetrics?.verifiedDocuments || 0}
+                      <ChevronRight className="h-3 w-3 ml-1 opacity-50" />
+                    </span>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
+                  <div 
+                    className="flex items-center justify-between text-sm cursor-pointer hover:bg-purple-50 p-2 rounded -m-2 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDrillDownDocuments('pending');
+                    }}
+                  >
                     <span className="text-gray-600">Pending</span>
-                    <span className="font-medium text-yellow-600">{realTimeMetrics?.pendingDocuments || 0}</span>
+                    <span className="font-medium text-yellow-600 flex items-center">
+                      {realTimeMetrics?.pendingDocuments || 0}
+                      <ChevronRight className="h-3 w-3 ml-1 opacity-50" />
+                    </span>
                   </div>
                 </div>
               </div>
@@ -793,19 +941,25 @@ export function SuperAdminDashboard() {
                 >
                   <div className="flex items-center">
                     <Users className="h-4 w-4 mr-3 text-blue-600" />
-                    Manage Users
+                    <div className="text-left">
+                      <span className="font-medium">User Management</span>
+                      <p className="text-xs text-gray-500">{realTimeMetrics?.totalUsers || 0} users</p>
+                    </div>
                   </div>
                   <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Button>
                 
                 <Button 
-                  onClick={handleSystemSettings}
+                  onClick={handleWorkflowDesigner}
                   className="w-full justify-between group bg-gradient-to-r from-purple-50 to-violet-50 hover:from-purple-100 hover:to-violet-100 text-gray-700 border border-purple-200 hover:border-purple-300 transition-all duration-200" 
                   variant="outline"
                 >
                   <div className="flex items-center">
-                    <Settings className="h-4 w-4 mr-3 text-purple-600" />
-                    System Settings
+                    <Workflow className="h-4 w-4 mr-3 text-purple-600" />
+                    <div className="text-left">
+                      <span className="font-medium">Workflow Designer</span>
+                      <p className="text-xs text-gray-500">Create flows</p>
+                    </div>
                   </div>
                   <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Button>
@@ -817,22 +971,68 @@ export function SuperAdminDashboard() {
                 >
                   <div className="flex items-center">
                     <Database className="h-4 w-4 mr-3 text-green-600" />
-                    Database Health
+                    <div className="text-left">
+                      <span className="font-medium">System Health</span>
+                      <p className="text-xs text-gray-500 capitalize">{realTimeMetrics?.systemHealth || 'checking'}</p>
+                    </div>
                   </div>
                   <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Button>
                 
                 <Button 
-                  onClick={handleExportReports}
+                  onClick={handleAnalytics}
                   className="w-full justify-between group bg-gradient-to-r from-orange-50 to-red-50 hover:from-orange-100 hover:to-red-100 text-gray-700 border border-orange-200 hover:border-orange-300 transition-all duration-200" 
                   variant="outline"
                 >
                   <div className="flex items-center">
-                    <Download className="h-4 w-4 mr-3 text-orange-600" />
-                    Export Reports
+                    <BarChart3 className="h-4 w-4 mr-3 text-orange-600" />
+                    <div className="text-left">
+                      <span className="font-medium">Analytics</span>
+                      <p className="text-xs text-gray-500">View reports</p>
+                    </div>
                   </div>
                   <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Button>
+                
+                <Button 
+                  onClick={() => navigateDirect('/super-admin/table-management')}
+                  className="w-full justify-between group bg-gradient-to-r from-indigo-50 to-blue-50 hover:from-indigo-100 hover:to-blue-100 text-gray-700 border border-indigo-200 hover:border-indigo-300 transition-all duration-200" 
+                  variant="outline"
+                >
+                  <div className="flex items-center">
+                    <Database className="h-4 w-4 mr-3 text-indigo-600" />
+                    <div className="text-left">
+                      <span className="font-medium">Table Management</span>
+                      <p className="text-xs text-gray-500">Manage all tables</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </Button>
+
+                {/* Dynamic Quick Actions Row */}
+                <div className="pt-3 border-t border-gray-100">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button 
+                      onClick={handleQuickUserCreate}
+                      size="sm"
+                      className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200"
+                      variant="outline"
+                    >
+                      <Users className="h-3 w-3 mr-1" />
+                      Add User
+                    </Button>
+                    <Button 
+                      onClick={handleQuickSystemCheck}
+                      size="sm"
+                      className="bg-green-50 hover:bg-green-100 text-green-700 border border-green-200"
+                      variant="outline"
+                      disabled={refreshing}
+                    >
+                      <Activity className="h-3 w-3 mr-1" />
+                      {refreshing ? 'Checking...' : 'Health Check'}
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -946,7 +1146,7 @@ export function SuperAdminDashboard() {
                     {Object.entries(dashboardStats.casesByStatus || {}).map(([status, count]) => (
                       <div 
                         key={status} 
-                        onClick={() => navigate(`/cases?status=${status}`)}
+                        onClick={() => navigateDirect(`/cases?status=${status}`)}
                         className="group flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-gray-50 to-white border border-gray-100 hover:border-green-200 hover:shadow-md transition-all duration-200 cursor-pointer"
                       >
                         <div className="flex items-center space-x-3">
@@ -988,7 +1188,7 @@ export function SuperAdminDashboard() {
                     {Object.entries(dashboardStats.usersByRole || {}).map(([role, count]) => (
                       <div 
                         key={role} 
-                        onClick={() => navigate(`${ROUTES.ADVANCED_USER_MANAGEMENT}?role=${role}`)}
+                        onClick={() => navigateDirect(`${ROUTES.ADVANCED_USER_MANAGEMENT}?role=${role}`)}
                         className="group flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-gray-50 to-white border border-gray-100 hover:border-purple-200 hover:shadow-md transition-all duration-200 cursor-pointer"
                       >
                         <div className="flex items-center space-x-3">
@@ -1107,7 +1307,7 @@ export function SuperAdminDashboard() {
                 
                 <div className="flex justify-end pt-4 border-t border-gray-200">
                   <Button 
-                    onClick={() => navigate('/super-admin/system-logs')}
+                    onClick={() => navigateDirect('/super-admin/system-logs')}
                     className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
                   >
                     View All Logs

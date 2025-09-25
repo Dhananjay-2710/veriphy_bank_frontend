@@ -8,6 +8,7 @@ import { WhatsAppTimeline } from './WhatsAppTimeline';
 import { ComplianceLog } from './ComplianceLog';
 import { WhatsAppCommunicator } from './WhatsAppCommunicator';
 import { DocumentManager } from '../Documents/DocumentManager';
+import { CaseWorkflowManager } from './CaseWorkflowManager';
 import { useCase, useDocuments, useWhatsAppMessages, useComplianceLogs, useCaseStatusHistory, useCaseWorkflowStages } from '../../hooks/useDashboardData';
 import { useAuth } from '../../contexts/AuthContextFixed';
 import { SupabaseDatabaseService } from '../../services/supabase-database';
@@ -35,9 +36,9 @@ export function CasePage({ caseId, onBack }: CasePageProps) {
 
   const tabs = [
     { id: 'overview', label: 'Overview' },
+    { id: 'workflow', label: 'Workflow', icon: Workflow },
     { id: 'documents', label: 'Documents' },
     { id: 'document-manager', label: 'Document Manager' },
-    { id: 'workflow', label: 'Workflow', icon: Workflow },
     { id: 'status-history', label: 'Status History', icon: History },
     { id: 'whatsapp', label: 'WhatsApp Timeline' },
     { id: 'communicator', label: 'Chat with Customer' },
@@ -319,80 +320,24 @@ export function CasePage({ caseId, onBack }: CasePageProps) {
         
         {/* Workflow Tab */}
         {activeTab === 'workflow' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Workflow Stages</h3>
-              <div className="flex space-x-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => handleCreateWorkflowStage('New Stage', workflowStages.length + 1)}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Stage
-                </Button>
-                <Button variant="outline" onClick={refetchStages}>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Refresh
-                </Button>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 gap-4">
-              {workflowStages.map((stage) => (
-                <Card key={stage.id} className="hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <h4 className="font-semibold">{stage.stage_name}</h4>
-                          <Badge variant={
-                            stage.completed_at 
-                              ? 'success' 
-                              : stage.is_active 
-                                ? 'info' 
-                                : 'default'
-                          }>
-                            {stage.completed_at ? 'Completed' : stage.is_active ? 'Active' : 'Pending'}
-                          </Badge>
-                          <span className="text-sm text-gray-500">Order: {stage.stage_order}</span>
-                        </div>
-                        <div className="text-sm text-gray-600 space-y-1">
-                          <p><strong>Started:</strong> {new Date(stage.started_at).toLocaleString()}</p>
-                          {stage.completed_at && (
-                            <p><strong>Completed:</strong> {new Date(stage.completed_at).toLocaleString()}</p>
-                          )}
-                          {stage.assigned_to && (
-                            <p><strong>Assigned to:</strong> {stage.user?.name || stage.assigned_to}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleWorkflowStageUpdate(stage.id, { 
-                            is_active: !stage.is_active,
-                            completed_at: stage.is_active ? new Date().toISOString() : null
-                          })}
-                        >
-                          {stage.is_active ? 'Complete' : 'Reactivate'}
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-            
-            {workflowStages.length === 0 && (
-              <Card>
-                <CardContent className="text-center py-12">
-                  <Workflow className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">No workflow stages found</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+          <CaseWorkflowManager
+            caseId={caseId}
+            onStatusChange={(newStatus) => {
+              // Refresh case data when status changes
+              refetchCase();
+              setActiveTab('overview'); // Switch to overview to see updated status
+            }}
+            onNavigateToCase={(caseId) => {
+              // Already on case page, just switch tabs
+              setActiveTab('overview');
+            }}
+            onNavigateToDocuments={(caseId) => {
+              setActiveTab('documents');
+            }}
+            onNavigateToCompliance={(caseId) => {
+              setActiveTab('compliance');
+            }}
+          />
         )}
         
         {/* Status History Tab */}

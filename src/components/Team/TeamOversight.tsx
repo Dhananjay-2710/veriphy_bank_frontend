@@ -43,7 +43,7 @@ export function TeamOversight({ onBack, onNavigateToCase }: TeamOversightProps) 
     },
     { 
       label: 'Top Performer', 
-      value: realTeamMembers.length > 0 ? realTeamMembers[0].full_name?.split(' ')[0] + ' S.' : 'N/A', 
+      value: realTeamMembers.length > 0 && realTeamMembers[0].name ? realTeamMembers[0].name.split(' ')[0] + ' S.' : 'N/A', 
       change: `${Math.floor(Math.random() * 20) + 10} cases closed`, 
       icon: Award, 
       trend: 'stable' 
@@ -60,7 +60,7 @@ export function TeamOversight({ onBack, onNavigateToCase }: TeamOversightProps) 
   // Transform real team members data
   const teamMembers = realTeamMembers.map(member => ({
     id: member.id,
-    name: member.full_name,
+    name: member.name, // Use the name property that's already mapped from full_name
     cases: cases.filter(c => c.assignedTo === member.id).length,
     capacity: 10, // Default capacity
     efficiency: `${Math.floor(Math.random() * 10) + 85}%`,
@@ -85,14 +85,14 @@ export function TeamOversight({ onBack, onNavigateToCase }: TeamOversightProps) 
     email: case_.customer.email,
     phone: case_.customer.phone,
     loanType: case_.loanType || 'Loan',
-    amount: `₹${Math.floor(Math.random() * 50) + 5}L`,
+    amount: case_.loan_amount ? `₹${Math.floor(case_.loan_amount / 100000)}L` : 'Amount not set',
     assignedTo: case_.assignedTo,
     assignedToName: realTeamMembers.find(m => m.id === case_.assignedTo)?.full_name || 'Unassigned',
     status: case_.status,
     priority: case_.priority,
     lastActivity: new Date(case_.updatedAt).toLocaleDateString(),
-    communicationCount: Math.floor(Math.random() * 20) + 5,
-    documentsComplete: Math.floor(Math.random() * 40) + 60
+    communicationCount: case_.communication_count || 0, // This should come from real data
+    documentsComplete: case_.documents_complete_percentage || 0 // This should come from real data
   }));
 
   // Mock communications data (could be replaced with real data later)
@@ -417,10 +417,10 @@ export function TeamOversight({ onBack, onNavigateToCase }: TeamOversightProps) 
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-                          {member.name.split(' ').map(n => n[0]).join('')}
+                          {member.name ? member.name.split(' ').map(n => n[0]).join('') : 'U'}
                         </div>
                         <div>
-                          <h3 className="font-medium text-gray-900">{member.name}</h3>
+                          <h3 className="font-medium text-gray-900">{member.name || 'Unknown User'}</h3>
                           <p className="text-sm text-gray-600">{member.specialization}</p>
                         </div>
                       </div>
@@ -482,10 +482,10 @@ export function TeamOversight({ onBack, onNavigateToCase }: TeamOversightProps) 
                 >
                   <div className="flex items-center space-x-3 mb-3">
                     <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-                      {member.name.split(' ').map(n => n[0]).join('')}
+                      {member.name ? member.name.split(' ').map(n => n[0]).join('') : 'U'}
                     </div>
                     <div>
-                      <h3 className="font-medium text-gray-900">{member.name}</h3>
+                      <h3 className="font-medium text-gray-900">{member.name || 'Unknown User'}</h3>
                       <p className="text-sm text-gray-600">{member.specialization}</p>
                     </div>
                   </div>
@@ -728,7 +728,7 @@ export function TeamOversight({ onBack, onNavigateToCase }: TeamOversightProps) 
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium text-gray-900">{member.name}</p>
+                      <p className="font-medium text-gray-900">{member.name || 'Unknown User'}</p>
                       <p className="text-sm text-gray-600">{member.specialization}</p>
                     </div>
                     <div className="text-right text-sm text-gray-500">

@@ -18,11 +18,11 @@ export const SUPABASE_TABLES = {
   DEPARTMENTS: 'departments',
   ROLES: 'roles',
   PERMISSIONS: 'permissions',
-  AUDIT_LOG: 'audit_log',
+  AUDIT_LOG: 'logs',
   FILES: 'files',
   FOLDERS: 'folders',
   NOTIFICATIONS: 'notifications',
-  LOGS: 'audit_log',
+  LOGS: 'logs',
   
   // Document Management Tables
   DOCUMENT_AGAINST_PRODUCT: 'document_against_product',
@@ -215,15 +215,18 @@ export function mapPermissionData(permissionData: any) {
 export function mapAuditLogData(auditLogData: any) {
   return {
     id: auditLogData.id,
+    organizationId: auditLogData.organization_id,
     userId: auditLogData.user_id,
     action: auditLogData.action,
-    resourceType: auditLogData.resource_type,
-    resourceId: auditLogData.resource_id,
-    details: auditLogData.details,
-    ipAddress: auditLogData.ip_address,
-    userAgent: auditLogData.user_agent,
+    resourceType: auditLogData.entity_type, // maps entity_type to resourceType
+    resourceId: auditLogData.entity_id, // maps entity_id to resourceId
+    details: auditLogData.description, // maps description to details
+    logType: auditLogData.log_type || 'info', // log_type as direct column
+    ipAddress: auditLogData.ip_address || 'Unknown', // ip_address as direct column
+    userAgent: auditLogData.user_agent || 'Unknown', // user_agent as direct column
     metadata: auditLogData.metadata,
     createdAt: auditLogData.created_at,
+    updatedAt: auditLogData.updated_at,
   };
 }
 
@@ -1576,6 +1579,70 @@ export function mapMigrationData(migrationData: any) {
     rollbackAppliedBy: migrationData.rollback_applied_by,
     dependencies: migrationData.dependencies || [],
     metadata: migrationData.metadata || {},
+  };
+}
+
+// =============================================================================
+// CUSTOMER & CASE MANAGEMENT MAPPING FUNCTIONS
+// =============================================================================
+
+export function mapCaseData(caseData: any) {
+  return {
+    id: caseData.id?.toString(),
+    caseNumber: caseData.case_number,
+    customerId: caseData.customer_id?.toString(),
+    assignedTo: caseData.assigned_to?.toString(),
+    loanType: caseData.loan_type,
+    loanAmount: caseData.loan_amount,
+    status: caseData.status,
+    priority: caseData.priority,
+    notes: caseData.notes,
+    createdAt: caseData.created_at,
+    updatedAt: caseData.updated_at,
+    customer: caseData.customers ? {
+      id: caseData.customers.id?.toString(),
+      userId: caseData.customers.user_id?.toString(),
+      name: caseData.customers.users ? 
+        `${caseData.customers.users.first_name} ${caseData.customers.users.last_name}` : 
+        'Unknown Customer',
+      email: caseData.customers.users?.email,
+      phone: caseData.customers.users?.phone,
+      panNumber: caseData.customers.pan_number,
+      kycStatus: caseData.customers.kyc_status,
+      riskProfile: caseData.customers.risk_profile,
+      monthlyIncome: caseData.customers.monthly_income
+    } : null,
+    assignedUser: caseData.users ? {
+      id: caseData.users.id?.toString(),
+      name: `${caseData.users.first_name} ${caseData.users.last_name}`,
+      firstName: caseData.users.first_name,
+      lastName: caseData.users.last_name
+    } : null
+  };
+}
+
+export function mapCustomerData(customerData: any) {
+  return {
+    id: customerData.id?.toString(),
+    userId: customerData.user_id?.toString(),
+    panNumber: customerData.pan_number,
+    aadhaarNumber: customerData.aadhaar_number,
+    dateOfBirth: customerData.date_of_birth,
+    kycStatus: customerData.kyc_status,
+    riskProfile: customerData.risk_profile,
+    monthlyIncome: customerData.monthly_income,
+    employmentType: customerData.employment_type,
+    createdAt: customerData.created_at,
+    updatedAt: customerData.updated_at,
+    user: customerData.users ? {
+      id: customerData.users.id?.toString(),
+      firstName: customerData.users.first_name,
+      lastName: customerData.users.last_name,
+      name: `${customerData.users.first_name} ${customerData.users.last_name}`,
+      email: customerData.users.email,
+      phone: customerData.users.phone,
+      organizationId: customerData.users.organization_id?.toString()
+    } : null
   };
 }
 

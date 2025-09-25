@@ -15,6 +15,7 @@ import { useTeamMembers } from '../../hooks/useDashboardData';
 import { useAuth } from '../../contexts/AuthContextFixed';
 import { UserProfile } from './UserProfile';
 import { SupabaseDatabaseService } from '../../services/supabase-database';
+import { UserWorkflowIntegration } from './UserWorkflowIntegration';
 
 interface UserManagementProps {
   onBack: () => void;
@@ -26,6 +27,7 @@ export function UserManagement({ onBack }: UserManagementProps) {
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [profileUser, setProfileUser] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState('users');
   // Form validation for create user
   const {
     values: newUser,
@@ -329,7 +331,54 @@ export function UserManagement({ onBack }: UserManagementProps) {
         </div>
       </div>
 
-      {/* User Stats */}
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'users'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <Users className="h-4 w-4 mr-2 inline" />
+            User List
+          </button>
+          <button
+            onClick={() => setActiveTab('workflow')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'workflow'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <UserCheck className="h-4 w-4 mr-2 inline" />
+            User Workflow
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'workflow' && (
+        <UserWorkflowIntegration
+          onUserSelected={(userId) => {
+            console.log('User selected:', userId);
+          }}
+          onUserUpdated={(userId) => {
+            console.log('User updated:', userId);
+            refetchUsers();
+          }}
+          onUserDeleted={(userId) => {
+            console.log('User deleted:', userId);
+            refetchUsers();
+          }}
+        />
+      )}
+
+      {activeTab === 'users' && (
+        <>
+          {/* User Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {userStats.map((stat, index) => {
           const colorClasses = {
@@ -403,7 +452,7 @@ export function UserManagement({ onBack }: UserManagementProps) {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-start space-x-4">
                     <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-                      {user.name.split(' ').map((n: string) => n[0]).join('')}
+                      {user.name ? user.name.split(' ').map((n: string) => n[0]).join('') : 'U'}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center space-x-3 mb-2">
@@ -596,6 +645,9 @@ export function UserManagement({ onBack }: UserManagementProps) {
             </form>
           </div>
         </div>
+      )}
+
+        </>
       )}
 
       {/* User Profile Modal */}

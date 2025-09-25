@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { SupabaseDatabaseService } from '../../services/supabase-database';
 import { usePendingReviews } from '../../hooks/useDashboardData';
+import { useAuth } from '../../contexts/AuthContextFixed';
 
 interface PendingReviewsProps {
   onBack: () => void;
@@ -12,6 +13,7 @@ interface PendingReviewsProps {
 }
 
 export function PendingReviews({ onBack, onNavigateToCase }: PendingReviewsProps) {
+  const { user } = useAuth();
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [sortBy, setSortBy] = useState('priority');
   
@@ -21,94 +23,8 @@ export function PendingReviews({ onBack, onNavigateToCase }: PendingReviewsProps
     sortBy: sortBy
   });
   
-  // Use fallback mock data if real data is not available
-  const pendingReviews = pendingReviewsData && pendingReviewsData.length > 0 ? pendingReviewsData : [
-    {
-      id: 'review-001',
-      caseId: 'case-001',
-      customer: 'Ramesh & Sunita Gupta',
-      phone: '+91-9876543210',
-      loanType: 'Home Loan',
-      amount: '₹50L',
-      reviewType: 'final_approval',
-      priority: 'high',
-      submittedBy: 'Priya Sharma',
-      submittedAt: '2025-01-09T14:00:00Z',
-      waitTime: '6 hours',
-      documentsComplete: 95,
-      creditScore: 720,
-      riskRating: 'medium',
-      reviewNotes: 'All documents verified. Minor income discrepancy resolved.'
-    },
-    {
-      id: 'review-002',
-      caseId: 'case-008',
-      customer: 'Sanjay Patel',
-      phone: '+91-9876543216',
-      loanType: 'Business Loan',
-      amount: '₹15L',
-      reviewType: 'credit_assessment',
-      priority: 'high',
-      submittedBy: 'Vikram Joshi',
-      submittedAt: '2025-01-09T10:30:00Z',
-      waitTime: '10 hours',
-      documentsComplete: 100,
-      creditScore: 680,
-      riskRating: 'high',
-      reviewNotes: 'Business financials show declining trend. Requires senior review.'
-    },
-    {
-      id: 'review-003',
-      caseId: 'case-009',
-      customer: 'Meera Krishnan',
-      phone: '+91-9876543217',
-      loanType: 'Personal Loan',
-      amount: '₹2L',
-      reviewType: 'document_verification',
-      priority: 'medium',
-      submittedBy: 'Arjun Reddy',
-      submittedAt: '2025-01-09T12:15:00Z',
-      waitTime: '4 hours',
-      documentsComplete: 90,
-      creditScore: 750,
-      riskRating: 'low',
-      reviewNotes: 'Standard personal loan case. All documents in order.'
-    },
-    {
-      id: 'review-004',
-      caseId: 'case-010',
-      customer: 'Rajesh Kumar',
-      phone: '+91-9876543218',
-      loanType: 'Car Loan',
-      amount: '₹6L',
-      reviewType: 'final_approval',
-      priority: 'low',
-      submittedBy: 'Meera Nair',
-      submittedAt: '2025-01-08T16:45:00Z',
-      waitTime: '22 hours',
-      documentsComplete: 100,
-      creditScore: 690,
-      riskRating: 'medium',
-      reviewNotes: 'Vehicle valuation completed. Ready for final approval.'
-    },
-    {
-      id: 'review-005',
-      caseId: 'case-011',
-      customer: 'Ananya Sharma',
-      phone: '+91-9876543219',
-      loanType: 'Home Loan',
-      amount: '₹40L',
-      reviewType: 'risk_assessment',
-      priority: 'medium',
-      submittedBy: 'Priya Sharma',
-      submittedAt: '2025-01-09T09:20:00Z',
-      waitTime: '12 hours',
-      documentsComplete: 85,
-      creditScore: 710,
-      riskRating: 'medium',
-      reviewNotes: 'Property valuation pending. Income verification complete.'
-    }
-  ];
+  // Use live data from Supabase
+  const pendingReviews = pendingReviewsData || [];
   
   const [processingAction, setProcessingAction] = useState<string | null>(null);
 
@@ -142,7 +58,7 @@ export function PendingReviews({ onBack, onNavigateToCase }: PendingReviewsProps
       console.log('Approving review:', reviewId);
       
       await SupabaseDatabaseService.approveReview(reviewId, {
-        approvedBy: 'current_user_id', // This should come from auth context
+        approvedBy: user?.id || '', // Get from auth context
         approvedAt: new Date().toISOString(),
         approvalNotes: 'Approved via pending reviews'
       });
@@ -151,10 +67,12 @@ export function PendingReviews({ onBack, onNavigateToCase }: PendingReviewsProps
       refetchReviews();
       
       // Show success message
-      alert('Review approved successfully!');
+      console.log('Review approved successfully!');
+      // TODO: Replace with proper toast notification
     } catch (err) {
       console.error('Error approving review:', err);
-      alert('Failed to approve review. Please try again.');
+      console.error('Failed to approve review. Please try again.');
+      // TODO: Replace with proper error toast notification
     } finally {
       setProcessingAction(null);
     }
@@ -175,10 +93,12 @@ export function PendingReviews({ onBack, onNavigateToCase }: PendingReviewsProps
       refetchReviews();
       
       // Show success message
-      alert('Review rejected successfully!');
+      console.log('Review rejected successfully!');
+      // TODO: Replace with proper toast notification
     } catch (err) {
       console.error('Error rejecting review:', err);
-      alert('Failed to reject review. Please try again.');
+      console.error('Failed to reject review. Please try again.');
+      // TODO: Replace with proper error toast notification
     } finally {
       setProcessingAction(null);
     }
@@ -199,10 +119,12 @@ export function PendingReviews({ onBack, onNavigateToCase }: PendingReviewsProps
       refetchReviews();
       
       // Show success message
-      alert('Information request sent successfully!');
+      console.log('Information request sent successfully!');
+      // TODO: Replace with proper toast notification
     } catch (err) {
       console.error('Error requesting information:', err);
-      alert('Failed to request information. Please try again.');
+      console.error('Failed to request information. Please try again.');
+      // TODO: Replace with proper error toast notification
     } finally {
       setProcessingAction(null);
     }
