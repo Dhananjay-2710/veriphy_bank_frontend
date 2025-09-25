@@ -22,7 +22,7 @@ export const SUPABASE_TABLES = {
   FILES: 'files',
   FOLDERS: 'folders',
   NOTIFICATIONS: 'notifications',
-  LOGS: 'logs',
+  LOGS: 'audit_log',
   
   // Document Management Tables
   DOCUMENT_AGAINST_PRODUCT: 'document_against_product',

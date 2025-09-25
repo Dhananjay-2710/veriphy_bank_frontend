@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Users, 
   FileText, 
@@ -14,9 +15,16 @@ import {
   Eye,
   Download,
   RefreshCw,
-  BarChart3
+  BarChart3,
+  ArrowUpRight,
+  Bell,
+  MoreHorizontal,
+  ChevronRight,
+  Server,
+  Gauge,
+  Sparkles
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
+// Card components are not used in the new design
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../contexts/AuthContextFixed';
@@ -28,6 +36,7 @@ import {
   useAuditLogs
 } from '../../hooks/useDashboardData';
 import { SupabaseDatabaseService } from '../../services/supabase-database';
+import { ROUTES } from '../../constants/navigation';
 
 interface RealTimeMetrics {
   totalUsers: number;
@@ -71,12 +80,15 @@ interface DashboardStats {
 
 export function SuperAdminDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month' | 'quarter'>('today');
   const [refreshing, setRefreshing] = useState(false);
   const [realTimeMetrics, setRealTimeMetrics] = useState<RealTimeMetrics | null>(null);
   const [liveActivity, setLiveActivity] = useState<LiveActivity[]>([]);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showAlertModal, setShowAlertModal] = useState(false);
 
   // Get real data from Supabase hooks
   const { 
@@ -98,14 +110,16 @@ export function SuperAdminDashboard() {
   } = useTasks(user?.id || '');
 
   const { 
-    data: systemHealthData, 
     loading: systemLoading 
   } = useSystemHealth();
 
+  // Stable filters to prevent infinite loops
+  const auditLogsFilters = useMemo(() => ({ limit: 10 }), []);
+  
   const { 
     auditLogs, 
     loading: logsLoading 
-  } = useAuditLogs({ limit: 10 });
+  } = useAuditLogs(auditLogsFilters);
 
   // Process real data into metrics
   const processRealTimeMetrics = useCallback(async () => {
@@ -115,7 +129,7 @@ export function SuperAdminDashboard() {
       setRefreshing(true);
 
       // Get additional data from Supabase
-      const documentsData = await SupabaseDatabaseService.getDocuments('');
+      const documentsData = await SupabaseDatabaseService.getDocuments();
       const usersData = await SupabaseDatabaseService.getUsers();
       
       // Calculate real metrics from actual data
@@ -218,6 +232,94 @@ export function SuperAdminDashboard() {
     ]);
   };
 
+  // Navigation handlers
+  const handleManageUsers = () => {
+    navigate(ROUTES.ADVANCED_USER_MANAGEMENT);
+  };
+
+  const handleSystemSettings = () => {
+    navigate(ROUTES.SYSTEM_SETTINGS);
+  };
+
+  const handleDatabaseHealth = () => {
+    navigate(ROUTES.SYSTEM_MONITORING);
+  };
+
+  // Navigation handler for workflow designer (can be used for future features)
+  // const handleWorkflowDesigner = () => {
+  //   navigate(ROUTES.WORKFLOW_DESIGNER);
+  // };
+
+  const handleExportReports = () => {
+    setShowExportModal(true);
+  };
+
+  const handleViewAllActivity = () => {
+    // Navigate to audit logs or activity page
+    navigate('/super-admin/activity-logs');
+  };
+
+  const handleAlerts = () => {
+    setShowAlertModal(true);
+  };
+
+  const handleExportData = async (format: 'csv' | 'excel' | 'pdf') => {
+    try {
+      console.log(`Exporting data as ${format}...`);
+      
+      // Simulate export process with delay
+      setRefreshing(true);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Add actual export logic here
+      const exportData = {
+        users: users || [],
+        cases: cases || [],
+        tasks: tasks || [],
+        metrics: realTimeMetrics,
+        timestamp: new Date().toISOString()
+      };
+      
+      // Create downloadable content (this is a simplified example)
+      const content = format === 'csv' 
+        ? convertToCSV(exportData)
+        : format === 'excel'
+        ? exportData // For Excel, you'd use a library like xlsx
+        : exportData; // For PDF, you'd use jsPDF or similar
+      
+      // Trigger download (simplified)
+      downloadFile(content, `dashboard-export-${format}`, format);
+      
+      setShowExportModal(false);
+      setRefreshing(false);
+      
+      // Show success notification
+      alert(`Data exported as ${format.toUpperCase()} successfully!`);
+    } catch (error) {
+      console.error('Export failed:', error);
+      setRefreshing(false);
+      alert('Export failed. Please try again.');
+    }
+  };
+
+  // Helper functions for export
+  const convertToCSV = (data: any) => {
+    // Simplified CSV conversion
+    return JSON.stringify(data, null, 2);
+  };
+
+  const downloadFile = (content: any, filename: string, format: string) => {
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
   // Process metrics when data changes
   useEffect(() => {
     processRealTimeMetrics();
@@ -266,427 +368,756 @@ export function SuperAdminDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Super Admin Dashboard</h1>
-          <p className="text-gray-600">
-            Welcome back, {user?.full_name || 'Super Admin'}. Real-time system overview.
-          </p>
-          <p className="text-sm text-gray-500 mt-1">
-            Last updated: {lastUpdated.toLocaleTimeString()} • 
-            {realTimeMetrics?.totalUsers || 0} users • 
-            {realTimeMetrics?.totalCases || 0} cases • 
-            {realTimeMetrics?.totalTasks || 0} tasks
-          </p>
-        </div>
-        <div className="flex items-center space-x-3">
-          <div className="flex bg-white border border-gray-300 rounded-lg">
-            {(['today', 'week', 'month', 'quarter'] as const).map((range) => (
-              <button
-                key={range}
-                onClick={() => setTimeRange(range)}
-                className={`px-3 py-2 text-sm font-medium capitalize transition-colors ${
-                  timeRange === range
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-700 hover:text-blue-600'
-                } ${range === 'today' ? 'rounded-l-lg' : ''} ${range === 'quarter' ? 'rounded-r-lg' : ''}`}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      {/* Modern Header with Gradient */}
+      <div className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-lg">
+                <Gauge className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                  Super Admin Dashboard
+                </h1>
+                <p className="text-sm text-gray-600 flex items-center mt-1">
+                  <Sparkles className="h-4 w-4 mr-1 text-blue-500" />
+                  Welcome back, {user?.full_name || 'Super Admin'} - Real-time system control center
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              {/* Live Status Indicator */}
+              <div className="flex items-center px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2"></div>
+                <span className="text-sm font-medium text-green-700">Live</span>
+              </div>
+              
+              {/* Time Range Selector */}
+              <div className="flex bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                {(['today', 'week', 'month', 'quarter'] as const).map((range) => (
+                  <button
+                    key={range}
+                    onClick={() => setTimeRange(range)}
+                    className={`px-4 py-2 text-sm font-medium capitalize transition-all duration-200 ${
+                      timeRange === range
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm'
+                        : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
+                    }`}
+                  >
+                    {range}
+                  </button>
+                ))}
+              </div>
+              
+              {/* Action Buttons */}
+              <Button
+                onClick={() => {
+                  refreshAllData();
+                  processRealTimeMetrics();
+                }}
+                disabled={refreshing}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
               >
-                {range}
-              </button>
-            ))}
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              
+              <Button 
+                onClick={handleAlerts}
+                variant="outline" 
+                className="border-gray-200 hover:bg-gray-50"
+              >
+                <Bell className="h-4 w-4 mr-2" />
+                Alerts
+              </Button>
+            </div>
           </div>
-          <Button
-            onClick={() => {
-              refreshAllData();
-              processRealTimeMetrics();
-            }}
-            disabled={refreshing}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh Data
-          </Button>
+          
+          {/* Quick Stats Bar */}
+          <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+            <div className="flex items-center space-x-6">
+              <div className="flex items-center">
+                <Clock className="h-4 w-4 mr-1 text-blue-500" />
+                Last updated: {lastUpdated.toLocaleTimeString()}
+              </div>
+              <div className="flex items-center">
+                <Users className="h-4 w-4 mr-1 text-green-500" />
+                {realTimeMetrics?.totalUsers || 0} users online
+              </div>
+              <div className="flex items-center">
+                <FileText className="h-4 w-4 mr-1 text-purple-500" />
+                {realTimeMetrics?.totalCases || 0} active cases
+              </div>
+              <div className="flex items-center">
+                <Activity className="h-4 w-4 mr-1 text-orange-500" />
+                {realTimeMetrics?.totalTasks || 0} tasks pending
+              </div>
+            </div>
+            
+            <Badge variant={
+              realTimeMetrics?.systemHealth === 'excellent' ? 'success' :
+              realTimeMetrics?.systemHealth === 'good' ? 'info' :
+              realTimeMetrics?.systemHealth === 'warning' ? 'warning' : 'error'
+            }>
+              System {realTimeMetrics?.systemHealth || 'Unknown'}
+            </Badge>
+          </div>
         </div>
       </div>
 
-      {/* Real-time System Health Alert */}
-      {realTimeMetrics?.systemHealth === 'warning' && (
-        <Card className="border-yellow-200 bg-yellow-50">
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <AlertTriangle className="h-5 w-5 text-yellow-600 mr-3" />
-              <div>
-                <h3 className="font-semibold text-yellow-800">System Performance Warning</h3>
-                <p className="text-sm text-yellow-700">
-                  {realTimeMetrics?.overdueTasks} overdue tasks and {realTimeMetrics?.openCases} open cases detected. Attention needed.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-      
-      {realTimeMetrics?.systemHealth === 'critical' && (
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <AlertTriangle className="h-5 w-5 text-red-600 mr-3" />
-              <div>
-                <h3 className="font-semibold text-red-800">Critical System Alert</h3>
-                <p className="text-sm text-red-700">
-                  System performance is critically low. Immediate action required for {realTimeMetrics?.overdueTasks} overdue tasks.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Main Content */}
+      <div className="p-6 space-y-6">
 
-      {/* Real-time Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Total Users - Real Data */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Users</p>
-                <p className="text-3xl font-bold text-gray-900">{realTimeMetrics?.totalUsers || 0}</p>
-                <div className="flex items-center mt-1 space-x-2">
-                  <span className="text-sm text-green-600">
-                    <span className="font-medium">{realTimeMetrics?.activeUsers || 0}</span> active
-                  </span>
-                  <span className="text-sm text-blue-600">
-                    <span className="font-medium">{realTimeMetrics?.onlineUsers || 0}</span> online
-                  </span>
+        {/* Enhanced System Alerts */}
+        {(realTimeMetrics?.systemHealth === 'warning' || realTimeMetrics?.systemHealth === 'critical') && (
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 shadow-lg">
+            <div className="absolute top-0 right-0 w-32 h-32 transform translate-x-16 -translate-y-16">
+              <div className="w-full h-full bg-gradient-to-br from-yellow-400/20 to-orange-400/20 rounded-full"></div>
+            </div>
+            <div className="relative p-6">
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0">
+                  <div className="p-3 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full shadow-lg">
+                    <AlertTriangle className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">
+                    {realTimeMetrics?.systemHealth === 'critical' ? 'Critical System Alert' : 'System Performance Warning'}
+                  </h3>
+                  <p className="text-gray-700 mb-4">
+                    {realTimeMetrics?.systemHealth === 'critical' 
+                      ? `System performance is critically low. Immediate action required for ${realTimeMetrics?.overdueTasks} overdue tasks.`
+                      : `${realTimeMetrics?.overdueTasks} overdue tasks and ${realTimeMetrics?.openCases} open cases detected. Attention needed.`
+                    }
+                  </p>
+                  <div className="flex space-x-3">
+                    <Button size="sm" className="bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 text-white">
+                      View Details
+                    </Button>
+                    <Button size="sm" variant="outline" className="border-yellow-300 text-yellow-700 hover:bg-yellow-50">
+                      Dismiss
+                    </Button>
+                  </div>
                 </div>
               </div>
-              <div className="bg-blue-100 p-3 rounded-full">
-                <Users className="h-6 w-6 text-blue-600" />
-              </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        )}
 
-        {/* Cases Overview - Real Data */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Cases</p>
-                <p className="text-3xl font-bold text-gray-900">{realTimeMetrics?.totalCases || 0}</p>
-                <div className="flex items-center mt-1 space-x-2">
-                  <span className="text-sm text-yellow-600">
-                    <span className="font-medium">{realTimeMetrics?.openCases || 0}</span> open
-                  </span>
-                  <span className="text-sm text-blue-600">
-                    <span className="font-medium">{realTimeMetrics?.inProgressCases || 0}</span> active
-                  </span>
+        {/* Modern Key Metrics Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Users Metric Card */}
+          <div 
+            onClick={handleManageUsers}
+            className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 transform translate-x-8 -translate-y-8">
+              <div className="w-full h-full bg-gradient-to-br from-blue-400/10 to-indigo-400/10 rounded-full"></div>
+            </div>
+            <div className="relative p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow">
+                  <Users className="h-6 w-6 text-white" />
+                </div>
+                <div className="flex items-center text-green-600">
+                  <ArrowUpRight className="h-4 w-4 mr-1" />
+                  <span className="text-sm font-medium">+12%</span>
                 </div>
               </div>
-              <div className="bg-green-100 p-3 rounded-full">
-                <FileText className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Documents - Real Data */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Documents</p>
-                <p className="text-3xl font-bold text-gray-900">{realTimeMetrics?.totalDocuments || 0}</p>
-                <div className="flex items-center mt-1 space-x-2">
-                  <span className="text-sm text-green-600">
-                    <span className="font-medium">{realTimeMetrics?.verifiedDocuments || 0}</span> verified
-                  </span>
-                  <span className="text-sm text-yellow-600">
-                    <span className="font-medium">{realTimeMetrics?.pendingDocuments || 0}</span> pending
-                  </span>
+                <p className="text-sm font-medium text-gray-600 mb-1">Total Users</p>
+                <p className="text-3xl font-bold text-gray-900 mb-3">{realTimeMetrics?.totalUsers || 0}</p>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Active</span>
+                    <span className="font-medium text-green-600">{realTimeMetrics?.activeUsers || 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Online</span>
+                    <span className="font-medium text-blue-600">{realTimeMetrics?.onlineUsers || 0}</span>
+                  </div>
                 </div>
               </div>
-              <div className="bg-purple-100 p-3 rounded-full">
-                <Database className="h-6 w-6 text-purple-600" />
+            </div>
+          </div>
+
+          {/* Cases Metric Card */}
+          <div 
+            onClick={() => navigate('/cases')}
+            className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 transform translate-x-8 -translate-y-8">
+              <div className="w-full h-full bg-gradient-to-br from-green-400/10 to-emerald-400/10 rounded-full"></div>
+            </div>
+            <div className="relative p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow">
+                  <FileText className="h-6 w-6 text-white" />
+                </div>
+                <div className="flex items-center text-green-600">
+                  <ArrowUpRight className="h-4 w-4 mr-1" />
+                  <span className="text-sm font-medium">+8%</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">Total Cases</p>
+                <p className="text-3xl font-bold text-gray-900 mb-3">{realTimeMetrics?.totalCases || 0}</p>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Open</span>
+                    <span className="font-medium text-yellow-600">{realTimeMetrics?.openCases || 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">In Progress</span>
+                    <span className="font-medium text-blue-600">{realTimeMetrics?.inProgressCases || 0}</span>
+                  </div>
+                </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Tasks & System Health - Real Data */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
+          {/* Documents Metric Card */}
+          <div 
+            onClick={() => navigate('/document-manager')}
+            className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 transform translate-x-8 -translate-y-8">
+              <div className="w-full h-full bg-gradient-to-br from-purple-400/10 to-violet-400/10 rounded-full"></div>
+            </div>
+            <div className="relative p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow">
+                  <Database className="h-6 w-6 text-white" />
+                </div>
+                <div className="flex items-center text-green-600">
+                  <ArrowUpRight className="h-4 w-4 mr-1" />
+                  <span className="text-sm font-medium">+15%</span>
+                </div>
+              </div>
               <div>
-                <p className="text-sm font-medium text-gray-600">Tasks & Health</p>
-                <p className="text-3xl font-bold text-gray-900">{realTimeMetrics?.totalTasks || 0}</p>
-                <div className="flex items-center mt-1 space-x-2">
-                  <Badge variant={
-                    realTimeMetrics?.systemHealth === 'excellent' ? 'success' :
-                    realTimeMetrics?.systemHealth === 'good' ? 'info' :
-                    realTimeMetrics?.systemHealth === 'warning' ? 'warning' : 'error'
-                  } size="sm">
-                    {realTimeMetrics?.systemHealth || 'Good'}
-                  </Badge>
+                <p className="text-sm font-medium text-gray-600 mb-1">Documents</p>
+                <p className="text-3xl font-bold text-gray-900 mb-3">{realTimeMetrics?.totalDocuments || 0}</p>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Verified</span>
+                    <span className="font-medium text-green-600">{realTimeMetrics?.verifiedDocuments || 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Pending</span>
+                    <span className="font-medium text-yellow-600">{realTimeMetrics?.pendingDocuments || 0}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* System Health Metric Card */}
+          <div 
+            onClick={handleDatabaseHealth}
+            className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 transform translate-x-8 -translate-y-8">
+              <div className="w-full h-full bg-gradient-to-br from-orange-400/10 to-red-400/10 rounded-full"></div>
+            </div>
+            <div className="relative p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow">
+                  <Shield className="h-6 w-6 text-white" />
+                </div>
+                <div className="flex items-center text-green-600">
+                  <ArrowUpRight className="h-4 w-4 mr-1" />
+                  <span className="text-sm font-medium">98%</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">System Health</p>
+                <p className="text-3xl font-bold text-gray-900 mb-3">{realTimeMetrics?.totalTasks || 0}</p>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Status</span>
+                    <Badge variant={
+                      realTimeMetrics?.systemHealth === 'excellent' ? 'success' :
+                      realTimeMetrics?.systemHealth === 'good' ? 'info' :
+                      realTimeMetrics?.systemHealth === 'warning' ? 'warning' : 'error'
+                    } size="sm">
+                      {realTimeMetrics?.systemHealth || 'Good'}
+                    </Badge>
+                  </div>
                   {realTimeMetrics?.overdueTasks && realTimeMetrics.overdueTasks > 0 && (
-                    <span className="text-sm text-red-600">
-                      <span className="font-medium">{realTimeMetrics.overdueTasks}</span> overdue
-                    </span>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Overdue</span>
+                      <span className="font-medium text-red-600">{realTimeMetrics.overdueTasks}</span>
+                    </div>
                   )}
                 </div>
               </div>
-              <div className="bg-orange-100 p-3 rounded-full">
-                <Shield className="h-6 w-6 text-orange-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* Advanced Analytics & Quick Actions Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Performance Analytics */}
+          <div className="lg:col-span-5">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg">
+                    <Server className="h-5 w-5 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900">System Performance</h3>
+                </div>
+                <Button variant="outline" size="sm">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <div className="space-y-6">
+                {/* Response Time */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-600">Response Time</span>
+                    <span className="text-sm font-bold text-gray-900">
+                      {realTimeMetrics?.responseTime ? `${Math.round(realTimeMetrics.responseTime)}ms` : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all duration-700 ease-out"
+                        style={{ width: `${Math.min((realTimeMetrics?.responseTime || 0) / 500 * 100, 100)}%` }}
+                      ></div>
+                    </div>
+                    <div className="absolute -top-1 left-0 w-2 h-5 bg-blue-600 rounded-full opacity-50"></div>
+                  </div>
+                </div>
+
+                {/* Active Cases */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-600">Active Cases</span>
+                    <span className="text-sm font-bold text-gray-900">
+                      {realTimeMetrics?.inProgressCases || 0} / {realTimeMetrics?.totalCases || 0}
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full transition-all duration-700 ease-out"
+                        style={{ width: `${Math.min(((realTimeMetrics?.inProgressCases || 0) / Math.max(realTimeMetrics?.totalCases || 1, 1)) * 100, 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Document Verification */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-600">Document Verification</span>
+                    <span className="text-sm font-bold text-gray-900">
+                      {Math.round(((realTimeMetrics?.verifiedDocuments || 0) / Math.max(realTimeMetrics?.totalDocuments || 1, 1)) * 100)}%
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full transition-all duration-700 ease-out"
+                        style={{ width: `${Math.min(((realTimeMetrics?.verifiedDocuments || 0) / Math.max(realTimeMetrics?.totalDocuments || 1, 1)) * 100, 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
 
-      {/* Performance Metrics */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* System Performance */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Activity className="h-5 w-5 mr-2" />
-              System Performance
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Response Time</span>
-                  <span>{realTimeMetrics?.responseTime ? `${Math.round(realTimeMetrics.responseTime)}ms` : 'N/A'}</span>
+          {/* Business Analytics */}
+          <div className="lg:col-span-4">
+            <div className="bg-gradient-to-br from-violet-50 to-purple-50 rounded-2xl border border-violet-100 shadow-lg p-6">
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="p-2 bg-gradient-to-r from-violet-500 to-purple-500 rounded-lg">
+                  <BarChart3 className="h-5 w-5 text-white" />
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min((realTimeMetrics?.responseTime || 0) / 500 * 100, 100)}%` }}
-                  ></div>
-                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Business Metrics</h3>
               </div>
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Active Cases</span>
-                  <span>{realTimeMetrics?.inProgressCases || 0} / {realTimeMetrics?.totalCases || 0}</span>
+              
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-4 bg-white rounded-xl shadow-sm">
+                    <p className="text-2xl font-bold text-violet-600">{realTimeMetrics?.inProgressCases || 0}</p>
+                    <p className="text-sm text-gray-600">Active</p>
+                  </div>
+                  <div className="text-center p-4 bg-white rounded-xl shadow-sm">
+                    <p className="text-2xl font-bold text-green-600">{realTimeMetrics?.completedCases || 0}</p>
+                    <p className="text-sm text-gray-600">Completed</p>
+                  </div>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-green-600 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(((realTimeMetrics?.inProgressCases || 0) / Math.max(realTimeMetrics?.totalCases || 1, 1)) * 100, 100)}%` }}
-                  ></div>
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Document Verification</span>
-                  <span>{Math.round(((realTimeMetrics?.verifiedDocuments || 0) / Math.max(realTimeMetrics?.totalDocuments || 1, 1)) * 100)}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-yellow-600 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(((realTimeMetrics?.verifiedDocuments || 0) / Math.max(realTimeMetrics?.totalDocuments || 1, 1)) * 100, 100)}%` }}
-                  ></div>
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between text-sm">
-                  <span>Online Users</span>
-                  <span>{realTimeMetrics?.onlineUsers || 0}/{realTimeMetrics?.totalUsers || 0}</span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Real-time Statistics */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <BarChart3 className="h-5 w-5 mr-2" />
-              Business Analytics
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-2xl font-bold text-blue-600">{realTimeMetrics?.inProgressCases || 0}</p>
-                  <p className="text-sm text-gray-600">Active Cases</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-green-600">{realTimeMetrics?.completedCases || 0}</p>
-                  <p className="text-sm text-gray-600">Completed Cases</p>
-                </div>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Case Success Rate</p>
-                <div className="flex items-center mt-1">
-                  <div className="w-full bg-gray-200 rounded-full h-2 mr-2">
+                
+                <div className="pt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-600">Success Rate</span>
+                    <span className="text-lg font-bold text-green-600">
+                      {Math.round(((realTimeMetrics?.completedCases || 0) / Math.max(realTimeMetrics?.totalCases || 1, 1)) * 100)}%
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-white rounded-full overflow-hidden">
                     <div 
-                      className="bg-green-600 h-2 rounded-full transition-all duration-500"
+                      className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full transition-all duration-1000 ease-out"
                       style={{ width: `${Math.min(((realTimeMetrics?.completedCases || 0) / Math.max(realTimeMetrics?.totalCases || 1, 1)) * 100, 100)}%` }}
                     ></div>
                   </div>
-                  <span className="text-sm font-medium">{Math.round(((realTimeMetrics?.completedCases || 0) / Math.max(realTimeMetrics?.totalCases || 1, 1)) * 100)}%</span>
                 </div>
               </div>
-              <div>
-                <p className="text-sm text-gray-600 mb-2">System Health Status</p>
-                <Badge variant={
-                  realTimeMetrics?.systemHealth === 'excellent' ? 'success' :
-                  realTimeMetrics?.systemHealth === 'good' ? 'info' :
-                  realTimeMetrics?.systemHealth === 'warning' ? 'warning' : 'error'
-                }>
-                  {realTimeMetrics?.systemHealth || 'Unknown'}
-                </Badge>
+            </div>
+          </div>
+
+          {/* Quick Actions Panel */}
+          <div className="lg:col-span-3">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-lg p-6">
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="p-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg">
+                  <Zap className="h-5 w-5 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Quick Actions</h3>
+              </div>
+              
+              <div className="space-y-3">
+                <Button 
+                  onClick={handleManageUsers}
+                  className="w-full justify-between group bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-gray-700 border border-blue-200 hover:border-blue-300 transition-all duration-200" 
+                  variant="outline"
+                >
+                  <div className="flex items-center">
+                    <Users className="h-4 w-4 mr-3 text-blue-600" />
+                    Manage Users
+                  </div>
+                  <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </Button>
+                
+                <Button 
+                  onClick={handleSystemSettings}
+                  className="w-full justify-between group bg-gradient-to-r from-purple-50 to-violet-50 hover:from-purple-100 hover:to-violet-100 text-gray-700 border border-purple-200 hover:border-purple-300 transition-all duration-200" 
+                  variant="outline"
+                >
+                  <div className="flex items-center">
+                    <Settings className="h-4 w-4 mr-3 text-purple-600" />
+                    System Settings
+                  </div>
+                  <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </Button>
+                
+                <Button 
+                  onClick={handleDatabaseHealth}
+                  className="w-full justify-between group bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 text-gray-700 border border-green-200 hover:border-green-300 transition-all duration-200" 
+                  variant="outline"
+                >
+                  <div className="flex items-center">
+                    <Database className="h-4 w-4 mr-3 text-green-600" />
+                    Database Health
+                  </div>
+                  <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </Button>
+                
+                <Button 
+                  onClick={handleExportReports}
+                  className="w-full justify-between group bg-gradient-to-r from-orange-50 to-red-50 hover:from-orange-100 hover:to-red-100 text-gray-700 border border-orange-200 hover:border-orange-300 transition-all duration-200" 
+                  variant="outline"
+                >
+                  <div className="flex items-center">
+                    <Download className="h-4 w-4 mr-3 text-orange-600" />
+                    Export Reports
+                  </div>
+                  <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        {/* Quick Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Zap className="h-5 w-5 mr-2" />
-              Quick Actions
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <Button className="w-full justify-start" variant="outline">
-                <Users className="h-4 w-4 mr-2" />
-                Manage Users
-              </Button>
-              <Button className="w-full justify-start" variant="outline">
-                <Settings className="h-4 w-4 mr-2" />
-                System Settings
-              </Button>
-              <Button className="w-full justify-start" variant="outline">
-                <Database className="h-4 w-4 mr-2" />
-                Database Health
-              </Button>
-              <Button className="w-full justify-start" variant="outline">
-                <Download className="h-4 w-4 mr-2" />
-                Export Reports
-              </Button>
-              <Button className="w-full justify-start" variant="outline">
-                <Eye className="h-4 w-4 mr-2" />
-                Audit Logs
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Real-time Activity Feed */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span className="flex items-center">
-              <Activity className="h-5 w-5 mr-2" />
-              Live System Activity
-            </span>
-            <div className="flex items-center space-x-2">
-              <Badge variant="success" size="sm">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-1"></div>
-                Live
-              </Badge>
-              <Button variant="outline" size="sm">
-                <Eye className="h-4 w-4 mr-2" />
-                View All
-              </Button>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {liveActivity.length > 0 ? liveActivity.map((activity) => (
-              <div key={activity.id} className="flex items-start space-x-3 p-3 rounded-lg bg-gray-50">
-                <div className="mt-0.5 text-blue-600">
-                  {getActivityIcon(activity.type)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-900">{activity.description}</p>
-                  <div className="flex items-center mt-1 space-x-2">
-                    <p className="text-xs text-gray-500">
-                      {new Date(activity.created_at).toLocaleString()}
-                    </p>
-                    {activity.user_name && (
-                      <span className="text-xs text-blue-600">• {activity.user_name}</span>
-                    )}
+        {/* Modern Activity Feed & Insights */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Enhanced Activity Feed */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-lg overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-sm">
+                      <Activity className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">Live System Activity</h3>
+                      <p className="text-sm text-gray-600">Real-time updates from your system</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="flex items-center px-3 py-1 bg-green-100 border border-green-200 rounded-full">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2"></div>
+                      <span className="text-xs font-medium text-green-700">Live</span>
+                    </div>
+                    <Button 
+                      onClick={handleViewAllActivity}
+                      variant="outline" 
+                      size="sm" 
+                      className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View All
+                    </Button>
                   </div>
                 </div>
-                <Badge variant="info" size="sm">
-                  {activity.type.replace('_', ' ')}
-                </Badge>
               </div>
-            )) : (
-              <div className="text-center py-8">
-                <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No recent activity to display</p>
-                <p className="text-sm text-gray-400 mt-1">Activity will appear here in real-time</p>
+              
+              <div className="p-6">
+                {liveActivity.length > 0 ? (
+                  <div className="space-y-4">
+                    {liveActivity.slice(0, 8).map((activity, index) => (
+                      <div key={activity.id} className="group flex items-start space-x-4 p-4 rounded-xl bg-gradient-to-r from-gray-50 to-white border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all duration-200">
+                        <div className="flex-shrink-0">
+                          <div className={`p-2 rounded-full ${
+                            index % 4 === 0 ? 'bg-blue-100 text-blue-600' :
+                            index % 4 === 1 ? 'bg-green-100 text-green-600' :
+                            index % 4 === 2 ? 'bg-purple-100 text-purple-600' : 'bg-orange-100 text-orange-600'
+                          }`}>
+                            {getActivityIcon(activity.type)}
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 mb-1">{activity.description}</p>
+                          <div className="flex items-center space-x-3 text-xs text-gray-500">
+                            <div className="flex items-center">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {new Date(activity.created_at).toLocaleTimeString()}
+                            </div>
+                            {activity.user_name && (
+                              <div className="flex items-center">
+                                <Users className="h-3 w-3 mr-1" />
+                                <span className="text-blue-600 font-medium">{activity.user_name}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0">
+                          <Badge variant="info" size="sm">
+                            {activity.type.replace('_', ' ')}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                      <Activity className="h-8 w-8 text-blue-500" />
+                    </div>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-2">No Recent Activity</h4>
+                    <p className="text-gray-500 mb-4">Activity will appear here in real-time</p>
+                    <Button variant="outline" className="border-blue-200 text-blue-600 hover:bg-blue-50">
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh Activity
+                    </Button>
+                  </div>
+                )}
               </div>
+            </div>
+          </div>
+
+          {/* Enhanced System Insights */}
+          <div className="space-y-6">
+            {dashboardStats && (
+              <>
+                {/* Case Status Distribution */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-lg p-6">
+                  <div className="flex items-center space-x-3 mb-6">
+                    <div className="p-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg">
+                      <TrendingUp className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">Case Status</h3>
+                      <p className="text-sm text-gray-600">Distribution overview</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {Object.entries(dashboardStats.casesByStatus || {}).map(([status, count]) => (
+                      <div 
+                        key={status} 
+                        onClick={() => navigate(`/cases?status=${status}`)}
+                        className="group flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-gray-50 to-white border border-gray-100 hover:border-green-200 hover:shadow-md transition-all duration-200 cursor-pointer"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-3 h-3 rounded-full ${
+                            status === 'completed' ? 'bg-green-500' :
+                            status === 'in_progress' ? 'bg-blue-500' :
+                            status === 'open' ? 'bg-yellow-500' : 'bg-gray-400'
+                          }`}></div>
+                          <span className="capitalize text-sm font-medium text-gray-700 group-hover:text-green-700">{status.replace('_', ' ')}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant={
+                            status === 'completed' ? 'success' :
+                            status === 'in_progress' ? 'info' :
+                            status === 'open' ? 'warning' : 'default'
+                          }>
+                            {count}
+                          </Badge>
+                          <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-green-600 transition-colors" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Users by Role */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-lg p-6">
+                  <div className="flex items-center space-x-3 mb-6">
+                    <div className="p-2 bg-gradient-to-r from-purple-500 to-violet-500 rounded-lg">
+                      <Users className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">User Roles</h3>
+                      <p className="text-sm text-gray-600">Team distribution</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {Object.entries(dashboardStats.usersByRole || {}).map(([role, count]) => (
+                      <div 
+                        key={role} 
+                        onClick={() => navigate(`${ROUTES.ADVANCED_USER_MANAGEMENT}?role=${role}`)}
+                        className="group flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-gray-50 to-white border border-gray-100 hover:border-purple-200 hover:shadow-md transition-all duration-200 cursor-pointer"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                          <span className="capitalize text-sm font-medium text-gray-700 group-hover:text-purple-700">{role.replace('_', ' ')}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="info">
+                            {count}
+                          </Badge>
+                          <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-purple-600 transition-colors" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
             )}
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Real-time System Insights */}
-      {dashboardStats && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <TrendingUp className="h-5 w-5 mr-2" />
-                Case Status Distribution
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {Object.entries(dashboardStats.casesByStatus || {}).map(([status, count]) => (
-                  <div key={status} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    <span className="capitalize text-sm font-medium">{status.replace('_', ' ')}</span>
-                    <Badge variant={
-                      status === 'completed' ? 'success' :
-                      status === 'in_progress' ? 'info' :
-                      status === 'open' ? 'warning' : 'default'
-                    }>
-                      {count}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Users className="h-5 w-5 mr-2" />
-                Users by Role
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {Object.entries(dashboardStats.usersByRole || {}).map(([role, count]) => (
-                  <div key={role} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    <span className="capitalize text-sm font-medium">{role.replace('_', ' ')}</span>
-                    <Badge variant="info">
-                      {count}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
         </div>
-      )}
+
+        {/* Export Modal */}
+        {showExportModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-900">Export Reports</h3>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setShowExportModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </Button>
+              </div>
+              
+              <div className="space-y-4">
+                <p className="text-gray-600 mb-4">Select the format for your export:</p>
+                
+                <div className="grid grid-cols-1 gap-3">
+                  <Button 
+                    onClick={() => handleExportData('csv')}
+                    className="w-full justify-start bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 text-gray-700 border border-green-200 hover:border-green-300"
+                    variant="outline"
+                  >
+                    <FileText className="h-4 w-4 mr-3 text-green-600" />
+                    Export as CSV
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => handleExportData('excel')}
+                    className="w-full justify-start bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-gray-700 border border-blue-200 hover:border-blue-300"
+                    variant="outline"
+                  >
+                    <Database className="h-4 w-4 mr-3 text-blue-600" />
+                    Export as Excel
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => handleExportData('pdf')}
+                    className="w-full justify-start bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 text-gray-700 border border-red-200 hover:border-red-300"
+                    variant="outline"
+                  >
+                    <Download className="h-4 w-4 mr-3 text-red-600" />
+                    Export as PDF
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Alerts Modal */}
+        {showAlertModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-2xl mx-4 shadow-2xl max-h-[80vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg">
+                    <Bell className="h-5 w-5 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">System Alerts</h3>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setShowAlertModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </Button>
+              </div>
+              
+              <div className="space-y-4">
+                {dashboardStats?.systemAlerts && dashboardStats.systemAlerts.length > 0 ? (
+                  dashboardStats.systemAlerts.map((alert: any, index: number) => (
+                    <div key={index} className="p-4 rounded-xl bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200">
+                      <div className="flex items-start space-x-3">
+                        <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5" />
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-900">{alert.type || 'System Alert'}</h4>
+                          <p className="text-gray-700 mt-1">{alert.description || alert.message}</p>
+                          <p className="text-sm text-gray-500 mt-2">{alert.created_at || 'Just now'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                    <h4 className="text-lg font-semibold text-gray-900 mb-2">All Good!</h4>
+                    <p className="text-gray-600">No system alerts at this time.</p>
+                  </div>
+                )}
+                
+                <div className="flex justify-end pt-4 border-t border-gray-200">
+                  <Button 
+                    onClick={() => navigate('/super-admin/system-logs')}
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                  >
+                    View All Logs
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

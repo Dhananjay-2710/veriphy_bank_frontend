@@ -62,7 +62,7 @@ INSERT INTO system_settings (key, value, description, category) VALUES
 ('two_factor_auth_enabled', 'true', 'Two-factor authentication enabled', 'security'),
 ('maintenance_mode', 'false', 'System maintenance mode', 'system'),
 ('email_notifications_enabled', 'true', 'Email notifications enabled', 'notification'),
-('sms_notifications_enabled', 'true', 'SMS notifications enabled', 'notification'),
+('sms_notifications_enabled', 'true', 'SMS notifications_enabled', 'notification'),
 ('push_notifications_enabled', 'true', 'Push notifications enabled', 'notification'),
 ('auto_logout_minutes', '60', 'Auto logout timeout in minutes', 'security'),
 ('password_reset_expiry_hours', '24', 'Password reset link expiry in hours', 'security'),
@@ -111,6 +111,15 @@ When inserting into the `notifications` table, be aware of the following:
 - The schema uses a `data` (JSONB) column instead of `title` and `message`.
 - `organization_id` is optional but recommended.
 - The schema has `read_at` instead of `is_read` and `created_at`.
+
+When writing Supabase queries involving the `documents` table, ensure that you use `customer_id` rather than `loan_application_id` to filter documents.
+
+When encountering HTTP 400 or 406 errors when querying users by `auth_id` or direct `id`, especially for the super admin user, it indicates that the queries are not correctly handling database-only users. The following rules apply:
+
+- **Dual Authentication Handling:** Methods must handle both Supabase Auth users (identified by `auth_id`) and database-only users (identified by direct `id`).
+- **getUserById Method:** Fix `getUserById` and related methods to properly handle database-only users. Attempt to find the user by `auth_id` first, and if not found, then attempt to find the user by their direct `id`.
+- **Team Member Fetching:** Ensure team member fetching handles a mix of Supabase Auth and database-only users.
+- **ID Format Detection:** Use regex `/^\d+$/` to detect numeric IDs vs UUIDs when querying users. Use numeric IDs directly when detected and only attempt `auth_id` lookup for UUIDs.
 
 ## WORKFLOW & RELEASE RULES
 
@@ -405,6 +414,19 @@ Run these verification queries and let me know what results you get! 🚀
 
 ## SUPER ADMIN UI FUNCTIONAL FLOW ENHANCEMENT
 
+### Version Updates
+
+The SuperAdminDashboard component now uses `useDashboardStats` and not `useDashboardData` from `src/hooks/useDashboardData.ts`. Use the hook as follows:
+```typescript
+import { useDashboardStats } from '../../hooks/useDashboardData';
+
+// Get real data from hooks
+const { 
+ stats: dashboardStats, 
+ loading: casesLoading 
+} = useDashboardStats(user?.id || '', user?.role || 'super_admin');
+```
+
 The following components have been enhanced to improve the super admin functional flow:
 
 ### 1. Enhanced Super Admin Dashboard
@@ -460,15 +482,85 @@ To test the System Monitoring Dashboard:
 3. Navigate to `/super-admin/monitoring`
 4. Observe the real-time performance metrics.
 
-When using the SuperAdminDashboard component, import `useDashboardStats` and not `useDashboardData` from `src/hooks/useDashboardData.ts`. Use the hook as follows:
-```typescript
-import { useDashboardStats } from '../../hooks/useDashboardData';
+The Super Admin Dashboard must be completely dynamic and connected to real Supabase data. The Super Admin Dashboard should not have anything useless or static. It must be easy to navigate and understand.
 
-// Get real data from hooks
-const { 
- stats: dashboardStats, 
- loading: casesLoading 
-} = useDashboardStats(user?.id || '', user?.role || 'super_admin');
+When encountering errors such as "column documents.file_name does not exist", ensure that the database queries align with the actual schema. Review the relevant code and database structure to identify and correct any discrepancies in column names.
+
+When writing Supabase queries involving the `documents` table, ensure that you use `customer_id` rather than `loan_application_id` to filter documents.
+
+To prevent infinite loops in hooks, use `useMemo` to create stable filter objects and ensure that real-time subscriptions do not depend on the `fetchData` function. Add timeouts to prevent rapid successive calls to `fetchData`.
+
+When fetching data for a user, handle both cases where the `userId` might be the user's `auth_id` (UUID from Supabase Auth) or the user's direct database ID (for database-only users like the super admin). Update methods to handle both scenarios by first attempting to find the user by `auth_id`, and if not found, then attempt to find the user by their direct `id`.
+
+To resolve infinite loops caused by unstable filter objects, ensure to use `useMemo` to create stable filter references in both the hook and the component.
+
+Ensure that real-time subscriptions do not depend on the `fetchData` function to prevent infinite re-renders, and add timeouts to prevent rapid successive calls.
+
+When the super admin user is created directly in the database without a corresponding Supabase Auth user, the methods that use `auth_id` are expecting a UUID from Supabase Auth, but the super admin has a numeric ID. Update methods to handle both cases - when we have an `auth_id` and when we have a direct database user ID.
+
+If the `audit_log` table does not exist, it must be created. The table may be missing because the partitioning optimization script was run, which dropped the original table, but the partitions might not have been created properly. Create the `audit_log` table based on the original schema.
+
+If the partitioning optimization was never run, then `compliance_logs` should be used instead.
+
+Ensure the queries used to fetch the audit logs match the actual database schema.
+
+When creating the `audit_log` table, use this SQL script:
+
+```sql
+-- Create audit_log table if it doesn't exist
+-- This matches the schema from 001_create_initial_schema.sql
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT REFERENCES users(id),
+    action VARCHAR(100) NOT NULL,
+    resource_type VARCHAR(50) NOT NULL,
+    resource_id BIGINT,
+    old_values JSONB,
+    new_values JSONB,
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_audit_log_user_id ON audit_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_resource ON audit_log(resource_type, resource_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
+
+-- Insert sample audit logs for testing
+INSERT INTO audit_log (user_id, action, resource_type, resource_id, old_values, new_values, created_at) VALUES 
+(39, 'LOGIN', 'user', 39, NULL, '{"login_time": "2025-09-22T10:30:00.000Z"}', NOW()),
+(1, 'CREATE', 'case', 1, NULL, '{"status": "open", "loan_amount": 500000}', NOW() - INTERVAL '1 hour'),
+(2, 'UPDATE', 'case', 1, '{"status": "open"}', '{"status": "in_progress"}', NOW() - INTERVAL '30 minutes'),
+(39, 'DELETE', 'document', 5, '{"status": "pending"}', NULL, NOW() - INTERVAL '15 minutes'),
+(3, 'APPROVE', 'case', 2, '{"status": "pending"}', '{"status": "approved"}', NOW() - INTERVAL '5 minutes'),
+(39, 'VIEW', 'dashboard', NULL, NULL, '{"page": "super_admin_dashboard"}', NOW() - INTERVAL '2 minutes'),
+(1, 'EXPORT', 'report', NULL, NULL, '{"format": "pdf", "type": "monthly_report"}', NOW() - INTERVAL '10 minutes')
+ON CONFLICT DO NOTHING;
 ```
 
-The Super Admin Dashboard must be completely dynamic and connected to real Supabase data. The Super Admin Dashboard should not have anything useless or static.
+In `src/services/supabase-schema-mapping.ts`, the following mappings must be used:
+```typescript
+   AUDIT_LOG: 'audit_log',
+   LOGS: 'audit_log',
+```
+
+When encountering HTTP 400 or 406 errors when querying users by `auth_id` or direct `id`, especially for the super admin user (ID 39), it indicates that the queries are not correctly handling database-only users. The following rules apply:
+
+- **Dual Authentication Handling:** Methods must handle both Supabase Auth users (identified by `auth_id`) and database-only users (identified by direct `id`).
+- **getUserById Method:** Fix `getUserById` and related methods to properly handle database-only users. Attempt to find the user by `auth_id` first, and if not found, then attempt to find the user by their direct `id`.
+- **Team Member Fetching:** Ensure team member fetching handles a mix of Supabase Auth and database-only users.
+- **ID Format Detection**: Use regex `/^\d+$/` to detect numeric IDs vs UUIDs.
+- **Direct Database ID Usage**: When a numeric ID is detected, use it directly without attempting `auth_id` lookup.
+
+## SUPER ADMIN UI/UX RULES
+
+The super admin left side navbar is useless and must be removed. A full-width layout component for super admin must be created without a sidebar. `App.tsx` must be updated to use the new layout for super admin. The Super Admin Dashboard should now have a **professional, full-width interface** that maximizes screen real estate and provides quick access to all essential admin functions. A horizontal quick actions bar must be provided in the `FullWidthLayout` with:
+- 👥 **User Management** - Manage users across all organizations
+- 🖥️ **System Health** - Monitor system performance
+- 🔄 **Workflow Designer** - Design business workflows
+- 📊 **Analytics** - System analytics and reports
+- 📋 **Audit Logs** - System audit trails
+- 🗄️ **Database** - Database management tools

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { SupabaseDatabaseService } from '../services/supabase-database';
 import { 
   Case, 
@@ -322,18 +322,26 @@ export function useAuditLogs(filters?: { searchTerm?: string; type?: string; sev
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Stable filters reference using useMemo to prevent infinite loops
+  const stableFilters = useMemo(() => filters, [
+    filters?.searchTerm,
+    filters?.type, 
+    filters?.severity,
+    filters?.limit
+  ]);
+
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const result = await SupabaseDatabaseService.getAuditLogs(filters);
+      const result = await SupabaseDatabaseService.getAuditLogs(stableFilters);
       setAuditLogs(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch audit logs');
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [stableFilters]);
 
   const refetch = useCallback(() => {
     fetchData();
@@ -343,17 +351,20 @@ export function useAuditLogs(filters?: { searchTerm?: string; type?: string; sev
     fetchData();
   }, [fetchData]);
 
-  // Set up real-time subscription
+  // Set up real-time subscription (only once, not dependent on fetchData)
   useEffect(() => {
     const subscription = SupabaseDatabaseService.subscribeToAuditLogs((payload) => {
       console.log('Audit log real-time update:', payload);
-      fetchData(); // Refetch on any change
+      // Use a timeout to prevent rapid successive calls
+      setTimeout(() => {
+        fetchData();
+      }, 100);
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [fetchData]);
+  }, []); // Empty dependency array to prevent recreation
 
   return { auditLogs, loading, error, refetch };
 }

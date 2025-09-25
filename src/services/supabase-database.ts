@@ -315,14 +315,14 @@ export class SupabaseDatabaseService {
       updatedAt: dept.updated_at,
       organizationId: dept.organization_id?.toString(),
       parentDepartment: dept.parent_department ? {
-        id: dept.parent_department.id.toString(),
-        name: dept.parent_department.name,
-        code: dept.parent_department.code
+        id: ((dept.parent_department as any)?.id || (dept.parent_department as any)[0]?.id)?.toString(),
+        name: (dept.parent_department as any)?.name || (dept.parent_department as any)[0]?.name,
+        code: (dept.parent_department as any)?.code || (dept.parent_department as any)[0]?.code
       } : undefined,
       manager: dept.manager ? {
-        id: dept.manager.id.toString(),
-        full_name: dept.manager.full_name,
-        email: dept.manager.email
+        id: ((dept.manager as any)?.id || (dept.manager as any)[0]?.id)?.toString(),
+        full_name: (dept.manager as any)?.full_name || (dept.manager as any)[0]?.full_name,
+        email: (dept.manager as any)?.email || (dept.manager as any)[0]?.email
       } : undefined
     })) || [];
   }
@@ -651,19 +651,33 @@ export class SupabaseDatabaseService {
       query = query.eq('status', statusMap[filters.status] || filters.status);
     }
     if (filters?.assignedTo) {
-      // First get the user's internal ID from their auth_id
-      const { data: userData } = await supabase
-        .from('users')
-        .select('id')
-        .eq('auth_id', filters.assignedTo)
-        .single();
+      // Handle both auth_id (UUID) and direct user ID cases
+      const isNumericId = /^\d+$/.test(filters.assignedTo);
       
-      if (userData?.id) {
-        query = query.eq('assigned_to', userData.id);
+      if (isNumericId) {
+        // Direct database ID
+        console.log('Using direct database ID for assignedTo filter:', filters.assignedTo);
+        query = query.eq('assigned_to', parseInt(filters.assignedTo));
       } else {
-        // If no user found, return empty array
-        console.log('No user found for assignedTo filter');
-        return [];
+        // Try to find by auth_id (for Supabase Auth users)
+        console.log('Looking up user by auth_id for assignedTo filter:', filters.assignedTo);
+        const { data: userData, error: authError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('auth_id', filters.assignedTo)
+          .single();
+        
+        if (authError) {
+          console.log('Error finding user by auth_id for assignedTo:', authError.message);
+        }
+        
+        if (userData?.id) {
+          query = query.eq('assigned_to', userData.id);
+        } else {
+          // If no user found, return empty array
+          console.log('No user found for assignedTo filter');
+          return [];
+        }
       }
     }
     if (filters?.priority) {
@@ -816,25 +830,19 @@ export class SupabaseDatabaseService {
   // DOCUMENT MANAGEMENT
   // =============================================================================
 
-  static async getDocuments(caseId: string) {
-    const { data, error } = await supabase
+  static async getDocuments(caseId?: string) {
+    let query = supabase
       .from(SUPABASE_TABLES.DOCUMENTS)
       .select(`
         id,
+        customer_id,
         document_type_id,
-        file_name,
-        file_path,
-        file_size,
-        file_type,
-        mime_type,
+        file_id,
         status,
-        uploaded_at,
-        verified_at,
-        reviewed_at,
-        reviewed_by,
-        rejection_reason,
-        notes,
-        metadata,
+        uploaded_by,
+        submitted_at,
+        verified_by,
+        verified_on,
         created_at,
         updated_at,
         document_types!inner(
@@ -846,8 +854,14 @@ export class SupabaseDatabaseService {
           priority
         )
       `)
-      .eq('loan_application_id', caseId)
       .order('created_at', { ascending: false });
+
+    // Only filter by customer_id if provided and not empty
+    if (caseId && caseId.trim() !== '') {
+      query = query.eq('customer_id', caseId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching documents:', error);
@@ -859,21 +873,22 @@ export class SupabaseDatabaseService {
       
       return {
         id: doc.id.toString(),
-        name: docType?.name || doc.file_name || '',
+        name: docType?.name || `Document ${doc.id}`,
         type: docType?.category || 'other',
         status: mapDocumentStatus(doc.status) as "rejected" | "verified" | "pending" | "received",
         required: docType?.is_required || false,
-        uploadedAt: doc.uploaded_at,
-        verifiedAt: doc.verified_at,
-        reviewedAt: doc.reviewed_at,
-        reviewedBy: doc.reviewed_by ? doc.reviewed_by.toString() : undefined,
-        rejectionReason: doc.rejection_reason,
-        fileUrl: doc.file_path,
-        notes: doc.notes,
+        uploadedAt: doc.submitted_at || doc.created_at,
+        verifiedAt: doc.verified_on,
+        reviewedAt: doc.verified_on,
+        reviewedBy: doc.verified_by ? doc.verified_by.toString() : undefined,
+        rejectionReason: undefined, // rejection_reason doesn't exist in our schema
+        fileUrl: undefined, // file_path doesn't exist in our schema
+        notes: undefined, // notes doesn't exist in our schema
         category: (docType?.category as 'identity' | 'financial' | 'business' | 'property' | 'employment' | 'other') || 'other',
         priority: (docType?.priority as 'high' | 'medium' | 'low') || 'medium',
-        fileSize: doc.file_size ? Math.round(doc.file_size / 1024 / 1024 * 100) / 100 : undefined, // Convert bytes to MB
-        fileType: doc.file_type,
+        fileSize: undefined, // file_size doesn't exist in our schema
+        fileType: undefined, // file_type doesn't exist in our schema
+        file_id: doc.file_id
       };
     }) || [];
   }
@@ -883,8 +898,8 @@ export class SupabaseDatabaseService {
       .from(SUPABASE_TABLES.DOCUMENTS)
       .update({
         status: 'verified',
-        reviewed_at: new Date().toISOString(),
-        reviewed_by: parseInt(reviewedBy),
+        verified_on: new Date().toISOString(),
+        verified_by: parseInt(reviewedBy),
         updated_at: new Date().toISOString()
       })
       .eq('id', documentId)
@@ -904,8 +919,8 @@ export class SupabaseDatabaseService {
       .update({
         status: 'rejected',
         rejection_reason: reason,
-        reviewed_at: new Date().toISOString(),
-        reviewed_by: parseInt(reviewedBy),
+        verified_on: new Date().toISOString(),
+        verified_by: parseInt(reviewedBy),
         updated_at: new Date().toISOString()
       })
       .eq('id', documentId)
@@ -922,22 +937,18 @@ export class SupabaseDatabaseService {
   static async uploadDocument(
     caseId: string,
     documentTypeId: string,
-    fileName: string,
-    filePath: string,
-    fileSize: number,
-    fileType: string
+    _fileName: string,
+    _filePath: string,
+    _fileSize: number,
+    _fileType: string
   ) {
     const { data, error } = await supabase
       .from(SUPABASE_TABLES.DOCUMENTS)
       .insert({
-        loan_application_id: parseInt(caseId),
+        customer_id: parseInt(caseId),
         document_type_id: parseInt(documentTypeId),
-        file_name: fileName,
-        file_path: filePath,
-        file_size: fileSize,
-        file_type: fileType,
-        status: 'received',
-        uploaded_at: new Date().toISOString(),
+        status: 'pending',
+        submitted_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -1670,15 +1681,36 @@ export class SupabaseDatabaseService {
   // =============================================================================
 
   static async getWorkloadTasks(userId: string) {
-    // First get the user's internal ID from their auth_id
-    const { data: userData } = await supabase
-      .from('users')
-      .select('id')
-      .eq('auth_id', userId)
-      .single();
+    // Handle both auth_id (UUID) and direct user ID cases
+    let internalUserId: string | null = null;
+    
+    // Check if userId is a number (database ID) or UUID (auth_id)
+    const isNumericId = /^\d+$/.test(userId);
+    
+    if (isNumericId) {
+      // Direct database ID (like super admin)
+      console.log('Using direct database ID for workload tasks:', userId);
+      internalUserId = userId;
+    } else {
+      // Try to find by auth_id (for Supabase Auth users)
+      console.log('Looking up user by auth_id for workload tasks:', userId);
+      const { data: userByAuthId, error: authError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_id', userId)
+        .single();
 
-    if (!userData?.id) {
-      console.log('User not found for auth_id:', userId);
+      if (authError) {
+        console.log('Error finding user by auth_id:', authError.message);
+      }
+
+      if (userByAuthId?.id) {
+        internalUserId = userByAuthId.id.toString();
+      }
+    }
+
+    if (!internalUserId) {
+      console.log('User not found for userId:', userId);
       return [];
     }
 
@@ -1695,7 +1727,7 @@ export class SupabaseDatabaseService {
         created_at,
         metadata
       `)
-      .eq('assigned_to', userData.id)
+      .eq('assigned_to', internalUserId)
       .eq('status', 'open')
       .order('due_date', { ascending: true });
 
@@ -1872,8 +1904,11 @@ export class SupabaseDatabaseService {
         action,
         entity_type,
         entity_id,
-        description,
-        metadata,
+        before_state,
+        after_state,
+        ip_address,
+        session_id,
+        duration,
         created_at,
         users!inner(
           id,
@@ -1940,15 +1975,17 @@ export class SupabaseDatabaseService {
         timestamp: log.created_at,
         user: user?.full_name || 'System',
         action: this.mapAuditAction(log.action),
-        details: log.description || this.mapAuditDetails(log.action, log.entity_type, log.entity_id),
+        details: this.mapAuditDetails(log.action, log.entity_type, log.entity_id),
         type: typeMap[log.entity_type] || 'system',
         severity: getSeverity(log.action),
-        ipAddress: log.metadata?.ip_address || 'Unknown',
-        userAgent: log.metadata?.user_agent || 'Unknown',
-        oldValues: null,
-        newValues: null,
+        ipAddress: log.ip_address || 'Unknown',
+        userAgent: 'Unknown', // User agent not in schema
+        oldValues: log.before_state,
+        newValues: log.after_state,
         resourceType: log.entity_type,
-        resourceId: log.entity_id
+        resourceId: log.entity_id,
+        sessionId: log.session_id,
+        duration: log.duration
       };
     }) || [];
 

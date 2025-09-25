@@ -28,7 +28,8 @@ import { OrganizationSettingsPage } from './components/Admin/OrganizationSetting
 import { ManagerDashboard } from './components/Dashboard/ManagerDashboard';
 import { ComplianceReports } from './components/Compliance/ComplianceReports';
 import { DashboardLayout } from './components/Layout/DashboardLayout';
-import { SuperAdminDashboardFixed } from './components/Dashboard/SuperAdminDashboardFixed';
+import { FullWidthLayout } from './components/Layout/FullWidthLayout';
+// import { SuperAdminDashboardFixed } from './components/Dashboard/SuperAdminDashboardFixed';
 import { SuperAdminSetup } from './components/Admin/SuperAdminSetup';
 
 // New Admin Components
@@ -83,19 +84,9 @@ function AppContent() {
   switch (user?.role) {
     case 'super_admin':
       return (
-        <DashboardLayout>
-          <SuperAdminDashboardFixed 
-            onNavigateToUserManagement={() => window.location.href = ROUTES.USER_MANAGEMENT}
-            onNavigateToSystemSettings={() => window.location.href = ROUTES.SYSTEM_SETTINGS}
-            onNavigateToAuditLogs={() => window.location.href = ROUTES.AUDIT_LOGS}
-            onNavigateToAnalytics={() => window.location.href = ROUTES.ANALYTICS}
-            onNavigateToCase={() => {}}
-            onNavigateToFeatureFlags={() => window.location.href = ROUTES.FEATURE_FLAGS}
-            onNavigateToSystemIntegrations={() => window.location.href = ROUTES.SYSTEM_INTEGRATIONS}
-            onNavigateToSystemSettingsNew={() => window.location.href = ROUTES.SYSTEM_SETTINGS_NEW}
-            onNavigateToOrganizationSettings={() => window.location.href = ROUTES.ORGANIZATION_SETTINGS}
-          />
-        </DashboardLayout>
+        <FullWidthLayout>
+          <SuperAdminDashboard />
+        </FullWidthLayout>
       );
     case 'salesperson':
       return (
@@ -558,6 +549,25 @@ function App() {
         
         <Route
           path={ROUTES.SYSTEM_MONITORING}
+          element={
+            <DashboardLayout>
+              <SystemMonitoringDashboard />
+            </DashboardLayout>
+          }
+        />
+        
+        {/* Additional Super Admin Routes */}
+        <Route
+          path="/super-admin/activity-logs"
+          element={
+            <DashboardLayout>
+              <SystemMonitoringDashboard />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path="/super-admin/system-logs"
           element={
             <DashboardLayout>
               <SystemMonitoringDashboard />
