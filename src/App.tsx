@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, useParams } from "react-router-dom";
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useAuth } from './contexts/AuthContextFixed';
+import { WhatsAppIntegrationService } from './services/whatsapp-integration-service';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 import { LoginPage } from './components/Auth/LoginPage';
 import { DashboardLayout } from './components/Layout/DashboardLayout';
@@ -306,6 +307,27 @@ function AnalyticsWrapper() {
 function AppContent() {
   const { user, loading } = useAuth();
   const { navigateDirect } = useNavigation();
+
+  // Initialize WhatsApp integration when user is authenticated
+  useEffect(() => {
+    if (user && !loading) {
+      WhatsAppIntegrationService.initializeIntegration().then((result) => {
+        console.log('📱 WhatsApp Integration Status:', result);
+        
+        // Optionally show notification to user if there are issues
+        if (!result.success) {
+          console.warn('⚠️ WhatsApp integration has issues:', result.message);
+        }
+      }).catch((error) => {
+        console.error('❌ Failed to initialize WhatsApp integration:', error);
+      });
+    }
+
+    // Cleanup on unmount
+    return () => {
+      WhatsAppIntegrationService.disconnect();
+    };
+  }, [user, loading]);
 
   if (loading) {
     return (

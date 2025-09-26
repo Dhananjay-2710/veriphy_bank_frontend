@@ -308,11 +308,13 @@ export function CasePage({ caseId, onBack }: CasePageProps) {
         {activeTab === 'communicator' && (
           <div className="max-w-4xl mx-auto">
             <WhatsAppCommunicator 
+              caseId={caseId}
               messages={chatMessages}
               customerName={case_.customer.name}
               customerPhone={case_.customer.phone}
               onSendMessage={handleSendMessage}
               onSendDocument={handleSendDocument}
+              enableLiveMode={true}
             />
           </div>
         )}

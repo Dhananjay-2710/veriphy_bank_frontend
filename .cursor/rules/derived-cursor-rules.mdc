@@ -201,6 +201,7 @@ The following rules apply to the Database Management System in the super admin d
 -   The system must have real-time auto-refresh functionality.
 -   The system must have unique keys for table rows, column headers, and table cells.
 -   The system must handle null or undefined data gracefully.
+-   CRUD operations wherever needed should be implemented using modals. Ensure these modals add, edit, and delete rows from Supabase.
 
 The DatabaseManagement component now uses `row.id || index` for table rows, but if some rows don't have an `id` field or have duplicate IDs, this could cause React key warnings. Ensure unique keys for table rows by using `${selectedTable}-row-${row.id || index}`.
 
@@ -283,6 +284,93 @@ To support dynamic table management with CRUD operations, the following priority
 3.  **compliance_issues** - ✅ Full CRUD
 4.  **approval_queues** - ✅ Full CRUD
 5.  **feature_flags** - ✅ Full CRUD
+
+### Supabase Subscriptions
+
+Supabase subscriptions are real-time connections that automatically push database changes to the frontend application the moment they happen. They provide "live updates" for database records.
+
+The application uses fully functional subscriptions. The following tables have real-time updates:
+- `cases` table: Case status changes, new cases, updates
+- `documents` table: New documents, file changes, status updates
+- `whatsapp_messages` table: New messages, delivery status
+- `tasks` table: New tasks, status changes, assignments
+- Multiple tables: Live statistics for dashboard stats
+- `users` table: User additions, status changes for User Management
+- `organizations` table: Org updates, user assignments for Organization Management
+- `files` table: Uploads, downloads, changes for File Management
+- `permissions/roles` tables: Access control changes for Permissions/Roles
+- `loan_applications` table: Status changes, new submissions for Loan Applications
+
+Subscription setup occurs in the database service. For example:
+```typescript
+// FROM: src/services/supabase-database.ts
+static subscribeToCases(callback: (payload: any) => void) {
+  return supabase
+    .channel('cases')                    // Creates a subscription channel
+    .on('postgres_changes',             // Listens for database changes
+      { 
+        event: '*',                     // All database events (INSERT, UPDATE, DELETE)
+        schema: 'public', 
+        table: SUPABASE_TABLES.CASES   // Which table to watch
+      },
+      callback                          // What function to call when change detected
+    )
+    .subscribe();                       // Activate the subscription
+}
+```
+
+React hook integration occurs as follows:
+```typescript
+// FROM: src/hooks/useDashboardData.ts (Lines 215-224)
+export function useCases(filters) {
+  // ... existing state and fetchData ...
+
+  // Set up real-time subscription
+  useEffect(() => {
+    const subscription = SupabaseDatabaseService.subscribeToCases((payload) => {
+      console.log('Case real-time update:', payload);
+      fetchData(); // Refetch on any change
+    });
+
+    return () => {
+      subscription.unsubscribe(); // Clean up subscription
+    };
+  }, [fetchData]);
+}
+```
+
+The complete flow in action is:
+USER ACTION → DATABASE UPDATE → SUBSCRIPTION TRIGGER → UI AUTO-UPDATE
+
+#### CRUD Modals
+
+The application uses reusable modal components for CRUD operations, integrated with Supabase for real-time data persistence.
+
+-   **Core Modal Components:**
+    -   `src/components/ui/Modal.tsx` - Base modal framework
+    -   `src/components/ui/FormModal.tsx` - Form handling and CRUD operations wrapper. This component supports loading states, validation, and real-time interaction. It utilizes `ValidatedInput`, `ValidatedSelect`, and `ValidatedTextarea` from `src/components/ui/FormField.tsx`.
+-   **Entity-Specific CRUD Modals:**
+    -   `src/components/modals/UserManagementModal.tsx` - User CRUD with role/org/department management
+    -   `src/components/modals/CaseManagementModal.tsx` - Loan case creation and management
+    -   `src/components/modals/DocumentManagementModal.tsx` - Document upload and file handling
+    -   `src/components/modals/OrganizationManagementModal.tsx` - Organization setup and configuration
+
+All components ensure that every **Save**, **Update**, or **Delete** operation goes directly to the Supabase database and retains the real state. They can be integrated into any page within the Veriphy Bank application to provide immediate CRUD functionality wherever data management is required.
+
+The Database Management System should use these CRUD Modals.
+
+## Main User Roles
+
+The main roles are all below super admin. The super admin page is only for initial setup. The system must focus on the flow and functionality of other roles and perfect it. Every navigation and data should work with CRUD wherever required. There should not be any dead pages or no content errors for these main roles.
+
+## TO-DO List
+
+-   Analyze existing dashboard and navigation functionality for each role (salesperson, manager, credit-ops, compliance, admin, auditor)
+-   Identify missing components and dead pages for each role's navigation flow
+-   Ensure CRUD operations are implemented in all key components with Supabase integration
+-   Fix dead navigation links and ensure all role-based navigation works properly
+-   Verify all components use real Supabase data instead of mock data
+-   Improve navigation UX for all user roles with proper loading states and error handling
 
 ## WORKFLOW & RELEASE RULES
 
@@ -518,118 +606,4 @@ BEGIN
     
     -- Check for missing columns
     FOR table_name, column_name IN 
-        SELECT key, value 
-        FROM jsonb_each_text(expected_columns)
-    LOOP
-        FOREACH column_name IN ARRAY string_to_array(column_name, ',')
-        LOOP
-            column_name := trim(column_name);
-            IF NOT EXISTS (
-                SELECT 1 FROM information_schema.columns 
-                WHERE table_schema = 'public' 
-                AND table_name = table_name 
-                AND column_name = column_name
-            ) THEN
-                missing_columns := array_append(missing_columns, table_name || '.' || column_name);
-            END IF;
-        END LOOP;
-    END LOOP;
-    
-    -- Report results
-    IF array_length(missing_tables, 1) IS NULL AND array_length(missing_columns, 1) IS NULL THEN
-        RAISE NOTICE '✅ ALL TABLES AND COLUMNS ARE PROPERLY CREATED!';
-    ELSE
-        IF array_length(missing_tables, 1) > 0 THEN
-            RAISE NOTICE '❌ Missing tables: %', array_to_string(missing_tables, ', ');
-        END IF;
-        IF array_length(missing_columns, 1) > 0 THEN
-            RAISE NOTICE '❌ Missing columns: %', array_to_string(missing_columns, ', ');
-        END IF;
-    END IF;
-END $$;
-```
-
-## **🎯 QUICK CHECK - Run This Simple Query:**
-
-```sql
--- Quick check - should return 16 tables
-SELECT COUNT(*) as total_tables 
-FROM information_schema.tables 
-WHERE table_schema = 'public' 
-AND table_name IN (
-  'organizations', 'departments', 'roles', 'permissions', 'role_permissions',
-  'users', 'user_roles', 'products', 'document_types', 'customers', 
-  'cases', 'documents', 'tasks', 'logs', 'notifications', 'system_settings'
-);
-```
-
-**Expected result: `total_tables: 16`**
-
-## **✅ SUCCESS INDICATORS:**
-
-- ✅ All 16 tables exist
-- ✅ Key columns like `code` in organizations, `full_name` in users exist
-- ✅ Foreign key relationships are properly established
-- ✅ You can insert test data without errors
-- ✅ The application no longer shows "column not found" errors
-
-Run these verification queries and let me know what results you get! 🚀
-
-## SUPER ADMIN UI FUNCTIONAL FLOW ENHANCEMENT
-
-### Version Updates
-
-The SuperAdminDashboard component now uses `useDashboardStats` and not `useDashboardData` from `src/hooks/useDashboardData.ts`. Use the hook as follows:
-```typescript
-import { useDashboardStats } from '../../hooks/useDashboardData';
-
-// Get real data from hooks
-const { 
- stats: dashboardStats, 
- loading: casesLoading 
-} = useDashboardStats(user?.id || '', user?.role || 'super_admin');
-```
-
-The following components have been enhanced to improve the super admin functional flow:
-
-### 1. Enhanced Super Admin Dashboard
-- Real-time system metrics (CPU, Memory, Disk, Database)
-- Live user & case analytics with your populated data
-- System health monitoring with service status tracking
-- Activity feed showing real-time system events
-- Performance bottleneck analysis with optimization insights
-- Auto-refresh capabilities with configurable intervals
-
-To test the enhanced Super Admin Dashboard:
-1. Start your React app: `npm run dev`
-2. Login as Super Admin (superadmin@veriphy.com)
-3. Navigate to `/super-admin/dashboard`
-4. Observe the real-time system metrics and analytics.
-
-### 2. Workflow Designer & Management
-- Visual workflow creation with drag-and-drop interface
-- Pre-built templates for loan processing, document verification, compliance
-- Workflow analytics showing success rates and processing times
-- SLA management with time-based step tracking
-- Real-time workflow monitoring of active instances
-
-To test the Workflow Designer & Management:
-1. Start your React app: `npm run dev`
-2. Login as Super Admin (superadmin@veriphy.com)
-3. Navigate to `/super-admin/workflow-designer`
-4. Design and manage business workflows.
-
-### 3. Advanced User Management
-- Comprehensive user grid with all users from your database
-- Bulk operations (activate, suspend, reset passwords, etc.)
-- Advanced filtering by role, status, department
-- Real-time status with online/offline indicators
-- Security features with login attempt tracking
-
-## CRUD OPERATIONS
-
-### CRUD Status Summary
-
-The CRUD (Create, Read, Update, Delete) operations status for all tables has been updated.
-
-###
+        SELECT

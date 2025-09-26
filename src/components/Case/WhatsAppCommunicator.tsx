@@ -1,30 +1,51 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Smile, Phone, Video, MoreVertical, Shield } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
+import { Send, Paperclip, Smile, Phone, Video, MoreVertical, Shield, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { Badge } from '../ui/Badge';
 import { ValidatedTextarea } from '../ui/FormField';
 import { useFieldValidation } from '../../hooks/useFormValidation';
+import { useWhatsAppMessages } from '../../hooks/useWhatsAppMessages';
 import { WhatsAppMessage } from '../../types';
 
 interface WhatsAppCommunicatorProps {
-  messages: WhatsAppMessage[];
+  caseId: string;
+  messages?: WhatsAppMessage[];
   customerName: string;
   customerPhone: string;
   onSendMessage?: (message: string) => void;
   onSendDocument?: (file: File) => void;
+  enableLiveMode?: boolean;
 }
 
 export function WhatsAppCommunicator({ 
-  messages, 
+  caseId,
+  messages: externalMessages, 
   customerName, 
   customerPhone,
   onSendMessage,
-  onSendDocument 
+  onSendDocument,
+  enableLiveMode = true 
 }: WhatsAppCommunicatorProps) {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Use live WhatsApp messages hook if enabled
+  const {
+    messages: liveMessages,
+    loading: messagesLoading,
+    error: messagesError,
+    sendMessage: liveSendMessage,
+    refetch,
+    isConnected,
+    connectionStatus
+  } = useWhatsAppMessages({
+    caseId,
+    customerPhone,
+    enableLiveMode
+  });
+
+  // Use live messages if available, otherwise use external messages
+  const messages = enableLiveMode ? liveMessages : (externalMessages || []);
 
   // Message validation
   const {
@@ -49,10 +70,25 @@ export function WhatsAppCommunicator({
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = () => {
-    if (newMessage.trim() && onSendMessage) {
-      onSendMessage(newMessage.trim());
-      setNewMessage('');
+  const handleSendMessage = async () => {
+    if (newMessage.trim()) {
+      try {
+        setIsTyping(true);
+        
+        if (enableLiveMode) {
+          // Use live send message functionality
+          await liveSendMessage(newMessage.trim());
+        } else if (onSendMessage) {
+          // Use external handling
+          onSendMessage(newMessage.trim());
+        }
+        
+        setNewMessage('');
+      } catch (error) {
+        console.error('❌ Error sending message:', error);
+      } finally {
+        setIsTyping(false);
+      }
     }
   };
 
@@ -114,12 +150,37 @@ export function WhatsAppCommunicator({
               <h3 className="font-medium">{customerName}</h3>
               <p className="text-xs text-green-100">{customerPhone}</p>
               <div className="flex items-center space-x-1 text-xs text-green-100">
-                <div className="w-2 h-2 bg-green-300 rounded-full"></div>
-                <span>Online</span>
+                {enableLiveMode && (
+                  <>
+                    {isConnected ? (
+                      <Wifi className="h-3 w-3 text-green-300" />
+                    ) : (
+                      <WifiOff className="h-3 w-3 text-yellow-300" />
+                    )}
+                    <span>{connectionStatus}</span>
+                  </>
+                )}
+                {!enableLiveMode && (
+                  <>
+                    <div className="w-2 h-2 bg-green-300 rounded-full"></div>
+                    <span>Online</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            {enableLiveMode && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="text-white border-white hover:bg-green-700"
+                onClick={refetch}
+                disabled={messagesLoading}
+              >
+                <RefreshCw className={`h-4 w-4 ${messagesLoading ? 'animate-spin' : ''}`} />
+              </Button>
+            )}
             <Button variant="outline" size="sm" className="text-white border-white hover:bg-green-700">
               <Phone className="h-4 w-4" />
             </Button>
@@ -141,30 +202,56 @@ export function WhatsAppCommunicator({
         </div>
       </div>
 
+      {/* Connection Error */}
+      {enableLiveMode && messagesError && (
+        <div className="bg-red-50 border border-red-200 p-3 mx-4 mt-2 rounded-lg">
+          <div className="flex items-center space-x-2 text-red-700">
+            <WifiOff className="h-4 w-4" />
+            <span className="text-sm">Connection error: {messagesError || 'Unknown error'}</span>
+            <Button 
+              size="sm" 
+              onClick={refetch}
+              className="text-red-700 hover:bg-red-100"
+            >
+              Retry
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-        {messages.map((message) => (
-          <div key={message.id} className={`flex ${message.sender === 'agent' ? 'justify-end' : message.sender === 'system' ? 'justify-center' : 'justify-start'}`}>
-            <div className={`max-w-xs lg:max-w-md px-4 py-2 ${getMessageBubbleStyle(message.sender)}`}>
-              {message.type === 'document' && (
-                <div className="flex items-center space-x-2 mb-2">
-                  <Paperclip className="h-4 w-4" />
-                  <span className="text-sm font-medium">Document uploaded</span>
-                </div>
-              )}
-              <p className="text-sm">{message.content}</p>
-              <div className="flex items-center justify-end mt-1 space-x-1">
-                <span className="text-xs opacity-70">{formatTime(message.timestamp)}</span>
-                {message.sender === 'agent' && (
-                  <div className="flex space-x-1">
-                    <div className="w-1 h-1 bg-white rounded-full opacity-70"></div>
-                    <div className="w-1 h-1 bg-white rounded-full opacity-70"></div>
-                  </div>
-                )}
-              </div>
+        {messagesLoading && messages.length === 0 ? (
+          <div className="flex justify-center items-center h-32">
+            <div className="text-center">
+              <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-green-600" />
+              <p className="text-sm text-gray-600">Loading messages...</p>
             </div>
           </div>
-        ))}
+        ) : (
+          messages.map((message) => (
+            <div key={message.id} className={`flex ${message.sender === 'agent' ? 'justify-end' : message.sender === 'system' ? 'justify-center' : 'justify-start'}`}>
+              <div className={`max-w-xs lg:max-w-md px-4 py-2 ${getMessageBubbleStyle(message.sender)}`}>
+                {message.type === 'document' && (
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Paperclip className="h-4 w-4" />
+                    <span className="text-sm font-medium">Document uploaded</span>
+                  </div>
+                )}
+                <p className="text-sm">{message.content}</p>
+                <div className="flex items-center justify-end mt-1 space-x-1">
+                  <span className="text-xs opacity-70">{formatTime(message.timestamp)}</span>
+                  {message.sender === 'agent' && (
+                    <div className="flex space-x-1">
+                      <div className="w-1 h-1 bg-white rounded-full opacity-70"></div>
+                      <div className="w-1 h-1 bg-white rounded-full opacity-70"></div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
         
         {isTyping && (
           <div className="flex justify-start">
@@ -223,7 +310,7 @@ export function WhatsAppCommunicator({
               }}
               onKeyPress={handleKeyPress}
               placeholder="Type a message..."
-              error={messageError}
+              error={messageError || undefined}
               className="rounded-2xl resize-none pr-12"
               rows={1}
               style={{ minHeight: '44px', maxHeight: '120px' }}
