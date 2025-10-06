@@ -1,305 +1,221 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Building, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Users, 
-  RefreshCw, 
-  AlertTriangle,
-  Search,
-  Filter,
-  ChevronDown,
-  ChevronRight
-} from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowLeft, Users, Plus, Edit, Trash2, Search, Building2, RefreshCw, AlertTriangle, BarChart3, TrendingUp } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
-import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { Badge } from '../ui/Badge';
+import { 
+  ValidatedInput, 
+  ValidatedSelect, 
+  ValidationSummary,
+} from '../ui/FormField';
+import { useFormValidation } from '../../hooks/useFormValidation';
+import { VALIDATION_RULES } from '../../utils/validation';
 import { SupabaseDatabaseService } from '../../services/supabase-database';
+import { AuditLogger } from '../../utils/audit-logger';
+import { supabase } from '../../supabase-client';
 
 interface Department {
   id: string;
   name: string;
   code: string;
-  description: string;
-  departmentType: 'sales' | 'credit_ops' | 'compliance' | 'admin' | 'support';
-  parentDepartmentId?: string;
-  managerId?: string;
-  isActive: boolean;
+  description?: string;
+  organization_id: string;
+  organization_name?: string;
+  department_type: 'sales' | 'credit' | 'management' | 'administration' | 'compliance' | 'support';
+  parent_department_id?: string;
+  parent_department_name?: string;
+  manager_id?: string;
+  manager_name?: string;
+  is_active: boolean;
   metadata?: any;
-  createdAt: string;
-  updatedAt: string;
-  organizationId?: string;
-  parentDepartment?: Department;
-  manager?: {
-    id: string;
-    full_name: string;
-    email: string;
-  };
-  children?: Department[];
+  created_at: string;
+  updated_at: string;
 }
 
-interface DepartmentFormData {
+interface Organization {
+  id: string;
   name: string;
   code: string;
-  description: string;
-  departmentType: 'sales' | 'credit_ops' | 'compliance' | 'admin' | 'support';
-  parentDepartmentId?: string;
-  managerId?: string;
-  organizationId: string;
 }
 
-export function DepartmentManagement() {
+interface DepartmentManagementProps {
+  onBack: () => void;
+}
+
+export function DepartmentManagement({ onBack }: DepartmentManagementProps) {
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [organizations, setOrganizations] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [editingDept, setEditingDept] = useState<Department | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [orgFilter, setOrgFilter] = useState<string>('all');
-  const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
-  const [formData, setFormData] = useState<DepartmentFormData>({
-    name: '',
-    code: '',
-    description: '',
-    departmentType: 'sales',
-    organizationId: ''
+  const [selectedOrg, setSelectedOrg] = useState('all');
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingDept, setEditingDept] = useState<Department | null>(null);
+
+  // Form validation for create/edit department
+  const {
+    values: deptData,
+    errors: deptErrors,
+    isValid: isDeptValid,
+    isSubmitting: isSubmittingDept,
+    handleChange: handleDeptChange,
+    handleBlur: handleDeptBlur,
+    handleSubmit: handleDeptSubmit,
+    reset: resetDeptForm
+  } = useFormValidation({
+    validationRules: {
+      name: VALIDATION_RULES.fullName,
+      code: {
+        required: true,
+        minLength: 2,
+        maxLength: 10,
+        message: 'Code must be 2-10 characters'
+      },
+      organization_id: {
+        required: true,
+        message: 'Please select an organization'
+      },
+      department_type: {
+        required: true,
+        message: 'Please select a department type'
+      }
+    },
+    initialValues: {
+      name: '',
+      code: '',
+      description: '',
+      organization_id: '',
+      department_type: 'sales',
+      parent_department_id: '',
+      manager_id: '',
+      is_active: 'true',
+      metadata: ''
+    }
   });
 
-  // Fetch data
-  const fetchData = async () => {
+  // Load departments and organizations
+  const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
-      
-      const [deptData, orgData, userData] = await Promise.all([
+      const [deptsData, orgsData] = await Promise.all([
         SupabaseDatabaseService.getDepartments(),
-        SupabaseDatabaseService.getOrganizations(),
-        SupabaseDatabaseService.getUsers()
+        SupabaseDatabaseService.getOrganizations()
       ]);
       
-      setDepartments(deptData);
-      setOrganizations(orgData);
-      setUsers(userData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch data');
+      console.log('🔍 Departments loaded:', deptsData.length);
+      console.log('🔍 Organizations loaded:', orgsData.length);
+      
+      // Enhance departments with organization names and other related data
+      const enhancedDepts = deptsData.map(dept => ({
+        ...dept,
+        // Map camelCase to snake_case for the component interface
+        organization_id: dept.organizationId,
+        department_type: dept.departmentType,
+        is_active: dept.isActive,
+        created_at: dept.createdAt,
+        updated_at: dept.updatedAt,
+        organization_name: orgsData.find(org => org.id === dept.organizationId)?.name || 'Unknown',
+        parent_department_name: undefined, // Will be populated separately if needed
+        manager_name: undefined // Will be populated separately if needed
+      }));
+      
+      console.log('✅ Enhanced departments:', enhancedDepts.length);
+      
+      setDepartments(enhancedDepts);
+      setOrganizations(orgsData);
+      
+      // Log department management view for audit purposes
+      try {
+        await AuditLogger.logDashboardView('department_management', AuditLogger.getCurrentUserId());
+      } catch (auditError) {
+        console.error('Error logging department management view:', auditError);
+      }
+    } catch (err: any) {
+      console.error('Error loading data:', err);
+      setError('Failed to load departments');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    loadData();
+    
+    // Set up real-time subscription for departments
+    const subscription = supabase
+      .channel('departments-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'departments' },
+        (payload) => {
+          console.log('Department change received:', payload);
+          loadData(); // Refresh data when departments are modified
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (values: any) => {
     try {
-      setLoading(true);
-      
       if (editingDept) {
-        await SupabaseDatabaseService.updateDepartment(editingDept.id, formData);
+        // Update existing department
+        await SupabaseDatabaseService.updateDepartment(editingDept.id, values);
+        setEditingDept(null);
       } else {
-        await SupabaseDatabaseService.createDepartment(formData);
+        // Create new department
+        await SupabaseDatabaseService.createDepartment(values);
       }
       
-      await fetchData();
-      resetForm();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save department');
-    } finally {
-      setLoading(false);
+      resetDeptForm();
+      setShowCreateForm(false);
+      await loadData();
+    } catch (err: any) {
+      console.error('Error saving department:', err);
+      setError(err.message || 'Failed to save department');
     }
-  };
-
-  // Handle delete
-  const handleDelete = async (deptId: string) => {
-    if (!confirm('Are you sure you want to delete this department? This action cannot be undone.')) {
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      await SupabaseDatabaseService.deleteDepartment(deptId);
-      await fetchData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete department');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Reset form
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      code: '',
-      description: '',
-      departmentType: 'sales',
-      organizationId: ''
-    });
-    setEditingDept(null);
-    setShowForm(false);
   };
 
   // Handle edit
   const handleEdit = (dept: Department) => {
-    setFormData({
-      name: dept.name,
-      code: dept.code,
-      description: dept.description,
-      departmentType: dept.departmentType,
-      parentDepartmentId: dept.parentDepartmentId,
-      managerId: dept.managerId,
-      organizationId: dept.organizationId || ''
-    });
     setEditingDept(dept);
-    setShowForm(true);
-  };
-
-  // Toggle department expansion
-  const toggleExpansion = (deptId: string) => {
-    const newExpanded = new Set(expandedDepts);
-    if (newExpanded.has(deptId)) {
-      newExpanded.delete(deptId);
-    } else {
-      newExpanded.add(deptId);
-    }
-    setExpandedDepts(newExpanded);
-  };
-
-  // Build department tree
-  const buildDepartmentTree = (depts: Department[]): Department[] => {
-    const deptMap = new Map<string, Department>();
-    const rootDepts: Department[] = [];
-
-    // Create map and add children array
-    depts.forEach(dept => {
-      deptMap.set(dept.id, { ...dept, children: [] });
-    });
-
-    // Build tree structure
-    depts.forEach(dept => {
-      const deptWithChildren = deptMap.get(dept.id)!;
-      if (dept.parentDepartmentId && deptMap.has(dept.parentDepartmentId)) {
-        const parent = deptMap.get(dept.parentDepartmentId)!;
-        parent.children!.push(deptWithChildren);
-      } else {
-        rootDepts.push(deptWithChildren);
+    setShowCreateForm(true);
+    // Pre-populate form with existing data
+    Object.keys(deptData).forEach(key => {
+      if (dept[key as keyof Department]) {
+        handleDeptChange({ target: { name: key, value: dept[key as keyof Department] } } as any);
       }
     });
+  };
 
-    return rootDepts;
+  // Handle delete
+  const handleDelete = async (deptId: string) => {
+    if (window.confirm('Are you sure you want to delete this department?')) {
+      try {
+        await SupabaseDatabaseService.deleteDepartment(deptId);
+        await loadData();
+      } catch (err: any) {
+        console.error('Error deleting department:', err);
+        setError(err.message || 'Failed to delete department');
+      }
+    }
   };
 
   // Filter departments
   const filteredDepartments = departments.filter(dept => {
     const matchesSearch = dept.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          dept.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         dept.description.toLowerCase().includes(searchTerm.toLowerCase());
+                         dept.organization_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesOrg = selectedOrg === 'all' || dept.organization_id === selectedOrg;
     
-    const matchesType = typeFilter === 'all' || dept.departmentType === typeFilter;
-    const matchesOrg = orgFilter === 'all' || dept.organizationId === orgFilter;
-    
-    return matchesSearch && matchesType && matchesOrg;
+    return matchesSearch && matchesOrg;
   });
 
-  // Get department type badge
-  const getTypeBadge = (type: string) => {
-    const typeConfig = {
-      sales: { color: 'blue', label: 'Sales' },
-      credit_ops: { color: 'green', label: 'Credit Ops' },
-      compliance: { color: 'yellow', label: 'Compliance' },
-      admin: { color: 'purple', label: 'Admin' },
-      support: { color: 'gray', label: 'Support' }
-    };
-    
-    const config = typeConfig[type as keyof typeof typeConfig] || { color: 'gray', label: type };
-    return <Badge variant={config.color as any}>{config.label}</Badge>;
-  };
-
-  // Render department tree
-  const renderDepartmentTree = (depts: Department[], level = 0) => {
-    return depts.map(dept => (
-      <div key={dept.id} className="ml-4">
-        <Card className={`mb-2 ${level > 0 ? 'border-l-2 border-gray-200' : ''}`}>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                {dept.children && dept.children.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toggleExpansion(dept.id)}
-                    className="p-1 h-6 w-6"
-                  >
-                    {expandedDepts.has(dept.id) ? 
-                      <ChevronDown className="h-4 w-4" /> : 
-                      <ChevronRight className="h-4 w-4" />
-                    }
-                  </Button>
-                )}
-                <Building className="h-5 w-5 text-blue-600" />
-                <div>
-                  <h4 className="font-semibold text-gray-900">{dept.name}</h4>
-                  <p className="text-sm text-gray-500">{dept.code}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                {getTypeBadge(dept.departmentType)}
-                {dept.isActive ? (
-                  <Badge variant="success">Active</Badge>
-                ) : (
-                  <Badge variant="error">Inactive</Badge>
-                )}
-                <div className="flex space-x-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleEdit(dept)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDelete(dept.id)}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-            
-            {dept.description && (
-              <p className="text-sm text-gray-600 mt-2">{dept.description}</p>
-            )}
-            
-            <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-              <span>Created: {new Date(dept.createdAt).toLocaleDateString()}</span>
-              {dept.manager && (
-                <span>Manager: {dept.manager.full_name}</span>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        
-        {expandedDepts.has(dept.id) && dept.children && dept.children.length > 0 && (
-          <div className="ml-4">
-            {renderDepartmentTree(dept.children, level + 1)}
-          </div>
-        )}
-      </div>
-    ));
-  };
-
-  if (loading && departments.length === 0) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -310,83 +226,124 @@ export function DepartmentManagement() {
     );
   }
 
-  if (error && departments.length === 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-600 mb-4">
-            <AlertTriangle className="h-12 w-12 mx-auto mb-2" />
-            <p className="text-lg font-semibold">Error Loading Departments</p>
-            <p className="text-sm text-gray-600 mt-2">{error}</p>
-          </div>
-          <Button onClick={fetchData}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Retry
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  const departmentTree = buildDepartmentTree(filteredDepartments);
-
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <Button variant="outline" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Department Management</h1>
-          <p className="text-gray-600">Manage departments and organizational structure</p>
+            <p className="text-gray-600">Manage departments across all organizations</p>
+          </div>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={fetchData}>
+          <Button variant="outline" onClick={loadData}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button onClick={() => setShowForm(true)}>
+          <Button onClick={() => {
+            setEditingDept(null);
+            resetDeptForm();
+            setShowCreateForm(true);
+          }}>
             <Plus className="h-4 w-4 mr-2" />
             Add Department
           </Button>
         </div>
       </div>
 
-      {/* Filters */}
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Departments</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{departments.length}</div>
+            <p className="text-xs text-muted-foreground">Across all organizations</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Departments</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{departments.filter(d => d.is_active).length}</div>
+            <p className="text-xs text-muted-foreground">
+              {departments.length > 0 ? Math.round((departments.filter(d => d.is_active).length / departments.length) * 100) : 0}% of total
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Organizations</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{organizations.length}</div>
+            <p className="text-xs text-muted-foreground">With departments</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Department Types</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{new Set(departments.map(d => d.department_type)).size}</div>
+            <p className="text-xs text-muted-foreground">Different types</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <AlertTriangle className="h-5 w-5 text-red-400" />
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Error</h3>
+              <div className="mt-2 text-sm text-red-700">
+                <p>{error}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Search and Filter */}
       <Card>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
+        <CardHeader>
+          <CardTitle>Search Departments</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex space-x-4">
+            <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search departments..."
+                  placeholder="Search by name, code, or organization..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
             </div>
-            
-            <div>
+            <div className="w-64">
               <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Types</option>
-                <option value="sales">Sales</option>
-                <option value="credit_ops">Credit Ops</option>
-                <option value="compliance">Compliance</option>
-                <option value="admin">Admin</option>
-                <option value="support">Support</option>
-              </select>
-            </div>
-            
-            <div>
-              <select
-                value={orgFilter}
-                onChange={(e) => setOrgFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={selectedOrg}
+                onChange={(e) => setSelectedOrg(e.target.value)}
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="all">All Organizations</option>
                 {organizations.map(org => (
@@ -394,188 +351,212 @@ export function DepartmentManagement() {
                 ))}
               </select>
             </div>
-            
-            <div className="flex items-center">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSearchTerm('');
-                  setTypeFilter('all');
-                  setOrgFilter('all');
-                }}
-                className="w-full"
-              >
-                Clear Filters
-              </Button>
-            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Departments Tree */}
-      <div className="space-y-4">
-        {departmentTree.length > 0 ? (
-          renderDepartmentTree(departmentTree)
-        ) : (
+      {/* Create/Edit Form */}
+      {showCreateForm && (
           <Card>
-            <CardContent className="text-center py-12">
-              <Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">No departments found</p>
-              <Button onClick={() => setShowForm(true)} className="mt-4">
-                <Plus className="h-4 w-4 mr-2" />
-                Add First Department
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* Department Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <CardHeader>
-              <CardTitle>
-                {editingDept ? 'Edit Department' : 'Add New Department'}
-              </CardTitle>
+            <CardTitle>{editingDept ? 'Edit Department' : 'Create New Department'}</CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleDeptSubmit(onSubmit)} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Department Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Department Code *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.code}
-                      onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
+                <ValidatedInput
+                  label="Department Name"
+                  name="name"
+                  value={deptData.name}
+                  onChange={handleDeptChange('name')}
+                  onBlur={handleDeptBlur('name')}
+                  error={deptErrors.name}
+                  placeholder="Enter department name"
+                  required
+                />
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Department Type *
-                    </label>
-                    <select
-                      required
-                      value={formData.departmentType}
-                      onChange={(e) => setFormData({ ...formData, departmentType: e.target.value as any })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="sales">Sales</option>
-                      <option value="credit_ops">Credit Ops</option>
-                      <option value="compliance">Compliance</option>
-                      <option value="admin">Admin</option>
-                      <option value="support">Support</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Organization *
-                    </label>
-                    <select
-                      required
-                      value={formData.organizationId}
-                      onChange={(e) => setFormData({ ...formData, organizationId: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select Organization</option>
-                      {organizations.map(org => (
-                        <option key={org.id} value={org.id}>{org.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+                <ValidatedInput
+                  label="Department Code"
+                  name="code"
+                  value={deptData.code}
+                  onChange={handleDeptChange('code')}
+                  onBlur={handleDeptBlur('code')}
+                  error={deptErrors.code}
+                  placeholder="Enter unique code"
+                  required
+                />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                <ValidatedSelect
+                  label="Organization"
+                  name="organization_id"
+                  value={deptData.organization_id}
+                  onChange={handleDeptChange('organization_id')}
+                  onBlur={handleDeptBlur('organization_id')}
+                  error={deptErrors.organization_id}
+                  options={organizations.map(org => ({
+                    value: org.id,
+                    label: `${org.name} (${org.code})`
+                  }))}
+                  placeholder="Select organization"
+                  required
+                />
+
+                <ValidatedSelect
+                  label="Department Type"
+                  name="department_type"
+                  value={deptData.department_type}
+                  onChange={handleDeptChange('department_type')}
+                  onBlur={handleDeptBlur('department_type')}
+                  error={deptErrors.department_type}
+                  options={[
+                    { value: 'sales', label: 'Sales' },
+                    { value: 'credit', label: 'Credit' },
+                    { value: 'management', label: 'Management' },
+                    { value: 'administration', label: 'Administration' },
+                    { value: 'compliance', label: 'Compliance' },
+                    { value: 'support', label: 'Support' }
+                  ]}
+                  placeholder="Select department type"
+                  required
+                />
+
+                <ValidatedSelect
+                  label="Parent Department"
+                  name="parent_department_id"
+                  value={deptData.parent_department_id}
+                  onChange={handleDeptChange('parent_department_id')}
+                  onBlur={handleDeptBlur('parent_department_id')}
+                  error={deptErrors.parent_department_id}
+                  options={[
+                    { value: '', label: 'None (Top-level department)' },
+                    ...departments
+                      .filter(dept => dept.id !== editingDept?.id && dept.is_active)
+                      .map(dept => ({
+                        value: dept.id,
+                        label: `${dept.name} (${dept.code})`
+                      }))
+                  ]}
+                  placeholder="Select parent department (optional)"
+                />
+
+                <ValidatedSelect
+                  label="Status"
+                  name="is_active"
+                  value={deptData.is_active}
+                  onChange={handleDeptChange('is_active')}
+                  onBlur={handleDeptBlur('is_active')}
+                  error={deptErrors.is_active}
+                  options={[
+                    { value: 'true', label: 'Active' },
+                    { value: 'false', label: 'Inactive' }
+                  ]}
+                  required
+                />
+
+                <div className="md:col-span-2">
+                  <ValidatedInput
+                    label="Description"
+                    name="description"
+                    value={deptData.description}
+                    onChange={handleDeptChange('description')}
+                    onBlur={handleDeptBlur('description')}
+                    error={deptErrors.description}
+                    placeholder="Enter department description"
                   />
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Parent Department
-                    </label>
-                    <select
-                      value={formData.parentDepartmentId || ''}
-                      onChange={(e) => setFormData({ ...formData, parentDepartmentId: e.target.value || undefined })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">No Parent</option>
-                      {departments
-                        .filter(dept => dept.organizationId === formData.organizationId)
-                        .map(dept => (
-                          <option key={dept.id} value={dept.id}>{dept.name}</option>
-                        ))}
-                    </select>
                   </div>
                   
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Manager
-                    </label>
-                    <select
-                      value={formData.managerId || ''}
-                      onChange={(e) => setFormData({ ...formData, managerId: e.target.value || undefined })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">No Manager</option>
-                      {users
-                        .filter(user => user.organization_id === formData.organizationId)
-                        .map(user => (
-                          <option key={user.id} value={user.id}>{user.full_name}</option>
-                        ))}
-                    </select>
+              <ValidationSummary errors={deptErrors} />
+
+              <div className="flex justify-end space-x-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowCreateForm(false);
+                    setEditingDept(null);
+                    resetDeptForm();
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmittingDept || !isDeptValid}
+                >
+                  {isSubmittingDept ? 'Saving...' : (editingDept ? 'Update Department' : 'Create Department')}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Departments List */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Departments ({filteredDepartments.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {filteredDepartments.length === 0 ? (
+            <div className="text-center py-8">
+              <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No departments found</h3>
+              <p className="text-gray-600 mb-4">
+                {searchTerm || selectedOrg !== 'all' ? 'Try adjusting your search terms.' : 'Get started by creating your first department.'}
+              </p>
+              {!searchTerm && selectedOrg === 'all' && (
+                <Button onClick={() => setShowCreateForm(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Department
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredDepartments.map((dept) => (
+                <div key={dept.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <h3 className="text-lg font-medium text-gray-900">{dept.name}</h3>
+                        <Badge variant={dept.is_active ? 'default' : 'warning'}>
+                          {dept.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                        <Badge variant="info">{dept.code}</Badge>
+                        <div className="flex items-center">
+                          <Badge variant="info">
+                            <Building2 className="h-3 w-3 mr-1" />
+                            {dept.organization_name}
+                          </Badge>
+                        </div>
+                        <Badge variant="success">{dept.department_type}</Badge>
+                      </div>
+                      <div className="text-sm text-gray-600 space-y-1">
+                        {dept.description && <p><strong>Description:</strong> {dept.description}</p>}
+                        {dept.parent_department_name && <p><strong>Parent Department:</strong> {dept.parent_department_name}</p>}
+                        {dept.manager_name && <p><strong>Manager:</strong> {dept.manager_name}</p>}
+                        <p><strong>Created:</strong> {new Date(dept.created_at).toLocaleDateString()}</p>
+                        {dept.updated_at && dept.updated_at !== dept.created_at && (
+                          <p><strong>Updated:</strong> {new Date(dept.updated_at).toLocaleDateString()}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button variant="outline" size="sm" onClick={() => handleEdit(dept)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleDelete(dept.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-
-                <div className="flex justify-end space-x-3">
-                  <Button type="button" variant="outline" onClick={resetForm}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={loading}>
-                    {loading ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      editingDept ? 'Update Department' : 'Create Department'
-                    )}
-                  </Button>
-                </div>
-              </form>
+              ))}
+            </div>
+          )}
             </CardContent>
           </Card>
-        </div>
-      )}
     </div>
   );
 }

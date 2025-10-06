@@ -24,7 +24,8 @@ import {
   Activity,
   GitBranch,
   Monitor,
-  UserCog
+  UserCog,
+  Key
 } from 'lucide-react';
 
 // =============================================================================
@@ -158,9 +159,25 @@ export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
       id: 'organizations',
       label: 'Organizations',
       icon: Building,
-      path: '/organizations',
+      path: '/super-admin/organizations',
       roles: ['super-admin'],
       description: 'Manage all organizations'
+    },
+    {
+      id: 'departments',
+      label: 'Departments',
+      icon: Layers,
+      path: '/super-admin/departments',
+      roles: ['super-admin'],
+      description: 'Manage all departments'
+    },
+    {
+      id: 'customers',
+      label: 'Customers',
+      icon: Users,
+      path: '/super-admin/customers',
+      roles: ['super-admin'],
+      description: 'Manage all customers'
     },
     {
       id: 'system-settings',
@@ -177,6 +194,15 @@ export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
       path: ROUTES.AUDIT_LOGS,
       roles: ['super-admin', 'admin', 'auditor'],
       description: 'System audit logs and compliance'
+    },
+    {
+      id: 'super-admin-audit-logs',
+      label: 'Super Admin Audit Logs',
+      icon: Shield,
+      path: '/super-admin/audit-logs',
+      roles: ['super-admin'],
+      description: 'Comprehensive audit logs for Super Admin operations',
+      isNew: true
     },
     {
       id: 'analytics',
@@ -265,35 +291,35 @@ export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
   'admin': [
     {
       id: 'dashboard',
-      label: 'Dashboard',
+      label: 'Admin Dashboard',
       icon: Home,
       path: ROUTES.DASHBOARD,
       roles: ['admin'],
       description: 'Admin dashboard overview'
     },
     {
-      id: 'user-management',
-      label: 'User Management',
-      icon: Users,
-      path: ROUTES.USER_MANAGEMENT,
-      roles: ['admin'],
-      description: 'Manage organization users'
-    },
-    {
-      id: 'system-settings',
-      label: 'System Settings',
-      icon: Shield,
-      path: ROUTES.SYSTEM_SETTINGS,
-      roles: ['admin'],
-      description: 'Organization settings'
-    },
-    {
-      id: 'organization-settings',
-      label: 'Organization Settings',
+      id: 'department-management',
+      label: 'Department Management',
       icon: Building,
-      path: ROUTES.ORGANIZATION_SETTINGS,
+      path: '/admin/departments',
       roles: ['admin'],
-      description: 'Organization-specific settings'
+      description: 'Manage organizational departments'
+    },
+    {
+      id: 'roles-management',
+      label: 'Roles Management',
+      icon: Shield,
+      path: '/admin/roles',
+      roles: ['admin'],
+      description: 'Manage user roles and permissions'
+    },
+    {
+      id: 'permissions-management',
+      label: 'Permissions Management',
+      icon: Key,
+      path: '/admin/permissions',
+      roles: ['admin'],
+      description: 'Configure system permissions'
     },
     {
       id: 'audit-logs',
@@ -302,88 +328,6 @@ export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
       path: ROUTES.AUDIT_LOGS,
       roles: ['admin'],
       description: 'Organization audit logs'
-    },
-    {
-      id: 'analytics',
-      label: 'Analytics',
-      icon: BarChart3,
-      path: ROUTES.ANALYTICS,
-      roles: ['admin', 'manager'],
-      description: 'Organization analytics'
-    },
-    {
-      id: 'admin-tools',
-      label: 'Admin Tools',
-      icon: Settings,
-      path: '/admin',
-      roles: ['admin'],
-      description: 'Administrative tools',
-      children: [
-        {
-          id: 'loan-applications',
-          label: 'Loan Applications',
-          icon: FileText,
-          path: ROUTES.LOAN_APPLICATION_MANAGEMENT,
-          roles: ['admin'],
-          description: 'Manage loan applications'
-        },
-        {
-          id: 'task-categories',
-          label: 'Task Categories',
-          icon: Layers,
-          path: ROUTES.TASK_CATEGORY_MANAGEMENT,
-          roles: ['admin'],
-          description: 'Manage task categories'
-        },
-        {
-          id: 'compliance-issues',
-          label: 'Compliance Issues',
-          icon: AlertTriangle,
-          path: ROUTES.COMPLIANCE_ISSUE_MANAGEMENT,
-          roles: ['admin', 'compliance'],
-          description: 'Track compliance issues'
-        },
-        {
-          id: 'user-profiles',
-          label: 'User Profiles',
-          icon: UserCheck,
-          path: ROUTES.USER_PROFILE_MANAGEMENT,
-          roles: ['admin'],
-          description: 'Manage user profiles'
-        },
-        {
-          id: 'workflow-management',
-          label: 'Workflow Management',
-          icon: Workflow,
-          path: ROUTES.WORKFLOW_MANAGEMENT,
-          roles: ['admin'],
-          description: 'Configure workflows'
-        },
-        {
-          id: 'background-processing',
-          label: 'Background Processing',
-          icon: Zap,
-          path: ROUTES.BACKGROUND_PROCESSING,
-          roles: ['admin'],
-          description: 'Monitor background jobs'
-        },
-        {
-          id: 'cache-management',
-          label: 'Cache Management',
-          icon: Database,
-          path: ROUTES.CACHE_MANAGEMENT,
-          roles: ['admin'],
-          description: 'Manage caching'
-        },
-        {
-          id: 'entity-management',
-          label: 'Entity Management',
-          icon: Settings,
-          path: ROUTES.ENTITY_MANAGEMENT,
-          roles: ['admin'],
-          description: 'Manage entities'
-        }
-      ]
     }
   ],
 
@@ -403,6 +347,14 @@ export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
       path: ROUTES.TEAM,
       roles: ['manager'],
       description: 'Manage team members'
+    },
+    {
+      id: 'team-management',
+      label: 'Team Management',
+      icon: UserCog,
+      path: '/team-management',
+      roles: ['manager'],
+      description: 'Advanced team management'
     },
     {
       id: 'cases',
@@ -435,6 +387,14 @@ export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
       path: ROUTES.ANALYTICS,
       roles: ['manager'],
       description: 'Team performance analytics'
+    },
+    {
+      id: 'analytics-dashboard',
+      label: 'Analytics Dashboard',
+      icon: BarChart3,
+      path: '/analytics-dashboard',
+      roles: ['manager'],
+      description: 'Advanced analytics dashboard'
     }
   ],
 
@@ -478,6 +438,14 @@ export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
       path: ROUTES.WORKLOAD,
       roles: ['salesperson'],
       description: 'Plan and manage workload'
+    },
+    {
+      id: 'workload-management',
+      label: 'Workload Management',
+      icon: Calendar,
+      path: ROUTES.WORKLOAD_MANAGEMENT,
+      roles: ['salesperson'],
+      description: 'Advanced workload management'
     }
   ],
 
@@ -497,6 +465,14 @@ export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
       path: ROUTES.APPROVAL_QUEUE,
       roles: ['credit-ops'],
       description: 'Review and approve applications'
+    },
+    {
+      id: 'approval-queue-new',
+      label: 'Approval Queue (New)',
+      icon: CheckCircle,
+      path: ROUTES.APPROVAL_QUEUE_NEW,
+      roles: ['credit-ops'],
+      description: 'Enhanced approval queue interface'
     },
     {
       id: 'compliance-reports',
@@ -521,6 +497,14 @@ export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
       path: ROUTES.PENDING_REVIEWS,
       roles: ['credit-ops'],
       description: 'Items pending review'
+    },
+    {
+      id: 'cases',
+      label: 'Cases',
+      icon: FileText,
+      path: ROUTES.CASES,
+      roles: ['credit-ops'],
+      description: 'View and manage cases'
     }
   ],
 
@@ -556,6 +540,22 @@ export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
       path: ROUTES.COMPLIANCE_REVIEW,
       roles: ['compliance', 'credit-ops'],
       description: 'Review compliance issues'
+    },
+    {
+      id: 'pending-reviews',
+      label: 'Pending Reviews',
+      icon: Clock,
+      path: ROUTES.PENDING_REVIEWS,
+      roles: ['compliance'],
+      description: 'Items pending compliance review'
+    },
+    {
+      id: 'cases',
+      label: 'Cases',
+      icon: FileText,
+      path: ROUTES.CASES,
+      roles: ['compliance'],
+      description: 'View and review cases'
     }
   ],
 
@@ -583,6 +583,22 @@ export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
       path: ROUTES.ANALYTICS,
       roles: ['auditor'],
       description: 'Audit analytics'
+    },
+    {
+      id: 'cases',
+      label: 'Cases',
+      icon: FileText,
+      path: ROUTES.CASES,
+      roles: ['auditor'],
+      description: 'View and audit cases'
+    },
+    {
+      id: 'system-health',
+      label: 'System Health',
+      icon: Monitor,
+      path: '/system-health',
+      roles: ['auditor'],
+      description: 'Monitor system health and performance'
     }
   ]
 };

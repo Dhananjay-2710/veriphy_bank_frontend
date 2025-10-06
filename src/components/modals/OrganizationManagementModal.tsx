@@ -1,278 +1,285 @@
 import React, { useState, useEffect } from 'react';
-import { CrudModal } from '../ui/FormModal';
-import { ValidatedInput, ValidatedSelect, ValidatedTextarea } from '../ui/FormField';
-import { useAuth } from '../../contexts/AuthContextFixed';
+import { X, Building2, AlertCircle } from 'lucide-react';
+import { Button } from '../ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
+import { 
+  ValidatedInput, 
+  ValidatedSelect, 
+  ValidationSummary
+} from '../ui/FormField';
+import { useFormValidation } from '../../hooks/useFormValidation';
+import { VALIDATION_RULES } from '../../utils/validation';
 import { SupabaseDatabaseService } from '../../services/supabase-database';
 
 interface OrganizationManagementModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (org: any) => void;
-  initialOrganization?: any;
-  mode: 'create' | 'edit' | 'view';
-  hasPermission?: boolean;
+  organization?: any; // Organization data for editing
 }
 
 export function OrganizationManagementModal({
   isOpen,
   onClose,
-  onSave,
-  initialOrganization,
-  mode,
-  hasPermission = true
+  organization 
 }: OrganizationManagementModalProps) {
-  const { user } = useAuth();
-  const [formData, setFormData] = useState({
-    name: '',
-    slug: '',
-    domain: '',
-    description: '',
-    address: '',
-    contact_info: '',
-    max_users: 10,
-    max_loans_per_month: 100,
-    subscription_plan: 'trial' as 'trial' | 'basic' | 'premium' | 'enterprise',
-    status: 'trial',
-    features: '{}'
-  });
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const isEditing = !!organization;
+
+  const {
+    values,
+    errors,
+    isValid,
+    setValue,
+    validateField,
+    handleSubmit: validateForm,
+    reset: resetForm
+  } = useFormValidation({
+    validationRules: {
+      name: { required: true, message: 'Organization name is required' },
+      code: { required: true, message: 'Organization code is required' },
+      email: VALIDATION_RULES.email,
+      phone: VALIDATION_RULES.phone
+    },
+    initialValues: {
+      name: organization?.name || '',
+      code: organization?.code || '',
+      description: organization?.description || '',
+      email: organization?.email || '',
+      phone: organization?.phone || '',
+      website: organization?.website || '',
+      logoUrl: organization?.logoUrl || '',
+      address: organization?.address || '',
+      metadata: organization?.metadata || '',
+      settings: organization?.settings || '{}',
+      isActive: organization?.isActive?.toString() || 'true'
+    }
+  });
 
   useEffect(() => {
-    if (isOpen && initialOrganization) {
-      setFormData({
-        name: initialOrganization.name || '',
-        slug: initialOrganization.slug || '',
-        domain: initialOrganization.domain || '',
-        description: initialOrganization.description || '',
-        address: initialOrganization.address ? JSON.stringify(initialOrganization.address) : '',
-        contact_info: initialOrganization.contact_info ? JSON.stringify(initialOrganization.contact_info) : '',
-        max_users: initialOrganization.maxUsers || initialOrganization.max_users || 10,
-        max_loans_per_month: initialOrganization.maxLoansPerMonth || initialOrganization.max_loans_per_month || 100,
-        subscription_plan: initialOrganization.subscriptionPlan || initialOrganization.subscription_plan || 'trial',
-        status: initialOrganization.status || 'trial',
-        features: initialOrganization.features ? JSON.stringify(initialOrganization.features) : '{}'
-      });
+    if (isOpen) {
+      resetForm();
+      setError(null);
+      setSuccess(null);
     }
-  }, [isOpen, initialOrganization]);
+  }, [isOpen, organization]);
 
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      
-      const orgData = {
-        ...formData,
-        address: formData.address ? JSON.parse(formData.address) : null,
-        contact_info: formData.contact_info ? JSON.parse(formData.contact_info) : null,
-        features: formData.features ? JSON.parse(formData.features) : {},
-        maxUsers: formData.max_users,
-        maxLoansPerMonth: formData.max_loans_per_month,
-        max_users: formData.max_users,
-        max_loans_per_month: formData.max_loans_per_month,
-        subscriptionPlan: formData.subscription_plan,
-        subscription_plan: formData.subscription_plan
-      };
-      
-      if (mode === 'create') {
-        await SupabaseDatabaseService.createOrganization(orgData);
-      } else if (mode === 'edit' && initialOrganization?.id) {
-        await SupabaseDatabaseService.updateOrganization(initialOrganization.id, orgData);
-      }
-      
-      onSave(orgData);
-      onClose();
-    } catch (error) {
-      console.error('Error saving organization:', error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!initialOrganization?.id) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     
+    // Validate form
+    const validationResult = validateForm();
+    if (!validationResult) {
+      setError('Please fix validation errors');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
     try {
-      setDeleting(true);
-      await SupabaseDatabaseService.deleteOrganization(initialOrganization.id);
-      onSave({ deleted: true });
+      const organizationData = {
+        name: values.name,
+        code: values.code,
+        description: values.description || undefined,
+        email: values.email || undefined,
+        phone: values.phone || undefined,
+        website: values.website || undefined,
+        logoUrl: values.logoUrl || undefined,
+        address: values.address || undefined,
+        metadata: values.metadata || undefined,
+        settings: values.settings || '{}',
+        isActive: values.isActive === 'true'
+      };
+
+      if (isEditing) {
+        await SupabaseDatabaseService.updateOrganization(organization.id, organizationData);
+        setSuccess('Organization updated successfully!');
+      } else {
+        await SupabaseDatabaseService.createOrganization(organizationData);
+        setSuccess('Organization created successfully!');
+      }
+
+      // Close modal after a short delay
+      setTimeout(() => {
       onClose();
-    } catch (error) {
-      console.error('Error deleting organization:', error);
+      }, 1500);
+
+    } catch (err: any) {
+      console.error('Error saving organization:', err);
+      setError(err.message || 'Failed to save organization');
     } finally {
-      setDeleting(false);
+      setLoading(false);
     }
   };
 
-  const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleClose = () => {
+    if (!loading) {
+      onClose();
+    }
   };
 
-  const subscriptionPlans = [
-    { value: 'trial', label: 'Trial' },
-    { value: 'basic', label: 'Basic' },
-    { value: 'premium', label: 'Premium' },
-    { value: 'enterprise', label: 'Enterprise' }
-  ];
-
-  const statusOptions = [
-    { value: 'trial', label: 'Trial' },
-    { value: 'active', label: 'Active' },
-    { value: 'suspended', label: 'Suspended' },
-    { value: 'cancelled', label: 'Cancelled' }
-  ];
+  if (!isOpen) return null;
 
   return (
-    <CrudModal
-      isOpen={isOpen}
-      onClose={onClose}
-      onSave={handleSave}
-      onDelete={mode === 'edit' ? handleDelete : undefined}
-      title={`${mode === 'create' ? 'Create' : mode === 'edit' ? 'Edit' : 'View'} Organization`}
-      initialData={initialOrganization}
-      size="lg"
-      isLoading={loading}
-      isSaving={saving}
-      isDeleting={deleting}
-      submitText={mode === 'view' ? 'Close' : 'Save'}
-      cancelText="Cancel"
-      deleteText="Delete Organization"
-      showDelete={mode === 'edit' && hasPermission}
-    >
-      <div className="space-y-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b">
+          <div className="flex items-center space-x-3">
+            <Building2 className="h-6 w-6 text-blue-600" />
+            <h2 className="text-xl font-semibold text-gray-900">
+              {isEditing ? 'Edit Organization' : 'Create New Organization'}
+            </h2>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleClose}
+            disabled={loading}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Error/Success Messages */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-4">
+              <div className="flex">
+                <AlertCircle className="h-5 w-5 text-red-400" />
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">Error</h3>
+                  <div className="mt-2 text-sm text-red-700">{error}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {success && (
+            <div className="bg-green-50 border border-green-200 rounded-md p-4">
+              <div className="flex">
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-green-800">Success</h3>
+                  <div className="mt-2 text-sm text-green-700">{success}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Basic Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Basic Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <ValidatedInput
             label="Organization Name"
             name="name"
-            value={formData.name}
-            onChange={(e) => handleChange('name', e.target.value)}
+                  value={values.name}
+                  onChange={(e) => setValue('name', e.target.value)}
+                  onBlur={() => validateField('name')}
+                  error={errors.name}
+                  placeholder="Enter organization name"
+                  required
+                />
+
+                <ValidatedInput
+                  label="Organization Code"
+                  name="code"
+                  value={values.code}
+                  onChange={(e) => setValue('code', e.target.value.toUpperCase())}
+                  onBlur={() => validateField('code')}
+                  error={errors.code}
+                  placeholder="VERIPHY"
             required
-            disabled={mode === 'view'}
-            placeholder="Enter organization name"
+                />
+
+                <ValidatedInput
+                  label="Email"
+                  name="email"
+                  type="email"
+                  value={values.email}
+                  onChange={(e) => setValue('email', e.target.value)}
+                  onBlur={() => validateField('email')}
+                  error={errors.email}
+                  placeholder="info@organization.com"
+                />
+
+                <ValidatedInput
+                  label="Phone"
+                  name="phone"
+                  value={values.phone}
+                  onChange={(e) => setValue('phone', e.target.value)}
+                  onBlur={() => validateField('phone')}
+                  error={errors.phone}
+                  placeholder="+91-9999999999"
+                />
+
+                <ValidatedInput
+                  label="Website"
+                  name="website"
+                  value={values.website}
+                  onChange={(e) => setValue('website', e.target.value)}
+                  placeholder="https://organization.com"
           />
 
           <ValidatedInput
-            label="Slug"
-            name="slug"
-            value={formData.slug}
-            onChange={(e) => handleChange('slug', e.target.value.toLowerCase().replace(/\s+/g, '-'))}
-            disabled={mode === 'view'}
-            placeholder="organization-slug"
-          />
-        </div>
+                  label="Logo URL"
+                  name="logoUrl"
+                  value={values.logoUrl}
+                  onChange={(e) => setValue('logoUrl', e.target.value)}
+                  placeholder="https://organization.com/logo.png"
+                />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <ValidatedInput
-            label="Domain"
-            name="domain"
-            value={formData.domain}
-            onChange={(e) => handleChange('domain', e.target.value)}
-            type="url"
-            disabled={mode === 'view'}
-            placeholder="example.com"
-          />
+                <ValidatedInput
+                  label="Description"
+                  name="description"
+                  value={values.description}
+                  onChange={(e) => setValue('description', e.target.value)}
+                  placeholder="Organization description"
+                />
 
           <ValidatedSelect
             label="Status"
-            name="status"
-            value={formData.status}
-            onChange={(e) => handleChange('status', e.target.value)}
-            options={statusOptions}
-            required
-            disabled={mode === 'view'}
+                  name="isActive"
+                  value={values.isActive}
+                  onChange={(e) => setValue('isActive', e.target.value)}
+                  options={[
+                    { value: 'true', label: 'Active' },
+                    { value: 'false', label: 'Inactive' }
+                  ]}
           />
         </div>
+            </CardContent>
+          </Card>
 
-        <ValidatedTextarea
-          label="Description"
-          name="description"
-          value={formData.description}
-          onChange={(e) => handleChange('description', e.target.value)}
-          rows={3}
-          disabled={mode === 'view'}
-          placeholder="Brief description of the organization"
-        />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <ValidatedTextarea
-            label="Address (JSON)"
-            name="address"
-            value={formData.address}
-            onChange={(e) => handleChange('address', e.target.value)}
-            rows={3}
-            disabled={mode === 'view'}
-            placeholder='{"street": "123 Main St", "city": "City", "state": "State"}'
-          />
+          {/* Validation Summary */}
+          <ValidationSummary errors={errors} />
 
-          <ValidatedTextarea
-            label="Contact Info (JSON)"
-            name="contact_info"
-            value={formData.contact_info}
-            onChange={(e) => handleChange('contact_info', e.target.value)}
-            rows={3}
-            disabled={mode === 'view'}
-            placeholder='{"phone": "+1234567890", "email": "contact@example.com"}'
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <ValidatedInput
-            label="Max Users"
-            name="max_users"
-            type="number"
-            value={formData.max_users.toString()}
-            onChange={(e) => handleChange('max_users', e.target.value)}
-            required
-            disabled={mode === 'view'}
-            min="1"
-          />
-
-          <ValidatedInput
-            label="Max Loans/Month"
-            name="max_loans_per_month"
-            type="number"
-            value={formData.max_loans_per_month.toString()}
-            onChange={(e) => handleChange('max_loans_per_month', e.target.value)}
-            required
-            disabled={mode === 'view'}
-            min="1"
-          />
-
-          <ValidatedSelect
-            label="Subscription Plan"
-            name="subscription_plan"
-            value={formData.subscription_plan}
-            onChange={(e) => handleChange('subscription_plan', e.target.value)}
-            options={subscriptionPlans}
-            required
-            disabled={mode === 'view'}
-          />
-        </div>
-
-        <ValidatedTextarea
-          label="Features (JSON)"
-          name="features"
-          value={formData.features}
-          onChange={(e) => handleChange('features', e.target.value)}
-          rows={3}
-          disabled={mode === 'view'}
-          placeholder='{"basic_features": true, "advanced_features": false}'
-        />
-
-        {mode === 'view' && initialOrganization && (
-          <div className="border-t pt-4 mt-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Additional Information</h4>
-            <div className="text-sm text-gray-600 space-y-1">
-              <p><span className="font-medium">Organization ID:</span> {initialOrganization.id}</p>
-              <p><span className="font-medium">Created:</span> {new Date(initialOrganization.created_at || '').toLocaleDateString()}</p>
-              <p><span className="font-medium">Last Updated:</span> {new Date(initialOrganization.updated_at || '').toLocaleDateString()}</p>
-              {initialOrganization.trial_ends_at && (
-                <p><span className="font-medium">Trial Ends:</span> {new Date(initialOrganization.trial_ends_at).toLocaleDateString()}</p>
-              )}
-            </div>
+          {/* Form Actions */}
+          <div className="flex justify-end space-x-3 pt-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={loading || !isValid}
+            >
+              {loading ? 'Saving...' : (isEditing ? 'Update Organization' : 'Create Organization')}
+            </Button>
           </div>
-        )}
+        </form>
       </div>
-    </CrudModal>
+    </div>
   );
 }

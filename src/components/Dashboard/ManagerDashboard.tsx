@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Users, 
   TrendingUp, 
@@ -15,7 +15,10 @@ import {
   CheckCircle,
   ArrowUpRight,
   ArrowDownRight,
-  Minus
+  Minus,
+  Plus,
+  Trash2,
+  Save
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
@@ -23,6 +26,7 @@ import { Button } from '../ui/Button';
 import { useAuth } from '../../contexts/AuthContextFixed';
 import { useDashboardStats, useCases, useTeamMembers } from '../../hooks/useDashboardData';
 import { SupabaseDatabaseService } from '../../services/supabase-database';
+import { CaseAssignmentModal } from '../modals/CaseAssignmentModal';
 
 interface ManagerDashboardProps {
   onNavigateToTeam: () => void;
@@ -42,14 +46,32 @@ export function ManagerDashboard({
   const [teamStats, setTeamStats] = useState<any>({});
   const [highPriorityCases, setHighPriorityCases] = useState<any[]>([]);
   const [loadingTeam, setLoadingTeam] = useState(false);
+  const [assigningCase, setAssigningCase] = useState<string | null>(null);
+  const [showCreateCase, setShowCreateCase] = useState(false);
+  const [editingCase, setEditingCase] = useState<string | null>(null);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [selectedCaseForAssignment, setSelectedCaseForAssignment] = useState<any>(null);
+  const [newCase, setNewCase] = useState({
+    title: '',
+    description: '',
+    priority: 'medium',
+    assignedTo: '',
+    loanType: 'personal_loan',
+    loanAmount: 0,
+    customerId: ''
+  });
   
   // Get real data from Supabase
   const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useDashboardStats(user?.id || '', user?.role || '');
-  const { cases, loading: casesLoading, error: casesError, refetch: refetchCases } = useCases();
+  // For managers, show all cases in the organization so they can assign them to team members
+  const { cases, loading: casesLoading, error: casesError, refetch: refetchCases } = useCases({
+    showAll: true,
+    organizationId: user?.organizationId
+  });
   const { teamMembers, loading: teamLoading, error: teamError, refetch: refetchTeam } = useTeamMembers();
 
   // Fetch team performance data
-  const fetchTeamData = async () => {
+  const fetchTeamData = useCallback(async () => {
     if (!user?.organizationId) return;
     
     setLoadingTeam(true);
@@ -108,11 +130,103 @@ export function ManagerDashboard({
     } finally {
       setLoadingTeam(false);
     }
-  };
+  }, [user?.organizationId, user?.id]);
 
   useEffect(() => {
+    if (user?.organizationId) {
+      fetchTeamData();
+    }
+  }, [user?.organizationId, fetchTeamData]);
+
+  // Handle case assignment to team members
+  const handleAssignCase = async (caseId: string, assignToUserId: string) => {
+    try {
+      setAssigningCase(caseId);
+      await SupabaseDatabaseService.assignCaseToUser(caseId, assignToUserId);
+      // Refresh cases and team data
+      refetchCases();
+      fetchTeamData();
+    } catch (error) {
+      console.error('Error assigning case:', error);
+    } finally {
+      setAssigningCase(null);
+    }
+  };
+
+  // Handle opening assignment modal
+  const handleOpenAssignmentModal = (caseData: any) => {
+    setSelectedCaseForAssignment(caseData);
+    setShowAssignmentModal(true);
+  };
+
+  // Handle assignment modal completion
+  const handleAssignmentComplete = () => {
+    refetchCases();
     fetchTeamData();
-  }, [user?.organizationId]);
+  };
+
+  // Handle creating a new case
+  const handleCreateCase = async () => {
+    try {
+      if (!user?.organizationId || !newCase.customerId) {
+        alert('Please fill in all required fields');
+        return;
+      }
+
+      await SupabaseDatabaseService.createCase({
+        organizationId: user.organizationId,
+        customerId: parseInt(newCase.customerId),
+        productId: 1, // Default product
+        title: newCase.title,
+        description: newCase.description,
+        priority: newCase.priority,
+        assignedTo: newCase.assignedTo ? parseInt(newCase.assignedTo) : undefined,
+        loanType: newCase.loanType,
+        loanAmount: newCase.loanAmount
+      });
+
+      // Reset form and refresh data
+      setNewCase({
+        title: '',
+        description: '',
+        priority: 'medium',
+        assignedTo: '',
+        loanType: 'personal_loan',
+        loanAmount: 0,
+        customerId: ''
+      });
+      setShowCreateCase(false);
+      refetchCases();
+    } catch (error) {
+      console.error('Error creating case:', error);
+      alert('Failed to create case. Please try again.');
+    }
+  };
+
+  // Handle updating a case
+  const handleUpdateCase = async (caseId: string, updates: any) => {
+    try {
+      await SupabaseDatabaseService.updateCase(caseId, updates);
+      setEditingCase(null);
+      refetchCases();
+    } catch (error) {
+      console.error('Error updating case:', error);
+      alert('Failed to update case. Please try again.');
+    }
+  };
+
+  // Handle deleting a case
+  const handleDeleteCase = async (caseId: string) => {
+    if (window.confirm('Are you sure you want to delete this case?')) {
+      try {
+        await SupabaseDatabaseService.deleteCase(caseId);
+        refetchCases();
+      } catch (error) {
+        console.error('Error deleting case:', error);
+        alert('Failed to delete case. Please try again.');
+      }
+    }
+  };
   const handleKPIClick = (kpiType: string) => {
     switch (kpiType) {
       case 'team-cases':
@@ -139,7 +253,7 @@ export function ManagerDashboard({
   };
 
   // Use real data from Supabase, with fallbacks for missing data
-  const kpis = [
+  const kpis = useMemo(() => [
     { 
       label: 'Team Cases', 
       value: teamStats.totalActiveCases?.toString() || stats?.totalCases?.toString() || '0', 
@@ -176,19 +290,21 @@ export function ManagerDashboard({
       type: 'team-members', 
       details: `Active: ${teamStats.totalMembers || 0} | Busy: ${teamData.filter(m => m.status === 'busy').length} | Available: ${teamData.filter(m => m.status === 'available').length} | Top: ${teamStats.topPerformer?.full_name || 'N/A'}` 
     }
-  ];
+  ], [stats, teamStats, teamData, highPriorityCases]);
 
   // Use real team data from Supabase
-  const teamPerformance = teamData.map(member => ({
-    name: member.full_name || 'Unknown Member',
-    cases: member.activeCases,
-    completed: member.completedCases,
-    efficiency: `${member.efficiency}%`,
-    status: member.status,
-    id: member.id,
-    email: member.email,
-    totalCases: member.totalCases
-  }));
+  const teamPerformance = useMemo(() => {
+    return teamData.map(member => ({
+      name: member.full_name || 'Unknown Member',
+      cases: member.activeCases,
+      completed: member.completedCases,
+      efficiency: `${member.efficiency}%`,
+      status: member.status,
+      id: member.id,
+      email: member.email,
+      totalCases: member.totalCases
+    }));
+  }, [teamData]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -252,7 +368,12 @@ export function ManagerDashboard({
           <p className="text-gray-600">Team oversight and performance monitoring</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={() => { refetchStats(); refetchCases(); refetchTeam(); fetchTeamData(); }}>
+          <Button variant="outline" onClick={() => { 
+            refetchStats(); 
+            refetchCases(); 
+            refetchTeam(); 
+            fetchTeamData(); 
+          }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -343,55 +464,235 @@ export function ManagerDashboard({
         </CardContent>
       </Card>
 
-      {/* High Priority Cases */}
+      {/* All Cases with Assignment */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>High Priority Cases</CardTitle>
-            <Button variant="outline" size="sm" onClick={onNavigateToCases}>View All</Button>
+            <CardTitle>All Cases - Assign to Team Members</CardTitle>
+            <div className="flex space-x-2">
+              <Button size="sm" onClick={() => setShowCreateCase(true)}>
+                <Plus className="h-4 w-4 mr-1" />
+                Create Case
+              </Button>
+              <Button variant="outline" size="sm" onClick={onNavigateToCases}>View All</Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {highPriorityCases.length > 0 ? (
-              highPriorityCases.map((case_, index) => (
+            {cases.length > 0 ? (
+              cases.slice(0, 10).map((case_, index) => (
                 <div 
                   key={case_.id || index}
-                  className="p-4 border border-red-200 bg-red-50 rounded-lg cursor-pointer hover:bg-red-100 transition-colors"
-                  onClick={() => onNavigateToCase(case_.id)}
-                  title="Click to view case details"
+                  className="p-4 border border-gray-200 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium text-gray-900">
-                        {case_.customer?.name || 'Unknown Customer'}
-                      </h3>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <h3 className="font-medium text-gray-900">
+                          {case_.customer?.name || 'Unknown Customer'}
+                        </h3>
+                        <Badge variant={case_.priority === 'high' ? 'error' : case_.priority === 'medium' ? 'warning' : 'info'} size="sm">
+                          {case_.priority}
+                        </Badge>
+                      </div>
                       <p className="text-sm text-gray-600">
-                        {case_.loanType} • ₹{case_.loanAmount ? (case_.loanAmount / 100000).toFixed(0) + 'L' : 'N/A'} • {case_.customer?.employmentType || 'N/A'}
+                        {case_.loanType} • ₹{case_.loanAmount ? (case_.loanAmount / 100000).toFixed(0) + 'L' : 'N/A'} • {case_.customer?.employment || 'N/A'}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
                         Status: {case_.status} • Case: {case_.caseNumber}
                       </p>
-                      <p className="text-xs text-red-600">Click to review</p>
-                    </div>
-                    <div className="text-right">
-                      <Badge variant="error" size="sm">High Priority</Badge>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Assigned to {case_.assignedUser?.name || 'Unassigned'}
+                      <p className="text-xs text-gray-500">
+                        Currently assigned to: {case_.assignedTo ? `User ${case_.assignedTo}` : 'Unassigned'}
                       </p>
+                    </div>
+                    <div className="flex flex-col space-y-2">
+                      <div className="flex space-x-1">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => onNavigateToCase(case_.id)}
+                          title="View case details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setEditingCase(case_.id)}
+                          title="Edit case"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleOpenAssignmentModal(case_)}
+                          title="Assign case to team member"
+                          className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                        >
+                          <UserPlus className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleDeleteCase(case_.id)}
+                          title="Delete case"
+                          className="bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="p-4 border border-gray-200 bg-gray-50 rounded-lg text-center">
-                <p className="text-gray-500">No high priority cases at the moment</p>
-                <p className="text-xs text-gray-400 mt-1">All cases are being handled efficiently</p>
+              <div className="text-center py-8 text-gray-500">
+                <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                <p>No cases found</p>
+                <p className="text-sm">Create new cases to start managing your team</p>
               </div>
             )}
           </div>
         </CardContent>
       </Card>
+
+      {/* Create Case Modal */}
+      {showCreateCase && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Create New Case</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Customer ID *
+                </label>
+                <input
+                  type="number"
+                  value={newCase.customerId}
+                  onChange={(e) => setNewCase({...newCase, customerId: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter customer ID"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={newCase.title}
+                  onChange={(e) => setNewCase({...newCase, title: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Case title"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={newCase.description}
+                  onChange={(e) => setNewCase({...newCase, description: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="Case description"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Priority
+                </label>
+                <select
+                  value={newCase.priority}
+                  onChange={(e) => setNewCase({...newCase, priority: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Loan Type
+                </label>
+                <select
+                  value={newCase.loanType}
+                  onChange={(e) => setNewCase({...newCase, loanType: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="personal_loan">Personal Loan</option>
+                  <option value="home_loan">Home Loan</option>
+                  <option value="business_loan">Business Loan</option>
+                  <option value="car_loan">Car Loan</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Loan Amount
+                </label>
+                <input
+                  type="number"
+                  value={newCase.loanAmount}
+                  onChange={(e) => setNewCase({...newCase, loanAmount: parseFloat(e.target.value) || 0})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Loan amount in rupees"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Assign To (Optional)
+                </label>
+                <select
+                  value={newCase.assignedTo}
+                  onChange={(e) => setNewCase({...newCase, assignedTo: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select team member</option>
+                  {teamMembers.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.fullName || member.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button variant="outline" onClick={() => setShowCreateCase(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateCase}>
+                <Save className="h-4 w-4 mr-2" />
+                Create Case
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Case Assignment Modal */}
+      {showAssignmentModal && selectedCaseForAssignment && (
+        <CaseAssignmentModal
+          isOpen={showAssignmentModal}
+          onClose={() => {
+            setShowAssignmentModal(false);
+            setSelectedCaseForAssignment(null);
+          }}
+          caseData={selectedCaseForAssignment}
+          teamMembers={teamMembers}
+          onAssignmentComplete={handleAssignmentComplete}
+        />
+      )}
     </div>
   );
 }

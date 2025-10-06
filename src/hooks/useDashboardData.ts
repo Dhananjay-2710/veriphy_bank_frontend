@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { SupabaseDatabaseService } from '../services/supabase-database';
 import { 
   Case, 
@@ -39,10 +39,13 @@ export function useDashboardStats(userId: string, role: string) {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
-      setLoading(true);
+      if (!isInitialized) {
+        setLoading(true);
+      }
       setError(null);
       const result = await SupabaseDatabaseService.getDashboardStats(userId, role);
       setStats(result);
@@ -50,8 +53,9 @@ export function useDashboardStats(userId: string, role: string) {
       setError(err instanceof Error ? err.message : 'Failed to fetch dashboard stats');
     } finally {
       setLoading(false);
+      setIsInitialized(true);
     }
-  }, [userId, role]);
+  }, [userId, role, isInitialized]);
 
   const refetch = useCallback(() => {
     fetchData();
@@ -185,23 +189,32 @@ export function useRecentActivities() {
 }
 
 // Cases Hook
-export function useCases(filters?: { assignedTo?: string; status?: string; priority?: string }) {
+export function useCases(filters?: { assignedTo?: string; status?: string; priority?: string; organizationId?: number; showAll?: boolean }) {
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
-      setLoading(true);
+      if (!isInitialized) {
+        setLoading(true);
+      }
       setError(null);
-      const result = await SupabaseDatabaseService.getCases(filters);
-      setCases(result);
+      
+      // If showAll is true, don't apply assignedTo filter (for managers to see all cases)
+      const effectiveFilters = filters?.showAll ? { ...filters, assignedTo: undefined } : filters;
+      
+      const result = await SupabaseDatabaseService.getCases(effectiveFilters);
+      setCases(result as unknown as Case[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch cases');
     } finally {
       setLoading(false);
+      setIsInitialized(true);
     }
-  }, [filters]);
+  }, [filters, isInitialized]);
 
   const refetch = useCallback(() => {
     fetchData();
@@ -211,17 +224,31 @@ export function useCases(filters?: { assignedTo?: string; status?: string; prior
     fetchData();
   }, [fetchData]);
 
-  // Set up real-time subscription
+  // Set up real-time subscription (only after initial load)
   useEffect(() => {
+    if (!isInitialized) return;
+
     const subscription = SupabaseDatabaseService.subscribeToCases((payload) => {
       console.log('Case real-time update:', payload);
-      fetchData(); // Refetch on any change
+      // Only refetch if the update is relevant to current filters
+      if (!filters || payload.new || payload.old) {
+        // Debounce the refetch to prevent excessive API calls
+        if (debounceTimeoutRef.current) {
+          clearTimeout(debounceTimeoutRef.current);
+        }
+        debounceTimeoutRef.current = setTimeout(() => {
+          fetchData();
+        }, 500); // 500ms debounce
+      }
     });
 
     return () => {
       subscription.unsubscribe();
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
     };
-  }, [fetchData]);
+  }, [isInitialized, fetchData, filters]);
 
   return { cases, loading, error, refetch };
 }
@@ -291,10 +318,13 @@ export function useTeamMembers(organizationId?: number) {
   const [teamMembers, setTeamMembers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
-      setLoading(true);
+      if (!isInitialized) {
+        setLoading(true);
+      }
       setError(null);
       const result = await SupabaseDatabaseService.getTeamMembers();
       setTeamMembers(result);
@@ -302,8 +332,9 @@ export function useTeamMembers(organizationId?: number) {
       setError(err instanceof Error ? err.message : 'Failed to fetch team members');
     } finally {
       setLoading(false);
+      setIsInitialized(true);
     }
-  }, [organizationId]);
+  }, [organizationId, isInitialized]);
 
   const refetch = useCallback(() => {
     fetchData();
@@ -1491,7 +1522,7 @@ export function useCustomers(filters?: {
       setLoading(true);
       setError(null);
       const result = await SupabaseDatabaseService.getCustomers(filters);
-      setCustomers(result as Customer[]);
+      setCustomers(result as unknown as Customer[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch customers");
     } finally {

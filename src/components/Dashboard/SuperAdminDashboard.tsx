@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, 
@@ -19,6 +19,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { useAdminDashboardStats, useSystemHealth, useSystemAlerts } from '../../hooks/useDashboardData';
+import { AuditLogger } from '../../utils/audit-logger';
 import { DatabaseTest } from '../Test/DatabaseTest';
 import { DatabasePopulator } from '../Test/DatabasePopulator';
 import { DatabaseSchemaTest } from '../Test/DatabaseSchemaTest';
@@ -54,6 +55,20 @@ export function SuperAdminDashboard({
   const { stats: adminStats, loading: adminStatsLoading, error: adminStatsError, refetch: refetchAdminStats } = useAdminDashboardStats();
   const { data: systemHealthData, loading: systemHealthLoading, error: systemHealthError, refetch: refetchSystemHealth } = useSystemHealth();
   const { alerts: systemAlertsData, loading: systemAlertsLoading, error: systemAlertsError, refetch: refetchSystemAlerts } = useSystemAlerts();
+
+  // Log dashboard view for audit purposes
+  useEffect(() => {
+    const logDashboardView = async () => {
+      try {
+        await AuditLogger.logDashboardView('super_admin_dashboard', AuditLogger.getCurrentUserId());
+      } catch (error) {
+        console.error('Error logging dashboard view:', error);
+        // Don't throw here to avoid breaking the dashboard
+      }
+    };
+
+    logDashboardView();
+  }, []);
 
   const handleRefresh = () => {
     refetchAdminStats();
@@ -378,9 +393,9 @@ export function SuperAdminDashboard({
             <TestTube className="h-4 w-4 mr-2" />
             {isPopulating ? 'Populating...' : 'Populate Sample Data'}
           </Button>
-          <Button variant="outline" onClick={() => navigate('/audit-logs')}>
+          <Button variant="outline" onClick={onNavigateToAuditLogs}>
             <Shield className="h-4 w-4 mr-2" />
-            Audit Logs
+            Super Admin Audit Logs
           </Button>
           <Button variant="outline" onClick={() => navigate('/system-settings')}>
             <Settings className="h-4 w-4 mr-2" />

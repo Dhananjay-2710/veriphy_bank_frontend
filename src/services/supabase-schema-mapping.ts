@@ -30,8 +30,8 @@ export const SUPABASE_TABLES = {
   FILE_SIGNATURES: 'file_signatures',
   
   // Phase 2: Core Business Logic Tables
-  LOAN_APPLICATIONS: 'loan_applications',
-  LOAN_PRODUCTS: 'loan_products',
+  LOAN_APPLICATIONS: 'cases', // Using cases table for loan applications
+  LOAN_PRODUCTS: 'products', // Using products table for loan products
   WORKFLOW_STAGES: 'workflow_stages',
   WORKFLOW_TRANSITIONS: 'workflow_transitions',
   WORKFLOW_HISTORY: 'workflow_history',
@@ -192,8 +192,8 @@ export function mapRoleData(roleData: any) {
     id: roleData.id,
     name: roleData.name,
     description: roleData.description,
-    permissions: roleData.permissions || [],
-    isActive: roleData.is_active || true,
+    permissions: [], // Permissions are managed separately in a junction table
+    isActive: roleData.is_active !== undefined ? roleData.is_active : true,
     createdAt: roleData.created_at,
     updatedAt: roleData.updated_at,
   };
@@ -206,7 +206,7 @@ export function mapPermissionData(permissionData: any) {
     description: permissionData.description,
     resource: permissionData.resource,
     action: permissionData.action,
-    isActive: permissionData.is_active || true,
+    isActive: permissionData.is_active !== undefined ? permissionData.is_active : true,
     createdAt: permissionData.created_at,
     updatedAt: permissionData.updated_at,
   };
@@ -1602,21 +1602,21 @@ export function mapCaseData(caseData: any) {
     customer: caseData.customers ? {
       id: caseData.customers.id?.toString(),
       userId: caseData.customers.user_id?.toString(),
-      name: caseData.customers.users ? 
-        `${caseData.customers.users.first_name} ${caseData.customers.users.last_name}` : 
-        'Unknown Customer',
-      email: caseData.customers.users?.email,
-      phone: caseData.customers.users?.phone,
+      name: caseData.customers.full_name || 'Unknown Customer',
+      email: caseData.customers.email,
+      phone: caseData.customers.mobile || caseData.customers.phone,
       panNumber: caseData.customers.pan_number,
       kycStatus: caseData.customers.kyc_status,
       riskProfile: caseData.customers.risk_profile,
-      monthlyIncome: caseData.customers.monthly_income
+      monthlyIncome: caseData.customers.monthly_income,
+      employment: caseData.customers.employment_type
     } : null,
     assignedUser: caseData.users ? {
       id: caseData.users.id?.toString(),
-      name: `${caseData.users.first_name} ${caseData.users.last_name}`,
+      name: caseData.users.full_name || `${caseData.users.first_name || ''} ${caseData.users.last_name || ''}`.trim(),
       firstName: caseData.users.first_name,
-      lastName: caseData.users.last_name
+      lastName: caseData.users.last_name,
+      fullName: caseData.users.full_name
     } : null
   };
 }

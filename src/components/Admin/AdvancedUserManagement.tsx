@@ -22,29 +22,32 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { useAdvancedUserManagement } from '../../hooks/useDashboardData';
+import { SupabaseDatabaseService } from '../../services/supabase-database';
+import { useAuth } from '../../contexts/AuthContextFixed';
 
 interface User {
   id: string;
+  fullName: string;
   email: string;
-  full_name: string;
   mobile?: string;
-  role: string;
-  department_id?: number;
-  department_name?: string;
-  organization_id?: number;
-  organization_name?: string;
-  status: 'active' | 'inactive' | 'suspended' | 'pending';
-  last_login_at?: string;
-  created_at: string;
-  updated_at: string;
-  email_verified_at?: string;
-  employment_type?: string;
+  emailVerifiedAt?: string;
+  rememberToken?: string;
+  departmentId?: number;
+  employmentTypeId?: number;
+  organizationId?: number;
+  status: string;
   metadata?: any;
-  permissions?: string[];
-  is_online?: boolean;
-  login_attempts?: number;
-  locked_until?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  deletedAt?: string;
+  authId?: string;
+  role: string;
+  passwordHash?: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  isActive: boolean;
+  lastLoginAt?: string;
 }
 
 

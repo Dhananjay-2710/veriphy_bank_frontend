@@ -5,15 +5,18 @@ globs: *
 
 ## PROJECT RULES & CODING STANDARDS
 
-Comprehensive validation must be added across all text input fields in the project wherever required. When using `useCallback` in TypeScript, ensure the correct syntax for return type annotations is used. The correct syntax is `useCallback((): boolean => { ... })` and not `useCallback(): boolean => { ... }`. Ensure all JSX components have corresponding closing tags and proper nesting. When authenticating users against a database without Supabase Auth accounts, the login function should query the users table directly by email. Password validation must be implemented with proper hashing and validation, and should not be disabled in production environments. User roles from the database should be properly mapped to application roles. When authenticating users against a database without Supabase Auth accounts, the login function must query the users table directly by email, skipping Supabase Auth. Password validation must be implemented (but can be temporarily disabled for local testing). Role mapping should handle roles such as admin, manager, salesperson, credit-ops, and compliance. The application must support both Supabase Auth users (new signups) and database-only users (existing users). Registration must create Supabase Auth users and sync to the database, assigning roles via the `user_roles` table. The registration form should offer roles that match the database: `salesperson`, `manager`, `credit-ops`, `admin`, and `auditor`, and `compliance`. The application must support creating a `super_admin` role during initial setup.
-
-The `users` table includes the following fields: `id`, `full_name`, `email`, `mobile`, `email_verified_at`, `remember_token`, `department_id`, `employment_type_id`, `organization_id`, `status`, `metadata`, `created_at`, `updated_at`, `deleted_at`, `auth_id`, `role`. Passwords are handled by Supabase Auth, and the `auth_id` field links to Supabase Auth users. The `full_name` field should be used instead of separate first/last names. Use `mobile` instead of `phone`. The `role` field is stored directly in the `users` table.
+Comprehensive validation must be added across all text input fields in the project wherever required. When using `useCallback` in TypeScript, ensure the correct syntax for return type annotations is used. The correct syntax is `useCallback((): boolean => { ... })` and not `useCallback((): boolean => { ... }`. Ensure all JSX components have corresponding closing tags and proper nesting. When authenticating users against a database without Supabase Auth accounts, the login function should query the users table directly by email. Password validation must be implemented with proper hashing and validation, and should not be disabled in production environments. User roles from the database should be properly mapped to application roles. When authenticating users against a database without Supabase Auth accounts, the login function must query the users table directly by email, skipping Supabase Auth. Password validation must be implemented (but can be temporarily disabled for local testing). Role mapping should handle roles such as admin, manager, salesperson, credit-ops, and compliance.
 
 The application uses a dual authentication system:
+
 1.  Supabase Auth users (new signups with proper authentication)
 2.  Database-only users (existing users without Supabase Auth accounts)
 
-The `src/contexts/AuthContextFixed.tsx` file is the main authentication context for the Veriphy Bank frontend application. When importing `AuthContext`, ensure to import from `AuthContextFixed` due to the actual file name. The AuthContext supports registration functionality, including the creation of a `super_admin` user. The super admin is responsible for the initial organization setup using Supabase CRUD APIs. The admin can then configure their organization. The system should support adding one row to every table using CRUD operations in the super admin dashboard to populate the database initially. The `system_settings` table must exist in the Supabase database. The application must not use fallbacks if the `system_settings` table is missing; instead, the table must be created using the SQL script below.
+Registration must create Supabase Auth users and sync to the database, assigning roles via the `user_roles` table. The registration form should offer roles that match the database: `salesperson`, `manager`, `credit-ops`, `admin`, and `auditor`, and `compliance`.
+
+The `users` table includes the following fields: `id`, `full_name`, `email`, `mobile`, `email_verified_at`, `remember_token`, `department_id`, `employment_type_id`, `organization_id`, `status`, `metadata`, `created_at`, `updated_at`, `deleted_at`, `auth_id`, `role`, `password_hash`, `first_name`, `last_name`, `phone`, `is_active`, `last_login_at`. Passwords are handled by Supabase Auth, and the `auth_id` field links to Supabase Auth users. The `full_name` field should be used instead of separate first/last names. Use `mobile` instead of `phone`. The `role` field is stored directly in the `users` table.
+
+The `src/contexts/AuthContextFixed.tsx` file is the main authentication context for the Veriphy Bank frontend application. When importing `AuthContext`, ensure to import from `AuthContextFixed` due to the actual file name.
 
 To create the `system_settings` table in your Supabase database:
 
@@ -81,8 +84,6 @@ SELECT key, value, category FROM system_settings ORDER BY category, key;
 ```
 
 The database tables must be populated with data according to the user roles to have a proper functioning flow.
-
-When the database is cleared, all missing database tables (organizations, departments, roles, permissions, etc.) must be created. The organizations table must include the missing code column. All tables must be populated with comprehensive demo data. After database restoration, the application must be tested.
 
 When inserting into the `customers` table, ensure that the `kyc_status` value is a valid enum value. Valid `kyc_status` values:
 - `'pending'` - For customers awaiting KYC verification
@@ -189,7 +190,7 @@ To ensure unique keys for map operations in React components, use a combination 
 
 When a component has real-time auto-refresh functionality, make the auto-refresh optional with user controls. Provide a toggle checkbox for enabling/disabling auto-refresh and a clear visual indicator when auto-refresh is active. The default state should be auto-refresh OFF.
 
-When the keys are not unique in a map function, it can lead to React key warnings. Ensure unique keys for table rows by using `${selectedTable}-row-${row.id || index}`. For table columns use `${selectedTable}-col-${column.name}` and for table cells use `${selectedTable}-cell-${row.id || index}-${column.name}`. Also ensure that the data being mapped over is not null or undefined by using `(tableData?.data || []).map()` and `(tableSchema?.columns || []).map()`. When using checkboxes, only allow selection of rows with valid IDs. The select all checkbox should handle undefined data gracefully.
+When the keys are not unique in a map function, it can lead to React key warnings. Ensure unique keys for table rows by using `${selectedTable}-row-${row.id || index}`. For table columns use `${selectedTable}-col-${column.name}` and for table cells use `${selectedTable}-cell-${row.id || index}-${column.name}`. Also ensure that the data being mapped over is not null or undefined by using `(tableData?.data || [])).map()` and (tableSchema?.columns || []).map()`. When using checkboxes, only allow selection of rows with valid IDs. The select all checkbox should handle undefined data gracefully.
 
 #### Database Management System
 
@@ -209,7 +210,7 @@ The keys for column headers are not unique. Use `${selectedTable}-col-${column.n
 
 The keys for table cells are not unique. Use `${selectedTable}-cell-${row.id || index}-${column.name}` to prevent conflicts between tables.
 
-Ensure data is not null or undefined by using `(tableData?.data || []).map()` and `(tableSchema?.columns || []).map()`.
+Ensure data is not null or undefined by using `(tableData?.data || []).map()` and (tableSchema?.columns || []).map()`.
 
 The "select all" checkbox logic must handle undefined data gracefully.
 
@@ -245,7 +246,7 @@ The "select all" checkbox logic must handle undefined data gracefully.
 
 ### 5. Professional Error Handling
 
--   **No More 404s**: Gracefully handles missing tables without console errors
+-   No More 404s**: Gracefully handles missing tables without console errors
 -   **Smart Status Detection**: Distinguishes between "doesn't exist" and "permission denied"
 -   **User-Friendly Messages**: Clear explanations instead of raw error codes
 
@@ -354,6 +355,9 @@ The application uses reusable modal components for CRUD operations, integrated w
     -   `src/components/modals/CaseManagementModal.tsx` - Loan case creation and management
     -   `src/components/modals/DocumentManagementModal.tsx` - Document upload and file handling
     -   `src/components/modals/OrganizationManagementModal.tsx` - Organization setup and configuration
+    -   `src/components/modals/CaseAssignmentModal.tsx` - Loan case assignment to team members
+    -   `src/components/modals/CustomerManagementModal.tsx` - Customer CRUD with KYC and organization management
+    -   `src/components/modals/DepartmentManagementModal.tsx` - Department CRUD with organization assignment
 
 All components ensure that every **Save**, **Update**, or **Delete** operation goes directly to the Supabase database and retains the real state. They can be integrated into any page within the Veriphy Bank application to provide immediate CRUD functionality wherever data management is required.
 
@@ -363,247 +367,237 @@ The Database Management System should use these CRUD Modals.
 
 The main roles are all below super admin. The super admin page is only for initial setup. The system must focus on the flow and functionality of other roles and perfect it. Every navigation and data should work with CRUD wherever required. There should not be any dead pages or no content errors for these main roles.
 
-## TO-DO List
+The system now properly distinguishes between:
+- **Super Admin**: Manages ALL organizations and departments and customers globally. Has access to Customer Management.
+- **Admin**: Manages only their own organization (limited scope)
 
--   Analyze existing dashboard and navigation functionality for each role (salesperson, manager, credit-ops, compliance, admin, auditor)
--   Identify missing components and dead pages for each role's navigation flow
--   Ensure CRUD operations are implemented in all key components with Supabase integration
--   Fix dead navigation links and ensure all role-based navigation works properly
--   Verify all components use real Supabase data instead of mock data
--   Improve navigation UX for all user roles with proper loading states and error handling
+To enable a Super Admin to manage all the organizations and their departments and customers, ensure the following:
+1. **Authentication**: The user must have the `super_admin` role assigned in the database.
+2. **Authorization**: The application must correctly interpret the `super_admin` role and grant access to the appropriate components and data.
 
-## WORKFLOW & RELEASE RULES
+## Super Admin Functionality (Reinstated 2025-10-03)
 
-When integrating Supabase live data, follow these steps:
-1. Analyze current Supabase integration status across all components.
-2. Review Supabase database service methods and functionality.
-3. Check all components for live data integration.
-4. Identify components missing Supabase integration.
-5. Generate comprehensive integration status report.
+The system now supports the `super_admin` role, which has the capability to manage all organizations and their departments, and customers. Admin users can only manage their own organization. The Super Admin can:
 
-After integrating components, the system is ready for:
-1. **Navigation Integration** - Add these components to the main app routing
-2. **Advanced Features** - Implement pagination, bulk operations, and advanced filtering
-3. **Testing** - Add comprehensive unit and integration tests
-4. **Performance Optimization** - Implement caching strategies and query optimization
-5. **User Experience** - Add advanced UI features like drag-and-drop, bulk actions, etc.
+-   Manage ALL Organizations: Create, update, delete any organization
+-   Manage ALL Departments: Create departments for any organization
+-   View ALL Users: See users across all organizations
+-   Manage ALL Customers: Create, update, delete any customer
+-   System-wide Statistics: Access to global system metrics
+-   Cross-Organization Management: Full system administration
 
-When setting up the system as a super admin, follow these steps:
-1. Login as Super Admin → Access Super Admin Dashboard
-2. Click "System Setup" → Opens the setup wizard
-3. Step 1: Organizations → Create your first organization
-4. Step 2: Departments → Set up department structure
-5. Step 3: Products → Configure loan products
-6. Step 4: Workflows → (Coming soon)
+**Audit Logging for Super Admin Page**
 
-When setting up the system as an admin:
-1. Login as Admin → Access Admin Dashboard
-2. Use the same components to set up within their organization
-3. Create users and assign to departments
-4. Configure organization-specific settings
+Comprehensive audit logging must be implemented for all CRUD operations performed on the Super Admin page, specifically for customers, organizations, users, and departments. This includes:
 
-To fix import errors:
-1. Check the exact file path and name.
-2. Correct the import statement to match the actual location.
+-   **CRUD Operation Logging:** All create, read, update, and delete operations on the specified entities must be logged.
+-   **Audit Log Table:** The `audit_logs` table structure should be used to store these logs. The table must be updated as soon as the CRUD operations occur. The actual table name is `logs` and should be used instead of `audit_logs`.
+-   **Database Service Methods:** Enhance database service methods to include audit logging functionality for Super Admin CRUD operations.
 
-The Super Admin setup involves these steps:
-1. **Organization Management** - Create/edit organizations
-2. **Department Management** - Set up departments for each organization
-3. **Role & Permission Management** - Define roles and permissions
-4. **Product Management** - Create loan products
-5. **Document Type Management** - Define required documents
-6. **Workflow Setup** - Create approval workflows
+**Super Admin Dynamic Password Authentication**
 
-The Admin setup (Organization Level) involves these steps:
-1. **User Management** - Create users within their organization
-2. **Department Assignment - Assign users to departments
-3. **Task Category Setup** - Create task categories
-4. **Compliance Setup** - Set up compliance rules
+-   The Super Admin password is now validated against the `password_hash` field in the `users` table.
+-   The login function must validate Super Admin passwords against the `password_hash` field in the `users` table.
+-   There is no longer a default password.
+-   The `getSuperAdminPassword()` and `setSuperAdminPassword()` methods are no longer used.
+-   Audit logging must be implemented for password changes.
 
-Multiple methods are available for Super Admin setup:
-1. **Quick Setup (Recommended)**
-   1. Start your app: `npm run dev`
-   2. Go to setup page: `http://localhost:5173/setup`
-   3. Click "Create Super Admin"
-   4. Login with: `superadmin@veriphy.com` (any password)
-2. **Direct Database**
-   1. Open Supabase Dashboard
-   2. Go to Table Editor → users table
-   3. Insert the super admin record (see SUPER_ADMIN_SETUP.md)
-4. **Browser Console**
-   1. Open your app in browser
-   2. Press F12 → Console
-   3. Run the setup script (see SUPER_ADMIN_SETUP.md)
+**Super Admin Navigation Menu**
 
-To resolve project issues, follow these steps:
-1.  Run the build command: `npm run build`
-2.  Check for TypeScript compilation errors: `npx tsc --noEmit`
-3.  Run the linter: `npm run lint`
-4.  Address linting errors systematically, prioritizing the following:
-    - Remove unused variables and imports.
-    - Replace 'any' types with proper TypeScript types.
-    - Ensure variables are correctly declared as `const` instead of `let` where appropriate.
-    - Fix lexical declarations in case blocks.
-    - Correct parsing errors.
-    - Fix unnecessary escape characters in regex.
+The Super Admin navigation menu must be accessible and include the following items:
 
-The following step-by-step plan must be followed to populate all tables with demo data:
-1. Analyze all Supabase tables and their relationships.
-2. Map user roles to their responsibilities and permissions.
-3. Design comprehensive data flow with realistic demo data.
-4. Create SQL scripts to populate all tables with demo data.
-5. Execute the population scripts in Supabase.
-6. Test the application with populated data.
+1.  Super Admin Dashboard (`/super-admin/dashboard`) - Main dashboard with real-time data
+2.  System Monitoring (`/super-admin/monitoring`) - Real-time system performance monitoring
+3.  Advanced User Management (`/super-admin/users`) - Advanced user management with bulk operations
+4.  Workflow Designer (`/super-admin/workflow-designer`) - Design and manage business workflows
+5.  Organizations (`/super-admin/organizations`) - Manage all organizations with Supabase integration
+6.  Departments (`/super-admin/departments`) - Manage all departments with audit logging
+7.  Customers (`/super-admin/customers`) - Manage all customers with comprehensive tracking
+8.  Global Settings (`/system-settings`) - System-wide configuration
+9.  System Audit (`/audit-logs`) - System audit logs and compliance
+10. Super Admin Audit Logs (`/super-admin/audit-logs`) - Comprehensive audit logs for Super Admin operations
+11. Global Analytics (`/analytics`) - System-wide analytics and reporting
+12. Admin Tools (with sub-menu):
+    - Loan Applications Management
+    - Task Categories Management
+    - Compliance Issues Management
+    - User Profiles Management
+    - Workflow Management
+    - Background Processing
+    - Cache Management
+    - Entity Management
 
-To restore the database after accidentally using the clear database feature in the super admin dashboard, follow these steps:
-1. Create all missing database tables (organizations, departments, roles, permissions, etc.).
-2. Fix the organizations table to include the missing code column.
-3. Populate all tables with comprehensive demo data.
-4. Test the application after database restoration.
+**Navigation Menu Accessibility**
+- All navigation menu items for pages with dynamic data coming from Supabase must be enabled.
+- The Super Admin navigation menu must be accessible.
 
-To check if the table structure is fixed:
-## **🔍 METHOD 1: Check Table Structure with DESCRIBE (PostgreSQL)**
+**Super Admin Audit Logs**
+- Super Admin Audit Logs must be added to the navigation menu.
+- Super Admin Audit Logs must display comprehensive audit logs for Super Admin operations.
 
-Run these queries in your Supabase SQL Editor to check each table structure:
+**Department Management Functionality**
+- Department Management page must be fully functional with complete CRUD operations.
+- Department Management in the Super Admin should display data in tables.
+- Department Management page must be fully functional with complete CRUD operations.
 
-```sql
--- Check if all required columns exist in each table
-SELECT column_name, data_type, is_nullable, column_default 
-FROM information_schema.columns 
-WHERE table_name = 'organizations' 
-ORDER BY ordinal_position;
+**Organization Management Functionality**
+- Organization Management page must be fully functional with complete CRUD operations.
+- The Organization Management page must fetch data from the Supabase `organizations` table.
+- Full CRUD operations must be enabled on the Organization Management page.
 
-SELECT column_name, data_type, is_nullable, column_default 
-FROM information_schema.columns 
-WHERE table_name = 'users' 
-ORDER BY ordinal_position;
+**Customer Management Functionality**
+- Customer Management page must be fully functional with complete CRUD operations.
+- Customer Management must be added to the Super Admin dashboard.
 
-SELECT column_name, data_type, is_nullable, column_default 
-FROM information_schema.columns 
-WHERE table_name = 'customers' 
-ORDER BY ordinal_position;
+The following rules are effective as of 2025-10-03:
+- The `getCustomers` method now fetches the correct fields from your actual table: `id`, `full_name`, `dob`, `mobile`, `email`, `address`, `external_customer_code`, `kyc_status`, `metadata`, `organization_id`, `phone`, `pan_number`, `aadhaar_number`, `date_of_birth`, `gender`, `marital_status`, `employment_type`, `risk_profile`, `deleted_at`, `user_id`
+- The SuperAdminAuditLogs component now queries the `logs` table, not `audit_logs`
+- The Super Admin password is dynamically retrieved from the system settings
 
-SELECT column_name, data_type, is_nullable, column_default 
-WHERE table_name = 'cases' 
-ORDER BY ordinal_position;
+To prevent foreign key constraint violations during deletion operations, the following cascading delete logic must be implemented:
+- When deleting a customer:
+    - Delete related workflow instances.
+    - Delete related cases (loan applications).
+    - Delete related documents.
+    - Delete related tasks.
+    - Delete related notifications.
+    - Finally, delete the customer record.
+- When deleting an organization:
+    - Delete related departments.
+    - Delete related users.
+    - Delete related customers.
+    - Delete related cases.
+    - Delete related products.
+    - Finally, delete the organization record.
+- When deleting a department:
+    - Update users to remove department reference.
+    - Update child departments to remove parent reference.
+    - Delete related tasks.
+    - Finally, delete the department record.
 
-SELECT column_name, data_type, is_nullable, column_default 
-FROM information_schema.columns 
-WHERE table_name = 'notifications' 
-ORDER BY ordinal_position;
-```
+The Super Admin can now manage all organizations globally with full database persistence and a professional user experience!
 
-## **🔍 METHOD 2: Check All Tables Exist**
+### Super Admin Capabilities (Effective 2025-10-03)
 
-```sql
--- Check if all required tables exist
-SELECT table_name 
-FROM information_schema.tables 
-WHERE table_schema = 'public' 
-AND table_name IN (
-  'organizations', 'departments', 'roles', 'permissions', 'role_permissions',
-  'users', 'user_roles', 'products', 'document_types', 'customers', 
-  'cases', 'documents', 'tasks', 'logs', 'notifications', 'system_settings'
-)
-ORDER BY table_name;
-```
+The Super Admin now has **complete management capabilities**:
 
-## **🔍 METHOD 3: Check Specific Columns Exist**
+1. ✅ **Organizations**: Manage all organizations globally
+2. ✅ **Departments**: Manage departments across all organizations
+3. ✅ **Users**: Manage all users across all organizations
+4. ✅ **Customers**: Manage all customers across all organizations
 
-```sql
--- Check for specific columns that were missing
-SELECT 
-  table_name,
-  column_name,
-  data_type
-FROM information_schema.columns 
-WHERE table_schema = 'public' 
-AND (
-  (table_name = 'organizations' AND column_name = 'code') OR
-  (table_name = 'departments' AND column_name = 'code') OR
-  (table_name = 'users' AND column_name IN ('full_name', 'role', 'organization_id', 'department_id', 'mobile')) OR
-  (table_name = 'customers' AND column_name IN ('full_name', 'phone', 'email', 'pan_number', 'aadhaar_number')) OR
-  (table_name = 'cases' AND column_name IN ('case_number', 'loan_amount', 'status')) OR
-  (table_name = 'notifications' AND column_name = 'is_read')
-)
-ORDER BY table_name, column_name;
-```
+All data comes dynamically from your Supabase database, and all operations persist to the database with proper error handling and user feedback!
 
-## **🔍 METHOD 4: Test Data Insertion**
+### Super Admin Test Credentials (Effective 2025-10-03)
 
-Try inserting test data to see if the structure works:
+- **Super Admin:** superadmin@veriphy.com (MANAGES ALL ORGS)
+- **Admin User:** admin@veriphy.com (MANAGES OWN ORG)
 
-```sql
--- Test inserting into organizations (should work if structure is correct)
-INSERT INTO organizations (name, code, description, email, phone) 
-VALUES ('Test Org', 'TEST', 'Test Organization', 'test@test.com', '+91-1234567890')
-ON CONFLICT (code) DO NOTHING;
+**Note:** Super Admin can manage all organizations and departments. Admin can only manage their own organization.
 
--- Test inserting into users (should work if structure is correct)
-INSERT INTO users (email, password_hash, full_name, mobile, role, organization_id, department_id) 
-VALUES ('test@test.com', 'test123', 'Test User', '+91-1234567890', 'test_role', 1, 1)
-ON CONFLICT (email) DO NOTHING;
-```
+### User Table Columns (Effective 2025-10-03)
 
-## **🔍 METHOD 5: Check Foreign Key Relationships**
+The system now properly handles:
+- id
+- full_name
+- email
+- mobile
+- email_verified_at
+- remember_token
+- department_id
+- employment_type_id
+- organization_id
+- status
+- metadata
+- created_at
+- updated_at
+- deleted_at
+- auth_id
+- role
+- password_hash
+- first_name
+- last_name
+- phone
+- is_active
+- last_login_at
 
-```sql
--- Check foreign key constraints
-SELECT 
-  tc.table_name, 
-  kcu.column_name, 
-  ccu.table_name AS foreign_table_name,
-  ccu.column_name AS foreign_column_name 
-FROM information_schema.table_constraints AS tc 
-JOIN information_schema.key_column_usage AS kcu
-  ON tc.constraint_name = kcu.constraint_name
-  AND tc.table_schema = kcu.table_schema
-JOIN information_schema.constraint_column_usage AS ccu
-  ON ccu.constraint_name = tc.constraint_name
-  AND ccu.table_schema = ccu.table_schema
-WHERE tc.constraint_type = 'FOREIGN KEY' 
-AND tc.table_schema = 'public'
-ORDER BY tc.table_name;
-```
+### Customer Table Columns (Effective 2025-10-03)
+Based on your actual table data: `[{"idx":0,"id":1,"full_name":"Ramesh Gupta","dob":null,"mobile":null,"email":"ramesh.gupta@email.com","address":null,"external_customer_code":null,"kyc_status":"verified","metadata":null,"organization_id":1,"created_at":"2025-09-23 19:29:51.565989+00","updated_at":"2025-09-23 19:29:51.565989+00","phone":null,"pan_number":null,"aadhaar_number":null,"date_of_birth":null,"gender":null,"marital_status":null,"employment_type":null,"risk_profile":"medium","deleted_at":null,"user_id":null}]`
+The system now properly handles:
+- ✅ **id**: Customer ID
+- ✅ **full_name**: Full name
+- ✅ **dob**: Date of birth
+- ✅ **mobile**: Mobile number
+- ✅ **email**: Email address
+- ✅ **address**: Address information
+- ✅ **external_customer_code**: External customer code
+- ✅ **kyc_status**: KYC status
+- ✅ **metadata**: Additional metadata
+- ✅ **organization_id**: Organization ID
+- ✅ **created_at**: Creation timestamp
+- ✅ **updated_at**: Update timestamp
+- ✅ **phone**: Phone number
+- ✅ **pan_number**: PAN number
+- ✅ **aadhaar_number**: Aadhaar number
+- ✅ **date_of_birth**: Date of birth
+- ✅ **gender**: Gender
+- ✅ **marital_status**: Marital status
+- ✅ **employment_type**: Employment type
+- ✅ **risk_profile**: Risk profile
+- ✅ **deleted_at**: Deletion timestamp
+- ✅ **user_id**: User ID
 
-## **🔍 METHOD 6: Comprehensive Verification Script**
+### Organization Management (Effective 2025-10-03)
 
-Here's a complete verification script you can run:
+Your Organization Management is now **100% connected to Supabase**:
 
-```sql
--- COMPREHENSIVE TABLE STRUCTURE VERIFICATION
--- Run this to check if all tables and columns are properly created
+1. **Real Data**: All organizations come from your Supabase database
+2. **Full CRUD**: Create, read, update, delete operations work perfectly
+3. **Real-time Updates**: Changes reflect immediately
+4. **Professional UI**: Clean, modern interface with proper error handling
+5. **Advanced Filtering**: Search and filter capabilities
 
-DO $$
-DECLARE
-    missing_tables TEXT[] := ARRAY[]::TEXT[];
-    missing_columns TEXT[] := ARRAY[]::TEXT[];
-    table_name TEXT;
-    column_name TEXT;
-    expected_tables TEXT[] := ARRAY[
-        'organizations', 'departments', 'roles', 'permissions', 'role_permissions',
-        'users', 'user_roles', 'products', 'document_types', 'customers', 
-        'cases', 'documents', 'tasks', 'logs', 'notifications', 'system_settings'
-    ];
-    expected_columns JSONB := '{
-        "organizations": ["id", "name", "code", "description", "email", "phone"],
-        "users": ["id", "email", "password_hash", "full_name", "role", "organization_id", "department_id", "mobile"],
-        "customers": ["id", "user_id", "full_name", "phone", "email", "pan_number", "aadhaar_number"],
-        "cases": ["id", "case_number", "customer_id", "assigned_to", "loan_type", "loan_amount", "status"],
-        "notifications": ["id", "user_id", "type", "title", "message", "is_read"]
-    }';
-BEGIN
-    -- Check for missing tables
-    FOREACH table_name IN ARRAY expected_tables
-    LOOP
-        IF NOT EXISTS (
-            SELECT 1 FROM information_schema.tables 
-            WHERE table_schema = 'public' AND table_name = table_name
-        ) THEN
-            missing_tables := array_append(missing_tables, table_name);
-        END IF;
-    END LOOP;
-    
-    -- Check for missing columns
-    FOR table_name, column_name IN 
-        SELECT
+The Super Admin can now manage all organizations globally with full database persistence and a professional user experience!
+
+### Super Admin Capabilities (Effective 2025-10-03)
+
+The Super Admin now has **complete management capabilities**:
+
+1. ✅ **Organizations**: Manage all organizations globally
+2. ✅ **Departments**: Manage departments across all organizations
+3. ✅ **Users**: Manage all users across all organizations
+4. ✅ **Customers**: Manage all customers across all organizations
+
+All data comes dynamically from your Supabase database, and all operations persist to the database with proper error handling and user feedback!
+
+### Super Admin Test Credentials (Effective 2025-10-03)
+
+- **Super Admin:** superadmin@veriphy.com (MANAGES ALL ORGS)
+- **Admin User:** admin@veriphy.com (MANAGES OWN ORG)
+
+**Note:** Super Admin can manage all organizations and departments. Admin can only manage their own organization.
+
+### Department Management (Effective 2025-10-03)
+
+The Department Management is now 100% functional.
+- **Full CRUD**: Create, read, update, delete operations work perfectly
+- **Real-time Updates**: Changes reflect immediately
+
+### Audit Logging Schema (Effective 2025-10-05)
+
+The `logs` table in Supabase has the following schema:
+- `id`, `organization_id`, `user_id`, `action`, `entity_type`, `entity_id`, `description`
+
+### Admin Dashboard Rules (Effective 2025-10-05)
+
+The admin dashboard has been streamlined to focus on:
+
+1.  Department Management: Manage organizational departments
+2.  Roles Management: Create and manage user roles and permissions
+3.  Permissions Management: Configure system permissions and access controls
+
+All other functionalities have been removed to provide a cleaner and more focused administrative experience. The navigation has been updated accordingly.
+
+### LoginPage.tsx Modifications (Effective 2025-10-05)
+
+The "Show User Debugger" functionality has been removed from the

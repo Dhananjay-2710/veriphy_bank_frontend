@@ -24,7 +24,6 @@ interface AuthContextType {
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   register: (data: RegistrationData) => Promise<AppUser>;
-  registerSuperAdmin: (data: RegistrationData) => Promise<AppUser>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -71,9 +70,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         console.log('Found user in database:', dbUser);
 
-        // For database-only users, we'll accept any password for now
-        // TODO: Implement proper password validation against password_hash
-        console.log('Database user - password validation skipped for testing');
+        // Validate password against password_hash in users table
+        if (dbUser.password_hash) {
+          // Simple password validation - in production, use proper hashing
+          if (password !== dbUser.password_hash) {
+            console.log('❌ Password mismatch');
+            throw new Error("Invalid password.");
+          }
+          console.log('✅ Password validated successfully');
+        } else {
+          console.log('⚠️ No password hash found - accepting any password for testing');
+        }
 
         // Get role directly from users table (actual Supabase schema)
         const role = dbUser.role || 'admin'; // Default role
@@ -283,88 +290,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // ✅ Register Super Admin (bypasses some restrictions)
-  const registerSuperAdmin = async (data: RegistrationData) => {
-    console.log("Attempting Super Admin registration for:", data.email);
-    setLoading(true);
-    try {
-      const { firstName, lastName, email, phone, password } = data;
-
-      // 1. Sign up in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: email.toLowerCase(),
-        password,
-        options: {
-          data: {
-            firstName,
-            lastName,
-            phone,
-            role: 'super_admin',
-          },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (authError) {
-        console.error("Supabase Auth signup error:", authError.message);
-        throw new Error(authError.message);
-      }
-
-      if (!authData.user) {
-        throw new Error("Failed to create super admin account");
-      }
-
-      console.log("Super Admin Auth user created:", authData.user);
-
-      // 2. Insert into public.users table with super_admin role
-      const { data: userData, error: insertError } = await supabase
-        .from("users")
-        .insert([
-          {
-            full_name: `${firstName} ${lastName}`.trim(),
-            email: email.toLowerCase(),
-            mobile: phone,
-            auth_id: authData.user.id,
-            role: 'super_admin',
-            status: 'active',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ])
-        .select()
-        .single();
-
-      if (insertError) {
-        console.error("Database insert error:", insertError.message);
-        // If database insert fails, we should clean up the auth user
-        await supabase.auth.admin.deleteUser(authData.user.id);
-        throw new Error(insertError.message);
-      }
-
-      console.log("Super Admin inserted into database:", userData);
-
-      // 3. Create user profile
-      const profile: AppUser = {
-        id: authData.user.id,
-        email: authData.user.email,
-        role: 'super_admin',
-        full_name: `${firstName} ${lastName}`.trim(),
-      };
-
-      // 4. If session is available (email confirmation disabled), set user
-      if (authData.session) {
-        setUser(profile);
-        localStorage.setItem('veriphy_user', JSON.stringify(profile));
-      }
-
-      return profile;
-    } catch (error) {
-      console.error("Super Admin registration error:", error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // ✅ Restore session on mount + listen for auth state changes
   useEffect(() => {
@@ -458,7 +383,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser, register, registerSuperAdmin }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser, register }}>
       {children}
     </AuthContext.Provider>
   );

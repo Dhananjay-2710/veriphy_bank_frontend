@@ -1,4 +1,5 @@
 import { supabase } from '../supabase-client';
+import { AuditLogger } from '../utils/audit-logger';
 import { 
   SUPABASE_TABLES, 
   mapCaseToLoanApplication, 
@@ -9,7 +10,6 @@ import {
   mapAuditLogData,
   mapProductData,
   mapCaseData,
-  mapCustomerData,
   mapSubProductData,
   mapDocumentTypeData,
   mapFileData,
@@ -77,22 +77,17 @@ export class SupabaseDatabaseService {
       .from(SUPABASE_TABLES.ORGANIZATIONS)
       .select(`
         id,
-        uuid,
         name,
-        slug,
-        domain,
-        logo_url,
+        code,
         description,
+        email,
+        phone,
+        website,
+        logo_url,
         address,
-        contact_info,
+        metadata,
         settings,
-        status,
-        subscription_plan,
-        trial_ends_at,
-        subscription_ends_at,
-        max_users,
-        max_loans_per_month,
-        features,
+        is_active,
         created_at,
         updated_at
       `)
@@ -114,22 +109,17 @@ export class SupabaseDatabaseService {
 
     return data?.map(org => ({
       id: org.id.toString(),
-      uuid: org.uuid,
       name: org.name,
-      slug: org.slug,
-      domain: org.domain,
-      logoUrl: org.logo_url,
+      code: org.code,
       description: org.description,
+      email: org.email,
+      phone: org.phone,
+      website: org.website,
+      logoUrl: org.logo_url,
       address: org.address,
-      contactInfo: org.contact_info,
+      metadata: org.metadata,
       settings: org.settings,
-      status: org.status,
-      subscriptionPlan: org.subscription_plan,
-      trialEndsAt: org.trial_ends_at,
-      subscriptionEndsAt: org.subscription_ends_at,
-      maxUsers: org.max_users,
-      maxLoansPerMonth: org.max_loans_per_month,
-      features: org.features,
+      isActive: org.is_active,
       createdAt: org.created_at,
       updatedAt: org.updated_at
     })) || [];
@@ -137,30 +127,31 @@ export class SupabaseDatabaseService {
 
   static async createOrganization(organizationData: {
     name: string;
-    slug: string;
-    domain?: string;
+    code: string;
     description?: string;
+    email?: string;
+    phone?: string;
+    website?: string;
+    logoUrl?: string;
     address?: any;
-    contactInfo?: any;
-    maxUsers: number;
-    maxLoansPerMonth: number;
-    subscriptionPlan: 'trial' | 'basic' | 'premium' | 'enterprise';
+    metadata?: any;
+    settings?: any;
   }) {
     console.log('🚀 Creating organization:', organizationData);
     console.log('📊 Using table:', SUPABASE_TABLES.ORGANIZATIONS);
     
     const insertData = {
       name: organizationData.name,
-      slug: organizationData.slug,
-      domain: organizationData.domain,
+      code: organizationData.code,
       description: organizationData.description,
+      email: organizationData.email,
+      phone: organizationData.phone,
+      website: organizationData.website,
+      logo_url: organizationData.logoUrl,
       address: organizationData.address,
-      contact_info: organizationData.contactInfo,
-      max_users: organizationData.maxUsers,
-      max_loans_per_month: organizationData.maxLoansPerMonth,
-      subscription_plan: organizationData.subscriptionPlan,
-      status: 'trial',
-      trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days trial
+      metadata: organizationData.metadata,
+      settings: organizationData.settings || '{}',
+      is_active: true,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -184,31 +175,58 @@ export class SupabaseDatabaseService {
     }
 
     console.log('✅ Organization created successfully:', data);
+
+    // Create audit log for organization creation
+    try {
+      await AuditLogger.logOrganizationCreation(
+        data?.[0]?.id?.toString() || 'unknown',
+        organizationData,
+        AuditLogger.getCurrentUserId()
+      );
+    } catch (auditError) {
+      console.error('Error creating audit log for organization creation:', auditError);
+      // Don't throw here to avoid breaking the main operation
+    }
+
     return data?.[0];
   }
 
   static async updateOrganization(organizationId: string, updates: {
     name?: string;
-    slug?: string;
-    domain?: string;
+    code?: string;
     description?: string;
+    email?: string;
+    phone?: string;
+    website?: string;
+    logoUrl?: string;
     address?: any;
-    contactInfo?: any;
-    maxUsers?: number;
-    maxLoansPerMonth?: number;
-    subscriptionPlan?: 'trial' | 'basic' | 'premium' | 'enterprise';
-    status?: 'trial' | 'active' | 'suspended' | 'cancelled';
+    metadata?: any;
+    settings?: any;
+    isActive?: boolean;
   }) {
     console.log('Updating organization:', organizationId, updates);
+    
+    // Get the current organization data for audit logging
+    const { data: currentData } = await supabase
+      .from(SUPABASE_TABLES.ORGANIZATIONS)
+      .select('*')
+      .eq('id', organizationId)
+      .single();
     
     const { data, error } = await supabase
       .from(SUPABASE_TABLES.ORGANIZATIONS)
       .update({
-        ...updates,
-        contact_info: updates.contactInfo,
-        max_users: updates.maxUsers,
-        max_loans_per_month: updates.maxLoansPerMonth,
-        subscription_plan: updates.subscriptionPlan,
+        name: updates.name,
+        code: updates.code,
+        description: updates.description,
+        email: updates.email,
+        phone: updates.phone,
+        website: updates.website,
+        logo_url: updates.logoUrl,
+        address: updates.address,
+        metadata: updates.metadata,
+        settings: updates.settings,
+        is_active: updates.isActive,
         updated_at: new Date().toISOString()
       })
       .eq('id', organizationId)
@@ -219,20 +237,126 @@ export class SupabaseDatabaseService {
       throw new Error(`Failed to update organization: ${error.message}`);
     }
 
+    // Create audit log for organization update
+    try {
+      await AuditLogger.logOrganizationUpdate(
+        organizationId,
+        currentData,
+        data?.[0],
+        AuditLogger.getCurrentUserId()
+      );
+    } catch (auditError) {
+      console.error('Error creating audit log for organization update:', auditError);
+      // Don't throw here to avoid breaking the main operation
+    }
+
     return data?.[0];
   }
 
   static async deleteOrganization(organizationId: string) {
     console.log('Deleting organization:', organizationId);
     
-    const { error } = await supabase
+    // Get the current organization data for audit logging
+    const { data: currentData } = await supabase
       .from(SUPABASE_TABLES.ORGANIZATIONS)
-      .delete()
-      .eq('id', organizationId);
+      .select('*')
+      .eq('id', organizationId)
+      .single();
+    
+    if (!currentData) {
+      throw new Error('Organization not found');
+    }
 
-    if (error) {
-      console.error('Error deleting organization:', error);
-      throw new Error(`Failed to delete organization: ${error.message}`);
+    try {
+      // Step 1: Delete related departments first
+      console.log('Deleting related departments...');
+      const { error: departmentsError } = await supabase
+        .from('departments')
+        .delete()
+        .eq('organization_id', organizationId);
+
+      if (departmentsError && !departmentsError.message.includes('does not exist')) {
+        console.error('Error deleting departments:', departmentsError);
+        throw new Error(`Failed to delete departments: ${departmentsError.message}`);
+      }
+
+      // Step 2: Delete related users
+      console.log('Deleting related users...');
+      const { error: usersError } = await supabase
+        .from('users')
+        .delete()
+        .eq('organization_id', organizationId);
+
+      if (usersError && !usersError.message.includes('does not exist')) {
+        console.error('Error deleting users:', usersError);
+        throw new Error(`Failed to delete users: ${usersError.message}`);
+      }
+
+      // Step 3: Delete related customers
+      console.log('Deleting related customers...');
+      const { error: customersError } = await supabase
+        .from('customers')
+        .delete()
+        .eq('organization_id', organizationId);
+
+      if (customersError && !customersError.message.includes('does not exist')) {
+        console.error('Error deleting customers:', customersError);
+        throw new Error(`Failed to delete customers: ${customersError.message}`);
+      }
+
+      // Step 4: Delete related cases
+      console.log('Deleting related cases...');
+      const { error: casesError } = await supabase
+        .from('cases')
+        .delete()
+        .eq('organization_id', organizationId);
+
+      if (casesError && !casesError.message.includes('does not exist')) {
+        console.error('Error deleting cases:', casesError);
+        throw new Error(`Failed to delete cases: ${casesError.message}`);
+      }
+
+      // Step 5: Delete related products
+      console.log('Deleting related products...');
+      const { error: productsError } = await supabase
+        .from('products')
+        .delete()
+        .eq('organization_id', organizationId);
+
+      if (productsError && !productsError.message.includes('does not exist')) {
+        console.error('Error deleting products:', productsError);
+        throw new Error(`Failed to delete products: ${productsError.message}`);
+      }
+
+      // Step 6: Finally delete the organization
+      console.log('Deleting organization record...');
+      const { error } = await supabase
+        .from(SUPABASE_TABLES.ORGANIZATIONS)
+        .delete()
+        .eq('id', organizationId);
+
+      if (error) {
+        console.error('Error deleting organization:', error);
+        throw new Error(`Failed to delete organization: ${error.message}`);
+      }
+
+      console.log('✅ Organization and all related records deleted successfully');
+
+    } catch (error) {
+      console.error('Error in cascading delete:', error);
+      throw error;
+    }
+
+    // Create audit log for organization deletion
+    try {
+      await AuditLogger.logOrganizationDeletion(
+        organizationId,
+        currentData,
+        AuditLogger.getCurrentUserId()
+      );
+    } catch (auditError) {
+      console.error('Error creating audit log for organization deletion:', auditError);
+      // Don't throw here to avoid breaking the main operation
     }
   }
 
@@ -248,6 +372,35 @@ export class SupabaseDatabaseService {
   }
 
   // =============================================================================
+  // DATABASE DEBUGGING
+  // =============================================================================
+
+  static async debugDatabaseTables() {
+    console.log('🔍 Debugging database tables...');
+    
+    // Try to get information about available tables
+    const tables = ['departments', 'organizations', 'users', 'customers', 'cases'];
+    
+    for (const table of tables) {
+      try {
+        const { data, error } = await supabase
+          .from(table)
+          .select('*')
+          .limit(1);
+        
+        console.log(`🔍 Table "${table}":`, { 
+          exists: !error, 
+          error: error?.message, 
+          dataCount: data?.length || 0,
+          sampleData: data?.[0] 
+        });
+      } catch (err) {
+        console.log(`❌ Table "${table}" error:`, err);
+      }
+    }
+  }
+
+  // =============================================================================
   // DEPARTMENT MANAGEMENT
   // =============================================================================
 
@@ -256,8 +409,86 @@ export class SupabaseDatabaseService {
     departmentType?: string;
     isActive?: boolean;
   }) {
-    console.log('Fetching departments with filters:', filters);
+    console.log('🔍 Fetching departments with filters:', filters);
+    console.log('🔍 Using table:', SUPABASE_TABLES.DEPARTMENTS);
+    console.log('🔍 SUPABASE_TABLES object:', SUPABASE_TABLES);
     
+    // First, let's try a simple query to see if the table exists and has data
+    console.log('🔍 Testing basic table access...');
+    const { data: testData, error: testError } = await supabase
+      .from(SUPABASE_TABLES.DEPARTMENTS)
+      .select('*')
+      .limit(5);
+    
+    console.log('🔍 Test query result:', { testData, testError });
+    
+    if (testError) {
+      console.error('❌ Error accessing departments table:', testError);
+      
+      // Try with the exact table name in case there's a mapping issue
+      console.log('🔍 Trying with exact table name "departments"...');
+      const { data: testData2, error: testError2 } = await supabase
+        .from('departments')
+        .select('*')
+        .limit(5);
+      
+      console.log('🔍 Direct table query result:', { testData2, testError2 });
+      
+      if (testError2) {
+        console.error('❌ Error accessing departments table directly:', testError2);
+        return [];
+      }
+      
+      console.log('🔍 Raw departments data (direct query):', testData2);
+      
+      // If direct query works, use it
+      const { data: directData, error: directError } = await supabase
+        .from('departments')
+        .select(`
+          id,
+          name,
+          code,
+          description,
+          department_type,
+          parent_department_id,
+          manager_id,
+          is_active,
+          metadata,
+          created_at,
+          updated_at,
+          organization_id
+        `)
+        .order('created_at', { ascending: false });
+        
+      if (directError) {
+        console.error('❌ Error in direct query:', directError);
+        return [];
+      }
+      
+      console.log('🔍 All departments data (direct):', directData);
+      
+      // Map the data manually since we're using direct query
+      return directData?.map(dept => ({
+        id: dept.id.toString(),
+        name: dept.name,
+        code: dept.code,
+        description: dept.description,
+        departmentType: dept.department_type,
+        parentDepartmentId: dept.parent_department_id?.toString(),
+        managerId: dept.manager_id?.toString(),
+        isActive: dept.is_active,
+        metadata: dept.metadata,
+        createdAt: dept.created_at,
+        updatedAt: dept.updated_at,
+        organizationId: dept.organization_id?.toString(),
+        parentDepartment: null, // Will be populated later if needed
+        manager: null // Will be populated later if needed
+      })) || [];
+    }
+    
+    console.log('🔍 Raw departments data (first 5):', testData);
+    
+    // Use a simple query without foreign key joins to avoid relationship errors
     let query = supabase
       .from(SUPABASE_TABLES.DEPARTMENTS)
       .select(`
@@ -272,17 +503,7 @@ export class SupabaseDatabaseService {
         metadata,
         created_at,
         updated_at,
-        organization_id,
-        parent_department:parent_department_id(
-          id,
-          name,
-          code
-        ),
-        manager:manager_id(
-          id,
-          full_name,
-          email
-        )
+        organization_id
       `)
       .order('created_at', { ascending: false });
 
@@ -303,6 +524,8 @@ export class SupabaseDatabaseService {
       return [];
     }
 
+    console.log('🔍 Processing departments data:', data);
+    
     return data?.map(dept => ({
       id: dept.id.toString(),
       name: dept.name,
@@ -316,16 +539,9 @@ export class SupabaseDatabaseService {
       createdAt: dept.created_at,
       updatedAt: dept.updated_at,
       organizationId: dept.organization_id?.toString(),
-      parentDepartment: dept.parent_department ? {
-        id: ((dept.parent_department as any)?.id || (dept.parent_department as any)[0]?.id)?.toString(),
-        name: (dept.parent_department as any)?.name || (dept.parent_department as any)[0]?.name,
-        code: (dept.parent_department as any)?.code || (dept.parent_department as any)[0]?.code
-      } : undefined,
-      manager: dept.manager ? {
-        id: ((dept.manager as any)?.id || (dept.manager as any)[0]?.id)?.toString(),
-        full_name: (dept.manager as any)?.full_name || (dept.manager as any)[0]?.full_name,
-        email: (dept.manager as any)?.email || (dept.manager as any)[0]?.email
-      } : undefined
+      // Note: parentDepartment and manager will be populated separately if needed
+      parentDepartment: null,
+      manager: null
     })) || [];
   }
 
@@ -361,6 +577,18 @@ export class SupabaseDatabaseService {
       throw new Error(`Failed to create department: ${error.message}`);
     }
 
+    // Create audit log for department creation
+    try {
+      await AuditLogger.logDepartmentCreation(
+        data?.[0]?.id?.toString() || 'unknown',
+        departmentData,
+        AuditLogger.getCurrentUserId()
+      );
+    } catch (auditError) {
+      console.error('Error creating audit log for department creation:', auditError);
+      // Don't throw here to avoid breaking the main operation
+    }
+
     return data?.[0];
   }
 
@@ -375,6 +603,13 @@ export class SupabaseDatabaseService {
     isActive?: boolean;
   }) {
     console.log('Updating department:', departmentId, updates);
+    
+    // Get the current department data for audit logging
+    const { data: currentData } = await supabase
+      .from(SUPABASE_TABLES.DEPARTMENTS)
+      .select('*')
+      .eq('id', departmentId)
+      .single();
     
     const { data, error } = await supabase
       .from(SUPABASE_TABLES.DEPARTMENTS)
@@ -397,20 +632,102 @@ export class SupabaseDatabaseService {
       throw new Error(`Failed to update department: ${error.message}`);
     }
 
+    // Create audit log for department update
+    try {
+      await AuditLogger.logDepartmentUpdate(
+        departmentId,
+        currentData,
+        data?.[0],
+        AuditLogger.getCurrentUserId()
+      );
+    } catch (auditError) {
+      console.error('Error creating audit log for department update:', auditError);
+      // Don't throw here to avoid breaking the main operation
+    }
+
     return data?.[0];
   }
 
   static async deleteDepartment(departmentId: string) {
     console.log('Deleting department:', departmentId);
     
-    const { error } = await supabase
+    // Get the current department data for audit logging
+    const { data: currentData } = await supabase
       .from(SUPABASE_TABLES.DEPARTMENTS)
-      .delete()
-      .eq('id', departmentId);
+      .select('*')
+      .eq('id', departmentId)
+      .single();
+    
+    if (!currentData) {
+      throw new Error('Department not found');
+    }
 
-    if (error) {
-      console.error('Error deleting department:', error);
-      throw new Error(`Failed to delete department: ${error.message}`);
+    try {
+      // Step 1: Update users to remove department reference
+      console.log('Updating users to remove department reference...');
+      const { error: usersError } = await supabase
+        .from('users')
+        .update({ department_id: null })
+        .eq('department_id', departmentId);
+
+      if (usersError && !usersError.message.includes('does not exist')) {
+        console.error('Error updating users:', usersError);
+        throw new Error(`Failed to update users: ${usersError.message}`);
+      }
+
+      // Step 2: Update child departments to remove parent reference
+      console.log('Updating child departments...');
+      const { error: childDeptsError } = await supabase
+        .from('departments')
+        .update({ parent_department_id: null })
+        .eq('parent_department_id', departmentId);
+
+      if (childDeptsError && !childDeptsError.message.includes('does not exist')) {
+        console.error('Error updating child departments:', childDeptsError);
+        throw new Error(`Failed to update child departments: ${childDeptsError.message}`);
+      }
+
+      // Step 3: Delete related tasks
+      console.log('Deleting related tasks...');
+      const { error: tasksError } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('department_id', departmentId);
+
+      if (tasksError && !tasksError.message.includes('does not exist')) {
+        console.error('Error deleting tasks:', tasksError);
+        throw new Error(`Failed to delete tasks: ${tasksError.message}`);
+      }
+
+      // Step 4: Finally delete the department
+      console.log('Deleting department record...');
+      const { error } = await supabase
+        .from(SUPABASE_TABLES.DEPARTMENTS)
+        .delete()
+        .eq('id', departmentId);
+
+      if (error) {
+        console.error('Error deleting department:', error);
+        throw new Error(`Failed to delete department: ${error.message}`);
+      }
+
+      console.log('✅ Department and all related records deleted successfully');
+
+    } catch (error) {
+      console.error('Error in cascading delete:', error);
+      throw error;
+    }
+
+    // Create audit log for department deletion
+    try {
+      await AuditLogger.logDepartmentDeletion(
+        departmentId,
+        currentData,
+        AuditLogger.getCurrentUserId()
+      );
+    } catch (auditError) {
+      console.error('Error creating audit log for department deletion:', auditError);
+      // Don't throw here to avoid breaking the main operation
     }
   }
 
@@ -456,19 +773,35 @@ export class SupabaseDatabaseService {
   }
 
   static async getUsers(organizationId?: number) {
+    console.log('🔍 Fetching users from Supabase...');
+    console.log('📊 Using table:', SUPABASE_TABLES.USERS);
+    console.log('🏢 Organization filter:', organizationId);
+    
     let query = supabase
       .from(SUPABASE_TABLES.USERS)
       .select(`
         id,
-        email,
         full_name,
+        email,
         mobile,
-        role,
-        status,
-        organization_id,
+        email_verified_at,
+        remember_token,
         department_id,
+        employment_type_id,
+        organization_id,
+        status,
+        metadata,
         created_at,
-        updated_at
+        updated_at,
+        deleted_at,
+        auth_id,
+        role,
+        password_hash,
+        first_name,
+        last_name,
+        phone,
+        is_active,
+        last_login_at
       `);
 
     if (organizationId) {
@@ -478,16 +811,159 @@ export class SupabaseDatabaseService {
     const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching users:', error);
+      console.error('❌ Error fetching users:', error);
       return [];
     }
 
-    return data || [];
+    console.log('✅ Users fetched successfully:', data?.length || 0, 'users');
+    console.log('📋 Raw data:', data);
+
+    return data?.map(user => ({
+      id: user.id.toString(),
+      fullName: user.full_name,
+      email: user.email,
+      mobile: user.mobile,
+      emailVerifiedAt: user.email_verified_at,
+      rememberToken: user.remember_token,
+      departmentId: user.department_id,
+      employmentTypeId: user.employment_type_id,
+      organizationId: user.organization_id,
+      status: user.status,
+      metadata: user.metadata,
+      createdAt: user.created_at,
+      updatedAt: user.updated_at,
+      deletedAt: user.deleted_at,
+      authId: user.auth_id,
+      role: user.role,
+      passwordHash: user.password_hash,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      phone: user.phone,
+      isActive: user.is_active,
+      lastLoginAt: user.last_login_at
+    })) || [];
   }
 
   // =============================================================================
   // CASE MANAGEMENT (MAPPED TO CASES TABLE)
   // =============================================================================
+
+  static async assignCaseToUser(caseId: string, userId: string) {
+    console.log('Assigning case', caseId, 'to user', userId);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.CASES)
+      .update({ 
+        assigned_to: parseInt(userId),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', caseId)
+      .select();
+
+    if (error) {
+      console.error('Error assigning case:', error);
+      throw new Error(`Failed to assign case: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  // Create a new case (for managers)
+  static async createCase(caseData: {
+    organizationId: number;
+    customerId: number;
+    productId: number;
+    title?: string;
+    description?: string;
+    priority?: string;
+    assignedTo?: number;
+    loanType?: string;
+    loanAmount?: number;
+  }) {
+    console.log('Creating new case:', caseData);
+    
+    // Generate case number
+    const caseNumber = `CASE-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.CASES)
+      .insert({
+        organization_id: caseData.organizationId,
+        case_number: caseNumber,
+        customer_id: caseData.customerId,
+        product_id: caseData.productId,
+        title: caseData.title || '',
+        description: caseData.description || '',
+        status: 'open',
+        priority: caseData.priority || 'medium',
+        assigned_to: caseData.assignedTo || null,
+        loan_type: caseData.loanType || 'personal_loan',
+        loan_amount: caseData.loanAmount || 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+
+    if (error) {
+      console.error('Error creating case:', error);
+      throw new Error(`Failed to create case: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  // Update case details (for managers)
+  static async updateCase(caseId: string, updates: {
+    title?: string;
+    description?: string;
+    status?: string;
+    priority?: string;
+    assignedTo?: number;
+    loanType?: string;
+    loanAmount?: number;
+  }) {
+    console.log('Updating case:', caseId, updates);
+    
+    const updateData: any = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (updates.title !== undefined) updateData.title = updates.title;
+    if (updates.description !== undefined) updateData.description = updates.description;
+    if (updates.status !== undefined) updateData.status = updates.status;
+    if (updates.priority !== undefined) updateData.priority = updates.priority;
+    if (updates.assignedTo !== undefined) updateData.assigned_to = updates.assignedTo;
+    if (updates.loanType !== undefined) updateData.loan_type = updates.loanType;
+    if (updates.loanAmount !== undefined) updateData.loan_amount = updates.loanAmount;
+
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.CASES)
+      .update(updateData)
+      .eq('id', caseId)
+      .select();
+
+    if (error) {
+      console.error('Error updating case:', error);
+      throw new Error(`Failed to update case: ${error.message}`);
+    }
+
+    return data?.[0];
+  }
+
+  // Delete case (for managers)
+  static async deleteCase(caseId: string) {
+    console.log('Deleting case:', caseId);
+    
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.CASES)
+      .delete()
+      .eq('id', caseId);
+
+    if (error) {
+      console.error('Error deleting case:', error);
+      throw new Error(`Failed to delete case: ${error.message}`);
+    }
+  }
 
   static async getCases(filters?: {
     status?: string;
@@ -517,23 +993,9 @@ export class SupabaseDatabaseService {
         metadata,
         created_at,
         updated_at,
-        customers(
-          id,
-          full_name,
-          mobile,
-          email,
-          dob,
-          address,
-          kyc_status,
-          metadata
-        ),
-        products(
-          id,
-          name,
-          code,
-          description,
-          metadata
-        )
+        loan_type,
+        loan_amount,
+        organization_id
       `)
       .order('created_at', { ascending: false });
 
@@ -599,36 +1061,33 @@ export class SupabaseDatabaseService {
     }
 
     return data.map(case_ => {
-      const customer = Array.isArray(case_.customers) ? case_.customers[0] : case_.customers;
-      const product = Array.isArray(case_.products) ? case_.products[0] : case_.products;
-      
       return {
         id: case_.id,
         caseNumber: case_.case_number || `CASE-${case_.id}`,
         customer: {
-          id: customer?.id || '',
-          userId: customer?.id || '',
-          name: customer?.full_name || 'Unknown Customer',
-          phone: customer?.mobile || '',
-          email: customer?.email || '',
-          panNumber: customer?.metadata?.pan_number || '',
-          aadhaarNumber: customer?.metadata?.aadhaar_number || '',
-          dateOfBirth: customer?.dob || '',
-          gender: customer?.metadata?.gender || '',
-          age: customer?.dob ? Math.floor((Date.now() - new Date(customer.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 0,
-          maritalStatus: customer?.metadata?.marital_status || 'single',
-          employment: customer?.metadata?.employment_type || 'salaried',
-          riskProfile: customer?.metadata?.risk_profile || 'low',
-          kycStatus: customer?.kyc_status || 'pending',
-          metadata: customer?.metadata || {},
+          id: case_.customer_id?.toString() || '',
+          userId: case_.customer_id?.toString() || '',
+          name: `Customer ${case_.customer_id || 'Unknown'}`,
+          phone: '',
+          email: '',
+          panNumber: '',
+          aadhaarNumber: '',
+          dateOfBirth: '',
+          gender: '',
+          age: 0,
+          maritalStatus: 'single',
+          employment: 'salaried',
+          riskProfile: 'low',
+          kycStatus: 'pending',
+          metadata: {},
           createdAt: case_.created_at,
           updatedAt: case_.updated_at,
         },
-        assignedTo: case_.assigned_to || '',
+        assignedTo: case_.assigned_to?.toString() || '',
         status: mapCaseToLoanApplication(case_).status as "new" | "in-progress" | "review" | "approved" | "rejected",
         priority: mapCaseToLoanApplication(case_).priority as "low" | "medium" | "high",
-        loanAmount: case_.metadata?.requested_amount || 0,
-        loanType: product?.name || 'Personal Loan',
+        loanAmount: case_.loan_amount || 0,
+        loanType: case_.loan_type || 'Personal Loan',
         createdAt: case_.created_at,
         updatedAt: case_.updated_at,
         documents: [], // Will be fetched separately
@@ -636,6 +1095,41 @@ export class SupabaseDatabaseService {
         complianceLog: [], // Will be fetched separately
       };
     });
+  }
+
+  // Get customer details for a specific case
+  static async getCustomerForCase(customerId: string) {
+    console.log('Fetching customer details for ID:', customerId);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.CUSTOMERS)
+      .select(`
+        id,
+        user_id,
+        pan_number,
+        aadhaar_number,
+        date_of_birth,
+        kyc_status,
+        risk_profile,
+        monthly_income,
+        employment_type,
+        users!inner(
+          id,
+          first_name,
+          last_name,
+          email,
+          mobile
+        )
+      `)
+      .eq('id', customerId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching customer:', error);
+      return null;
+    }
+
+    return data;
   }
 
   static async getCaseById(caseId: string) {
@@ -2337,7 +2831,6 @@ export class SupabaseDatabaseService {
         id,
         name,
         description,
-        permissions,
         is_active,
         created_at,
         updated_at
@@ -5286,151 +5779,7 @@ export class SupabaseDatabaseService {
   // CUSTOMER ACQUISITION & CASE MANAGEMENT (Salesperson Core Features)
   // =============================================================================
 
-  // Create new customer with KYC workflow
-  static async createCustomer(customerData: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone: string;
-    dateOfBirth?: string;
-    panNumber?: string;
-    aadhaarNumber?: string;
-    address?: any;
-    monthlyIncome?: number;
-    employmentType?: string;
-    organizationId: string;
-  }) {
-    console.log('🔍 Creating new customer:', customerData);
-    
-    try {
-      // First create user record
-      const { data: userData, error: userError } = await supabase
-        .from(SUPABASE_TABLES.USERS)
-        .insert({
-          first_name: customerData.firstName,
-          last_name: customerData.lastName,
-          email: customerData.email,
-          phone: customerData.phone,
-          role: 'customer',
-          organization_id: customerData.organizationId,
-          status: 'active',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select();
 
-      if (userError) {
-        console.error('Error creating user:', userError);
-        throw new Error(`Failed to create user: ${userError.message}`);
-      }
-
-      const userId = userData?.[0]?.id;
-      if (!userId) {
-        throw new Error('Failed to get user ID after creation');
-      }
-
-      // Then create customer record
-      const { data: customerRecord, error: customerError } = await supabase
-        .from(SUPABASE_TABLES.CUSTOMERS)
-        .insert({
-          user_id: userId,
-          pan_number: customerData.panNumber,
-          aadhaar_number: customerData.aadhaarNumber,
-          date_of_birth: customerData.dateOfBirth,
-          employment_type: customerData.employmentType,
-          monthly_income: customerData.monthlyIncome,
-          address: customerData.address,
-          kyc_status: 'pending',
-          risk_profile: 'medium',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select();
-
-      if (customerError) {
-        console.error('Error creating customer:', customerError);
-        throw new Error(`Failed to create customer: ${customerError.message}`);
-      }
-
-      console.log('✅ Customer created successfully:', customerRecord?.[0]);
-      return {
-        ...userData[0],
-        customerDetails: customerRecord?.[0]
-      };
-    } catch (error) {
-      console.error('Error in createCustomer:', error);
-      throw error;
-    }
-  }
-
-  // Create new loan application case
-  static async createCase(caseData: {
-    customerId: string;
-    loanType: string;
-    loanAmount: number;
-    assignedTo?: string;
-    priority?: 'low' | 'medium' | 'high';
-    organizationId: string;
-  }) {
-    console.log('🔍 Creating new case:', caseData);
-    
-    try {
-      // Generate case number
-      const caseNumber = `LOAN-${Date.now()}`;
-      
-      const { data, error } = await supabase
-        .from(SUPABASE_TABLES.CASES)
-        .insert({
-          case_number: caseNumber,
-          customer_id: caseData.customerId,
-          assigned_to: caseData.assignedTo,
-          loan_type: caseData.loanType,
-          loan_amount: caseData.loanAmount,
-          status: 'new',
-          priority: caseData.priority || 'medium',
-          organization_id: caseData.organizationId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select(`
-          id,
-          case_number,
-          customer_id,
-          assigned_to,
-          loan_type,
-          loan_amount,
-          status,
-          priority,
-          created_at,
-          updated_at,
-          customers!inner(
-            id,
-            user_id,
-            pan_number,
-            kyc_status,
-            risk_profile,
-            users!inner(
-              id,
-              first_name,
-              last_name,
-              email,
-              phone
-            )
-          )
-        `);
-
-      if (error) {
-        console.error('Error creating case:', error);
-        throw new Error(`Failed to create case: ${error.message}`);
-      }
-
-      console.log('✅ Case created successfully:', data?.[0]);
-      return mapCaseData(data?.[0]);
-    } catch (error) {
-      console.error('Error in createCase:', error);
-      throw error;
-    }
-  }
 
   // Update case status and information
   static async updateCaseStatus(caseId: string, status: string, notes?: string) {
@@ -5502,20 +5851,19 @@ export class SupabaseDatabaseService {
         customers!inner(
           id,
           user_id,
+          full_name,
           pan_number,
           kyc_status,
           risk_profile,
           monthly_income,
-          users!inner(
-            id,
-            first_name,
-            last_name,
-            email,
-            phone
-          )
+          employment_type,
+          email,
+          mobile,
+          phone
         ),
         users(
           id,
+          full_name,
           first_name,
           last_name
         )
@@ -5560,24 +5908,27 @@ export class SupabaseDatabaseService {
       .from(SUPABASE_TABLES.CUSTOMERS)
       .select(`
         id,
-        user_id,
+        full_name,
+        dob,
+        mobile,
+        email,
+        address,
+        external_customer_code,
+        kyc_status,
+        metadata,
+        organization_id,
+        created_at,
+        updated_at,
+        phone,
         pan_number,
         aadhaar_number,
         date_of_birth,
-        kyc_status,
-        risk_profile,
-        monthly_income,
+        gender,
+        marital_status,
         employment_type,
-        created_at,
-        updated_at,
-        users!inner(
-          id,
-          first_name,
-          last_name,
-          email,
-          phone,
-          organization_id
-        )
+        risk_profile,
+        deleted_at,
+        user_id
       `)
       .order('created_at', { ascending: false });
 
@@ -5585,7 +5936,7 @@ export class SupabaseDatabaseService {
       query = query.eq('kyc_status', filters.kycStatus);
     }
     if (filters?.organizationId) {
-      query = query.eq('users.organization_id', filters.organizationId);
+      query = query.eq('organization_id', filters.organizationId);
     }
 
     const { data, error } = await query;
@@ -5595,7 +5946,33 @@ export class SupabaseDatabaseService {
       return [];
     }
 
-    return data?.map(mapCustomerData) || [];
+    console.log('✅ Customers fetched successfully:', data?.length || 0, 'customers');
+    console.log('📋 Raw data:', data);
+
+    return data?.map(customer => ({
+      id: customer.id.toString(),
+      fullName: customer.full_name,
+      dob: customer.dob,
+      mobile: customer.mobile,
+      email: customer.email,
+      address: customer.address,
+      externalCustomerCode: customer.external_customer_code,
+      kycStatus: customer.kyc_status,
+      metadata: customer.metadata,
+      organizationId: customer.organization_id?.toString(),
+      createdAt: customer.created_at,
+      updatedAt: customer.updated_at,
+      phone: customer.phone,
+      panNumber: customer.pan_number,
+      aadhaarNumber: customer.aadhaar_number,
+      dateOfBirth: customer.date_of_birth,
+      gender: customer.gender,
+      maritalStatus: customer.marital_status,
+      employmentType: customer.employment_type,
+      riskProfile: customer.risk_profile,
+      deletedAt: customer.deleted_at,
+      userId: customer.user_id?.toString()
+    })) || [];
   }
 
   // Update customer KYC status
@@ -5629,6 +6006,267 @@ export class SupabaseDatabaseService {
     }
 
     return data?.[0];
+  }
+
+  // Create customer
+  static async createCustomer(customerData: {
+    fullName: string;
+    email?: string;
+    mobile?: string;
+    phone?: string;
+    address?: string;
+    externalCustomerCode?: string;
+    kycStatus?: string;
+    organizationId?: number;
+    panNumber?: string;
+    aadhaarNumber?: string;
+    dateOfBirth?: string;
+    dob?: string;
+    gender?: string;
+    maritalStatus?: string;
+    employmentType?: string;
+    riskProfile?: string;
+    userId?: number;
+  }) {
+    console.log('🚀 Creating customer:', customerData);
+    console.log('📊 Using table:', SUPABASE_TABLES.CUSTOMERS);
+    
+    const insertData = {
+      full_name: customerData.fullName,
+      email: customerData.email,
+      mobile: customerData.mobile,
+      phone: customerData.phone,
+      address: customerData.address,
+      external_customer_code: customerData.externalCustomerCode,
+      kyc_status: customerData.kycStatus || 'pending',
+      organization_id: customerData.organizationId,
+      pan_number: customerData.panNumber,
+      aadhaar_number: customerData.aadhaarNumber,
+      date_of_birth: customerData.dateOfBirth,
+      dob: customerData.dob,
+      gender: customerData.gender,
+      marital_status: customerData.maritalStatus,
+      employment_type: customerData.employmentType,
+      risk_profile: customerData.riskProfile || 'medium',
+      user_id: customerData.userId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    console.log('📝 Insert data:', insertData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.CUSTOMERS)
+      .insert(insertData)
+      .select();
+
+    if (error) {
+      console.error('❌ Error creating customer:', error);
+      throw new Error(`Failed to create customer: ${error.message}`);
+    }
+
+    console.log('✅ Customer created successfully:', data);
+
+    // Create audit log for customer creation
+    try {
+      await AuditLogger.logCustomerCreation(
+        data?.[0]?.id?.toString() || 'unknown',
+        customerData,
+        AuditLogger.getCurrentUserId()
+      );
+    } catch (auditError) {
+      console.error('Error creating audit log for customer creation:', auditError);
+      // Don't throw here to avoid breaking the main operation
+    }
+
+    return data?.[0];
+  }
+
+  // Update customer
+  static async updateCustomer(customerId: string, updates: {
+    fullName?: string;
+    email?: string;
+    mobile?: string;
+    phone?: string;
+    address?: string;
+    externalCustomerCode?: string;
+    kycStatus?: string;
+    organizationId?: number;
+    panNumber?: string;
+    aadhaarNumber?: string;
+    dateOfBirth?: string;
+    dob?: string;
+    gender?: string;
+    maritalStatus?: string;
+    employmentType?: string;
+    riskProfile?: string;
+    userId?: number;
+  }) {
+    console.log('Updating customer:', customerId, updates);
+    
+    // Get the current customer data for audit logging
+    const { data: currentData } = await supabase
+      .from(SUPABASE_TABLES.CUSTOMERS)
+      .select('*')
+      .eq('id', customerId)
+      .single();
+    
+    const updateData: any = {
+      updated_at: new Date().toISOString()
+    };
+
+    // Map frontend fields to database fields
+    if (updates.fullName !== undefined) updateData.full_name = updates.fullName;
+    if (updates.email !== undefined) updateData.email = updates.email;
+    if (updates.mobile !== undefined) updateData.mobile = updates.mobile;
+    if (updates.phone !== undefined) updateData.phone = updates.phone;
+    if (updates.address !== undefined) updateData.address = updates.address;
+    if (updates.externalCustomerCode !== undefined) updateData.external_customer_code = updates.externalCustomerCode;
+    if (updates.kycStatus !== undefined) updateData.kyc_status = updates.kycStatus;
+    if (updates.organizationId !== undefined) updateData.organization_id = updates.organizationId;
+    if (updates.panNumber !== undefined) updateData.pan_number = updates.panNumber;
+    if (updates.aadhaarNumber !== undefined) updateData.aadhaar_number = updates.aadhaarNumber;
+    if (updates.dateOfBirth !== undefined) updateData.date_of_birth = updates.dateOfBirth;
+    if (updates.dob !== undefined) updateData.dob = updates.dob;
+    if (updates.gender !== undefined) updateData.gender = updates.gender;
+    if (updates.maritalStatus !== undefined) updateData.marital_status = updates.maritalStatus;
+    if (updates.employmentType !== undefined) updateData.employment_type = updates.employmentType;
+    if (updates.riskProfile !== undefined) updateData.risk_profile = updates.riskProfile;
+    if (updates.userId !== undefined) updateData.user_id = updates.userId;
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.CUSTOMERS)
+      .update(updateData)
+      .eq('id', customerId)
+      .select();
+
+    if (error) {
+      console.error('Error updating customer:', error);
+      throw new Error(`Failed to update customer: ${error.message}`);
+    }
+
+    // Create audit log for customer update
+    try {
+      await AuditLogger.logCustomerUpdate(
+        customerId,
+        currentData,
+        data?.[0],
+        AuditLogger.getCurrentUserId()
+      );
+    } catch (auditError) {
+      console.error('Error creating audit log for customer update:', auditError);
+      // Don't throw here to avoid breaking the main operation
+    }
+
+    return data?.[0];
+  }
+
+  // Delete customer with cascading delete for related records
+  static async deleteCustomer(customerId: string) {
+    console.log('Deleting customer:', customerId);
+    
+    // Get the current customer data for audit logging
+    const { data: currentData } = await supabase
+      .from(SUPABASE_TABLES.CUSTOMERS)
+      .select('*')
+      .eq('id', customerId)
+      .single();
+    
+    if (!currentData) {
+      throw new Error('Customer not found');
+    }
+
+    try {
+      // Step 1: Delete related workflow instances first
+      console.log('Deleting related workflow instances...');
+      const { error: workflowError } = await supabase
+        .from('workflow_instances')
+        .delete()
+        .eq('case_id', customerId);
+
+      if (workflowError && !workflowError.message.includes('does not exist')) {
+        console.error('Error deleting workflow instances:', workflowError);
+        throw new Error(`Failed to delete workflow instances: ${workflowError.message}`);
+      }
+
+      // Step 2: Delete related cases (loan applications)
+      console.log('Deleting related cases...');
+      const { error: casesError } = await supabase
+        .from('cases')
+        .delete()
+        .eq('customer_id', customerId);
+
+      if (casesError && !casesError.message.includes('does not exist')) {
+        console.error('Error deleting cases:', casesError);
+        throw new Error(`Failed to delete cases: ${casesError.message}`);
+      }
+
+      // Step 3: Delete related documents
+      console.log('Deleting related documents...');
+      const { error: documentsError } = await supabase
+        .from('documents')
+        .delete()
+        .eq('customer_id', customerId);
+
+      if (documentsError && !documentsError.message.includes('does not exist')) {
+        console.error('Error deleting documents:', documentsError);
+        throw new Error(`Failed to delete documents: ${documentsError.message}`);
+      }
+
+      // Step 4: Delete related tasks
+      console.log('Deleting related tasks...');
+      const { error: tasksError } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('customer_id', customerId);
+
+      if (tasksError && !tasksError.message.includes('does not exist')) {
+        console.error('Error deleting tasks:', tasksError);
+        throw new Error(`Failed to delete tasks: ${tasksError.message}`);
+      }
+
+      // Step 5: Delete related notifications
+      console.log('Deleting related notifications...');
+      const { error: notificationsError } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('customer_id', customerId);
+
+      if (notificationsError && !notificationsError.message.includes('does not exist')) {
+        console.error('Error deleting notifications:', notificationsError);
+        throw new Error(`Failed to delete notifications: ${notificationsError.message}`);
+      }
+
+      // Step 6: Finally delete the customer
+      console.log('Deleting customer record...');
+      const { error } = await supabase
+        .from(SUPABASE_TABLES.CUSTOMERS)
+        .delete()
+        .eq('id', customerId);
+
+      if (error) {
+        console.error('Error deleting customer:', error);
+        throw new Error(`Failed to delete customer: ${error.message}`);
+      }
+
+      console.log('✅ Customer and all related records deleted successfully');
+
+    } catch (error) {
+      console.error('Error in cascading delete:', error);
+      throw error;
+    }
+
+    // Create audit log for customer deletion
+    try {
+      await AuditLogger.logCustomerDeletion(
+        customerId,
+        currentData,
+        AuditLogger.getCurrentUserId()
+      );
+    } catch (auditError) {
+      console.error('Error creating audit log for customer deletion:', auditError);
+      // Don't throw here to avoid breaking the main operation
+    }
   }
 
   // System Integrations
@@ -5762,6 +6400,100 @@ export class SupabaseDatabaseService {
     }
 
     return data?.map(mapSystemSettingData) || [];
+  }
+
+  // Get Super Admin Dynamic Password
+  static async getSuperAdminPassword(): Promise<string> {
+    console.log('🔐 Fetching Super Admin dynamic password from system settings...');
+    
+    try {
+      const { data, error } = await supabase
+        .from(SUPABASE_TABLES.SYSTEM_SETTINGS)
+        .select('value')
+        .eq('key', 'super_admin_password')
+        .eq('category', 'security')
+        .single();
+
+      if (error) {
+        console.error('❌ Error fetching super admin password:', error);
+        // Return a default password if not found
+        return 'superadmin123';
+      }
+
+      const password = data?.value || 'superadmin123';
+      console.log('✅ Super Admin password retrieved successfully');
+      return password;
+    } catch (error) {
+      console.error('❌ Error fetching super admin password:', error);
+      return 'superadmin123';
+    }
+  }
+
+  // Set Super Admin Dynamic Password
+  static async setSuperAdminPassword(newPassword: string): Promise<void> {
+    console.log('🔐 Setting Super Admin dynamic password...');
+    
+    try {
+      // First, try to update existing setting
+      const { data: existingData, error: updateError } = await supabase
+        .from(SUPABASE_TABLES.SYSTEM_SETTINGS)
+        .update({
+          value: newPassword,
+          updated_at: new Date().toISOString()
+        })
+        .eq('key', 'super_admin_password')
+        .eq('category', 'security')
+        .select();
+
+      if (updateError || !existingData || existingData.length === 0) {
+        // If update failed, create new setting
+        console.log('Creating new super admin password setting...');
+        const { error: insertError } = await supabase
+          .from(SUPABASE_TABLES.SYSTEM_SETTINGS)
+          .insert({
+            key: 'super_admin_password',
+            value: newPassword,
+            description: 'Dynamic password for Super Admin login',
+            category: 'security',
+            is_encrypted: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+
+        if (insertError) {
+          console.error('❌ Error creating super admin password setting:', insertError);
+          throw new Error(`Failed to set super admin password: ${insertError.message}`);
+        }
+      }
+
+      console.log('✅ Super Admin password updated successfully');
+      
+      // Log the password change for audit purposes
+      try {
+        await AuditLogger.log({
+          userId: AuditLogger.getCurrentUserId(),
+          action: 'UPDATE',
+          entityType: 'system',
+          entityId: null,
+          beforeState: null,
+          afterState: {
+            setting: 'super_admin_password',
+            action: 'password_updated'
+          },
+          metadata: {
+            operation: 'super_admin_password_update',
+            updatedBy: AuditLogger.getCurrentUserId(),
+            timestamp: new Date().toISOString()
+          }
+        });
+      } catch (auditError) {
+        console.error('Error creating audit log for password update:', auditError);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error setting super admin password:', error);
+      throw error;
+    }
   }
 
   static async createSystemSetting(settingData: {
@@ -9546,219 +10278,7 @@ export class SupabaseDatabaseService {
       .subscribe();
   }
 
-  // =============================================================================
-  // ADVANCED USER MANAGEMENT METHODS
-  // =============================================================================
 
-  // Get all users with comprehensive data for super admin
-  static async getAllUsersForSuperAdmin(filters?: {
-    searchTerm?: string;
-    role?: string;
-    status?: string;
-    organizationId?: number;
-    departmentId?: number;
-    limit?: number;
-    offset?: number;
-  }) {
-    console.log('Fetching all users for super admin with filters:', filters);
-    
-    let query = supabase
-      .from(SUPABASE_TABLES.USERS)
-      .select(`
-        id,
-        email,
-        full_name,
-        mobile,
-        role,
-        status,
-        last_login_at,
-        created_at,
-        updated_at,
-        email_verified_at,
-        employment_type_id,
-        metadata,
-        auth_id,
-        department_id,
-        organization_id,
-        departments(
-          id,
-          name,
-          code
-        ),
-        organizations(
-          id,
-          name,
-          code
-        )
-      `)
-      .order('created_at', { ascending: false });
-
-    // Apply filters
-    if (filters?.searchTerm) {
-      query = query.or(`full_name.ilike.%${filters.searchTerm}%,email.ilike.%${filters.searchTerm}%,role.ilike.%${filters.searchTerm}%`);
-    }
-    
-    if (filters?.role && filters.role !== 'all') {
-      query = query.eq('role', filters.role);
-    }
-    
-    if (filters?.status && filters.status !== 'all') {
-      query = query.eq('status', filters.status);
-    }
-    
-    if (filters?.organizationId) {
-      query = query.eq('organization_id', filters.organizationId);
-    }
-    
-    if (filters?.departmentId) {
-      query = query.eq('department_id', filters.departmentId);
-    }
-    
-    if (filters?.limit) {
-      query = query.limit(filters.limit);
-    }
-    
-    if (filters?.offset) {
-      query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching all users:', error);
-      return [];
-    }
-
-    return data?.map(user => ({
-      id: user.id?.toString(),
-      email: user.email,
-      full_name: user.full_name,
-      mobile: user.mobile,
-      role: user.role,
-      status: user.status,
-      last_login_at: user.last_login_at,
-      created_at: user.created_at,
-      updated_at: user.updated_at,
-      email_verified_at: user.email_verified_at,
-      employment_type: user.employment_type_id ? 'permanent' : 'contract',
-      metadata: user.metadata,
-      auth_id: user.auth_id,
-      department_id: user.department_id,
-      department_name: user.departments ? (Array.isArray(user.departments) ? user.departments[0]?.name : (user.departments as any)?.name) : null,
-      organization_id: user.organization_id,
-      organization_name: user.organizations ? (Array.isArray(user.organizations) ? user.organizations[0]?.name : (user.organizations as any)?.name) : null,
-      is_online: false, // This would need real-time tracking
-      login_attempts: 0,
-      permissions: [] // This would need to be calculated from roles
-    })) || [];
-  }
-
-  // Get user statistics for super admin dashboard
-  static async getUserStatisticsForSuperAdmin() {
-    console.log('Fetching user statistics for super admin');
-    
-    try {
-      // Get total user count
-      const { count: totalUsers, error: totalError } = await supabase
-        .from(SUPABASE_TABLES.USERS)
-        .select('*', { count: 'exact', head: true });
-
-      if (totalError) {
-        console.error('Error getting total user count:', totalError);
-        return this.getDefaultUserStats();
-      }
-
-      // Get active users count
-      const { count: activeUsers, error: activeError } = await supabase
-        .from(SUPABASE_TABLES.USERS)
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'active');
-
-      if (activeError) {
-        console.error('Error getting active user count:', activeError);
-      }
-
-      // Get suspended users count
-      const { count: suspendedUsers, error: suspendedError } = await supabase
-        .from(SUPABASE_TABLES.USERS)
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'suspended');
-
-      if (suspendedError) {
-        console.error('Error getting suspended user count:', suspendedError);
-      }
-
-      // Get users created today
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const { count: newUsersToday, error: newError } = await supabase
-        .from(SUPABASE_TABLES.USERS)
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', today.toISOString());
-
-      if (newError) {
-        console.error('Error getting new users count:', newError);
-      }
-
-      // Get role distribution
-      const { data: roleData, error: roleError } = await supabase
-        .from(SUPABASE_TABLES.USERS)
-        .select('role');
-
-      let roleDistribution = {};
-      if (!roleError && roleData) {
-        roleDistribution = roleData.reduce((acc: any, user: any) => {
-          acc[user.role] = (acc[user.role] || 0) + 1;
-          return acc;
-        }, {});
-      }
-
-      // Get department distribution
-      const { data: deptData, error: deptError } = await supabase
-        .from(SUPABASE_TABLES.USERS)
-        .select(`
-          departments(name)
-        `);
-
-      let departmentDistribution = {};
-      if (!deptError && deptData) {
-        departmentDistribution = deptData.reduce((acc: any, user: any) => {
-          const deptName = user.departments ? (Array.isArray(user.departments) ? user.departments[0]?.name : (user.departments as any)?.name) : null;
-          if (deptName) {
-            acc[deptName] = (acc[deptName] || 0) + 1;
-          }
-          return acc;
-        }, {});
-      }
-
-      return {
-        totalUsers: totalUsers || 0,
-        activeUsers: activeUsers || 0,
-        onlineUsers: Math.floor((activeUsers || 0) * 0.6), // Simulate online users
-        newUsersToday: newUsersToday || 0,
-        suspendedUsers: suspendedUsers || 0,
-        pendingVerification: Math.floor((totalUsers || 0) * 0.05), // Simulate pending
-        roleDistribution,
-        departmentDistribution
-      };
-    } catch (error) {
-      console.error('Error fetching user statistics:', error);
-      return this.getDefaultUserStats();
-    }
-  }
-
-  private static getDefaultUserStats() {
-    return {
-      totalUsers: 0,
-      activeUsers: 0,
-      onlineUsers: 0,
-      newUsersToday: 0,
-      suspendedUsers: 0,
-      pendingVerification: 0,
-      roleDistribution: {},
-      departmentDistribution: {}
-    };
-  }
 
   // Update user status (activate, deactivate, suspend)
   static async updateUserStatus(userId: string, status: 'active' | 'inactive' | 'suspended') {
@@ -9849,29 +10369,63 @@ export class SupabaseDatabaseService {
 
   // Create new user
   static async createUser(userData: {
+    fullName: string;
     email: string;
-    full_name: string;
     mobile?: string;
     role: string;
-    department_id?: number;
-    organization_id?: number;
-    employment_type?: string;
+    departmentId?: number;
+    organizationId?: number;
+    employmentTypeId?: number;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    passwordHash?: string;
   }) {
-    console.log('Creating new user:', userData);
+    console.log('🚀 Creating new user:', userData);
+    console.log('📊 Using table:', SUPABASE_TABLES.USERS);
+    
+    const insertData = {
+      full_name: userData.fullName,
+      email: userData.email,
+      mobile: userData.mobile,
+      role: userData.role,
+      department_id: userData.departmentId,
+      organization_id: userData.organizationId,
+      employment_type_id: userData.employmentTypeId,
+      first_name: userData.firstName,
+      last_name: userData.lastName,
+      phone: userData.phone,
+      password_hash: userData.passwordHash || 'default123',
+      status: 'active',
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    console.log('📝 Insert data:', insertData);
     
     const { data, error } = await supabase
       .from(SUPABASE_TABLES.USERS)
-      .insert({
-        ...userData,
-        status: 'active',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
+      .insert(insertData)
       .select();
 
     if (error) {
-      console.error('Error creating user:', error);
+      console.error('❌ Error creating user:', error);
       throw new Error(`Failed to create user: ${error.message}`);
+    }
+
+    console.log('✅ User created successfully:', data);
+
+    // Create audit log for user creation
+    try {
+      await AuditLogger.logUserCreation(
+        data?.[0]?.id?.toString() || 'unknown',
+        userData,
+        AuditLogger.getCurrentUserId()
+      );
+    } catch (auditError) {
+      console.error('Error creating audit log for user creation:', auditError);
+      // Don't throw here to avoid breaking the main operation
     }
 
     return data?.[0];
@@ -9879,22 +10433,51 @@ export class SupabaseDatabaseService {
 
   // Update user details
   static async updateUser(userId: string, updates: {
-    full_name?: string;
+    fullName?: string;
+    email?: string;
     mobile?: string;
     role?: string;
-    department_id?: number;
-    organization_id?: number;
-    employment_type?: string;
+    departmentId?: number;
+    organizationId?: number;
+    employmentTypeId?: number;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
     status?: string;
+    isActive?: boolean;
+    passwordHash?: string;
   }) {
     console.log('Updating user:', userId, updates);
     
+    // Get the current user data for audit logging
+    const { data: currentData } = await supabase
+      .from(SUPABASE_TABLES.USERS)
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    const updateData: any = {
+      updated_at: new Date().toISOString()
+    };
+
+    // Map frontend fields to database fields
+    if (updates.fullName !== undefined) updateData.full_name = updates.fullName;
+    if (updates.email !== undefined) updateData.email = updates.email;
+    if (updates.mobile !== undefined) updateData.mobile = updates.mobile;
+    if (updates.role !== undefined) updateData.role = updates.role;
+    if (updates.departmentId !== undefined) updateData.department_id = updates.departmentId;
+    if (updates.organizationId !== undefined) updateData.organization_id = updates.organizationId;
+    if (updates.employmentTypeId !== undefined) updateData.employment_type_id = updates.employmentTypeId;
+    if (updates.firstName !== undefined) updateData.first_name = updates.firstName;
+    if (updates.lastName !== undefined) updateData.last_name = updates.lastName;
+    if (updates.phone !== undefined) updateData.phone = updates.phone;
+    if (updates.status !== undefined) updateData.status = updates.status;
+    if (updates.isActive !== undefined) updateData.is_active = updates.isActive;
+    if (updates.passwordHash !== undefined) updateData.password_hash = updates.passwordHash;
+    
     const { data, error } = await supabase
       .from(SUPABASE_TABLES.USERS)
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', userId)
       .select();
 
@@ -9903,7 +10486,59 @@ export class SupabaseDatabaseService {
       throw new Error(`Failed to update user: ${error.message}`);
     }
 
+    // Create audit log for user update
+    try {
+      await AuditLogger.logUserUpdate(
+        userId,
+        currentData,
+        data?.[0],
+        AuditLogger.getCurrentUserId()
+      );
+    } catch (auditError) {
+      console.error('Error creating audit log for user update:', auditError);
+      // Don't throw here to avoid breaking the main operation
+    }
+
     return data?.[0];
+  }
+
+  // Delete user (soft delete)
+  static async deleteUser(userId: string) {
+    console.log('Deleting user:', userId);
+    
+    // Get the current user data for audit logging
+    const { data: currentData } = await supabase
+      .from(SUPABASE_TABLES.USERS)
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.USERS)
+      .update({
+        deleted_at: new Date().toISOString(),
+        is_active: false,
+        status: 'inactive',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+
+    if (error) {
+      console.error('Error deleting user:', error);
+      throw new Error(`Failed to delete user: ${error.message}`);
+    }
+
+    // Create audit log for user deletion
+    try {
+      await AuditLogger.logUserDeletion(
+        userId,
+        currentData,
+        AuditLogger.getCurrentUserId()
+      );
+    } catch (auditError) {
+      console.error('Error creating audit log for user deletion:', auditError);
+      // Don't throw here to avoid breaking the main operation
+    }
   }
 
   // Get user by ID (for both auth_id and direct id)

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useParams, Navigate } from "react-router-dom";
 import { Suspense, useEffect } from 'react';
 import { useAuth } from './contexts/AuthContextFixed';
 import { WhatsAppIntegrationService } from './services/whatsapp-integration-service';
@@ -26,6 +26,9 @@ import { AdminDashboard } from './components/Dashboard/AdminDashboard';
 import { UserManagement } from './components/Admin/UserManagement';
 import { SystemSettings } from './components/Admin/SystemSettings';
 import { Analytics } from './components/Admin/Analytics';
+import { DepartmentManagement } from './components/Admin/DepartmentManagement';
+import { RolesManagement } from './components/Admin/RolesManagement';
+import { PermissionsManagement } from './components/Admin/PermissionsManagement';
 import { FeatureFlagsPage } from './components/Admin/FeatureFlagsPage';
 import { SystemIntegrationsPage } from './components/Admin/SystemIntegrationsPage';
 import { SystemSettingsPage } from './components/Admin/SystemSettingsPage';
@@ -35,7 +38,6 @@ import { ComplianceReports } from './components/Compliance/ComplianceReports';
 import { TeamManagement } from './components/Team/TeamManagement';
 import { AnalyticsDashboard } from './components/Analytics/AnalyticsDashboard';
 // import { SuperAdminDashboardFixed } from './components/Dashboard/SuperAdminDashboardFixed';
-import { SuperAdminSetup } from './components/Admin/SuperAdminSetup';
 
 // New Admin Components
 import { LoanApplicationManagement } from './components/Admin/LoanApplicationManagement';
@@ -47,22 +49,14 @@ import { BackgroundProcessingPage } from './components/Admin/BackgroundProcessin
 import { CacheManagementPage } from './components/Admin/CacheManagementPage';
 import { EntityManagement } from './components/Admin/EntityManagement';
 
-// Enhanced Super Admin Components
-import { SuperAdminDashboard } from './components/Admin/SuperAdminDashboard';
+// Enhanced Admin Components
 import { WorkflowDesigner } from './components/Admin/WorkflowDesigner';
-import { AdvancedUserManagement } from './components/Admin/AdvancedUserManagement';
 
-// Table Management Components
-import { TableManagementDashboard } from './components/TableManagement/TableManagementDashboard';
-import { DatabaseManagement } from './components/Admin/DatabaseManagement';
 import { SystemMonitoringDashboard } from './components/Admin/SystemMonitoringDashboard';
-import { SuperAdminAnalytics } from './components/Admin/SuperAdminAnalytics';
+import { SuperAdminDashboard } from './components/Admin/SuperAdminDashboard';
+import { OrganizationManagement } from './components/Admin/OrganizationManagement';
+import { CustomerManagement } from './components/Admin/CustomerManagement';
 import { SuperAdminAuditLogs } from './components/Admin/SuperAdminAuditLogs';
-import { WorkflowManagement } from './components/Admin/WorkflowManagement';
-import { NotificationCenter } from './components/Admin/NotificationCenter';
-import { AdvancedAnalytics } from './components/Admin/AdvancedAnalytics';
-import { SecurityCompliance } from './components/Admin/SecurityCompliance';
-import { PerformanceOptimization } from './components/Admin/PerformanceOptimization';
 
 // Navigation Constants
 import { ROUTES } from './constants/navigation';
@@ -220,40 +214,6 @@ function AnalyticsDashboardWrapper() {
   );
 }
 
-function WorkflowManagementWrapper() {
-  const { navigateDirect } = useNavigation();
-  return (
-    <WorkflowManagement onBack={() => navigateDirect('/')} />
-  );
-}
-
-function NotificationCenterWrapper() {
-  const { navigateDirect } = useNavigation();
-  return (
-    <NotificationCenter onBack={() => navigateDirect('/')} />
-  );
-}
-
-function AdvancedAnalyticsWrapper() {
-  const { navigateDirect } = useNavigation();
-  return (
-    <AdvancedAnalytics onBack={() => navigateDirect('/')} />
-  );
-}
-
-function SecurityComplianceWrapper() {
-  const { navigateDirect } = useNavigation();
-  return (
-    <SecurityCompliance onBack={() => navigateDirect('/')} />
-  );
-}
-
-function PerformanceOptimizationWrapper() {
-  const { navigateDirect } = useNavigation();
-  return (
-    <PerformanceOptimization onBack={() => navigateDirect('/')} />
-  );
-}
 
 function FeatureFlagsPageWrapper() {
   const { navigateDirect } = useNavigation();
@@ -281,6 +241,55 @@ function OrganizationSettingsPageWrapper() {
   return (
     <OrganizationSettingsPage onNavigateToSystemSettings={() => navigateDirect('/system-settings-new')} />
   );
+}
+
+function OrganizationManagementWrapper() {
+  const { navigateDirect } = useNavigation();
+  return (
+    <OrganizationManagement onBack={() => navigateDirect('/')} />
+  );
+}
+
+function DepartmentManagementWrapper() {
+  // Use window.history.back() as a simple fallback to avoid navigation context issues
+  return (
+    <DepartmentManagement onBack={() => window.history.back()} />
+  );
+}
+
+function CustomerManagementWrapper() {
+  // Use window.history.back() as a simple fallback to avoid navigation context issues
+  return (
+    <CustomerManagement onBack={() => window.history.back()} />
+  );
+}
+
+function SuperAdminAuditLogsWrapper() {
+  // Use window.history.back() as a simple fallback to avoid navigation context issues
+  return (
+    <SuperAdminAuditLogs onBack={() => window.history.back()} />
+  );
+}
+
+function SuperAdminDashboardWrapper() {
+  // Use window.location.href for navigation to avoid navigation context issues
+  return (
+    <SuperAdminDashboard 
+      onNavigateToOrganizations={() => window.location.href = '/super-admin/organizations'}
+      onNavigateToDepartments={() => window.location.href = '/super-admin/departments'}
+      onNavigateToUsers={() => window.location.href = '/super-admin/users'}
+      onNavigateToCustomers={() => window.location.href = '/super-admin/customers'}
+      onNavigateToAuditLogs={() => window.location.href = '/super-admin/audit-logs'}
+    />
+  );
+}
+
+function SystemMonitoringDashboardWrapper() {
+  return <SystemMonitoringDashboard />;
+}
+
+function WorkflowDesignerWrapper() {
+  return <WorkflowDesigner />;
 }
 
 // Route wrapper components that provide navigation context
@@ -347,16 +356,8 @@ function AppContent() {
   // Dashboard views based on user role
   switch (user?.role) {
     case 'super_admin':
-      // Redirect to the proper super admin dashboard route
-      navigateDirect('/super-admin/', { replace: true });
-      return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Redirecting to Super Admin Dashboard...</p>
-          </div>
-        </div>
-      );
+      // Redirect to Super Admin dashboard route to enable sidebar navigation
+      return <Navigate to="/super-admin/dashboard" replace />;
     case 'salesperson':
       return (
         <DashboardLayout>
@@ -396,19 +397,7 @@ function AppContent() {
     case 'admin':
       return (
         <DashboardLayout>
-          <AdminDashboard 
-            onNavigateToCase={(caseId: string) => navigateDirect(`/case/${caseId}`)}
-            onNavigateToUserManagement={() => navigateDirect(ROUTES.USER_MANAGEMENT)}
-            onNavigateToSystemSettings={() => navigateDirect(ROUTES.SYSTEM_SETTINGS)}
-            onNavigateToAuditLogs={() => navigateDirect(ROUTES.AUDIT_LOGS)}
-            onNavigateToAnalytics={() => navigateDirect(ROUTES.ANALYTICS)}
-            onNavigateToSystemHealth={() => navigateDirect('/system-health')}
-            onNavigateToComplianceManagement={() => navigateDirect(ROUTES.COMPLIANCE_ISSUE_MANAGEMENT)}
-            onNavigateToFeatureFlags={() => navigateDirect(ROUTES.FEATURE_FLAGS)}
-            onNavigateToSystemIntegrations={() => navigateDirect(ROUTES.SYSTEM_INTEGRATIONS)}
-            onNavigateToSystemSettingsNew={() => navigateDirect(ROUTES.SYSTEM_SETTINGS_NEW)}
-            onNavigateToOrganizationSettings={() => navigateDirect(ROUTES.ORGANIZATION_SETTINGS)}
-          />
+          <AdminDashboard />
         </DashboardLayout>
       );
     case 'compliance':
@@ -445,9 +434,10 @@ function AppContent() {
                 <p><strong>Full Name:</strong> {user?.full_name || 'null'}</p>
               </div>
             </div>
+            
             <div className="mt-4">
               <p className="text-sm text-gray-500">
-                If you're a Super Admin, make sure to populate the database first using the Database Populator.
+                Please contact your system administrator to resolve this role issue.
               </p>
             </div>
           </div>
@@ -468,7 +458,79 @@ function App() {
         <Routes>
         <Route path="/" element={<AppContent />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/setup" element={<SuperAdminSetup />} />
+        
+        {/* Super Admin Routes */}
+        <Route
+          path="/super-admin/dashboard"
+          element={
+            <DashboardLayout>
+              <SuperAdminDashboardWrapper />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path="/super-admin/organizations"
+          element={
+            <DashboardLayout>
+              <OrganizationManagementWrapper />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path="/super-admin/departments"
+          element={
+            <DashboardLayout>
+              <DepartmentManagementWrapper />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path="/super-admin/users"
+          element={
+            <DashboardLayout>
+              <UserManagementWrapper />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path="/super-admin/customers"
+          element={
+            <DashboardLayout>
+              <CustomerManagementWrapper />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path="/super-admin/audit-logs"
+          element={
+            <DashboardLayout>
+              <SuperAdminAuditLogsWrapper />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path="/super-admin/monitoring"
+          element={
+            <DashboardLayout>
+              <SystemMonitoringDashboardWrapper />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path="/super-admin/workflow-designer"
+          element={
+            <DashboardLayout>
+              <WorkflowDesignerWrapper />
+            </DashboardLayout>
+          }
+        />
         
         {/* User Management Routes */}
         <Route
@@ -748,6 +810,33 @@ function App() {
         
         {/* New Admin Management Routes */}
         <Route
+          path="/admin/departments"
+          element={
+            <DashboardLayout>
+              <DepartmentManagement onBack={() => window.history.back()} />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path="/admin/roles"
+          element={
+            <DashboardLayout>
+              <RolesManagement onBack={() => window.history.back()} />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path="/admin/permissions"
+          element={
+            <DashboardLayout>
+              <PermissionsManagement onBack={() => window.history.back()} />
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
           path={ROUTES.LOAN_APPLICATION_MANAGEMENT}
           element={
             <DashboardLayout>
@@ -830,15 +919,6 @@ function App() {
           }
         />
         
-        {/* Enhanced Super Admin Routes */}
-        <Route
-          path={ROUTES.SUPER_ADMIN_DASHBOARD}
-          element={
-            <DashboardLayout>
-              <SuperAdminDashboard />
-            </DashboardLayout>
-          }
-        />
         
         <Route
           path={ROUTES.WORKFLOW_DESIGNER}
@@ -853,7 +933,7 @@ function App() {
           path={ROUTES.ADVANCED_USER_MANAGEMENT}
           element={
             <DashboardLayout>
-              <AdvancedUserManagement />
+              <UserManagementWrapper />
             </DashboardLayout>
           }
         />
@@ -867,134 +947,18 @@ function App() {
           }
         />
         
-        {/* Additional Super Admin Routes */}
-        <Route
-          path="/super-admin/activity-logs"
-          element={
-            <DashboardLayout>
-              <SystemMonitoringDashboard />
-            </DashboardLayout>
-          }
-        />
         
-        <Route
-          path="/super-admin/system-logs"
-          element={
-            <DashboardLayout>
-              <SystemMonitoringDashboard />
-            </DashboardLayout>
-          }
-        />
         
-        {/* Enhanced Super Admin Routes with Full Width Layout */}
-        <Route
-          path="/super-admin/"
-          element={
-            <FullWidthLayout>
-              <SuperAdminDashboard />
-            </FullWidthLayout>
-          }
-        />
-        
-        <Route
-          path="/super-admin/dashboard"
-          element={
-            <FullWidthLayout>
-              <SuperAdminDashboard />
-            </FullWidthLayout>
-          }
-        />
-        
-        <Route
-          path="/super-admin/users"
-          element={
-            <FullWidthLayout>
-              <AdvancedUserManagement />
-            </FullWidthLayout>
-          }
-        />
-        
-        <Route
-          path="/super-admin/database"
-          element={
-            <FullWidthLayout>
-              <DatabaseManagement />
-            </FullWidthLayout>
-          }
-        />
-        
-        <Route
-          path="/super-admin/workflow-management"
-          element={
-            <FullWidthLayout>
-              <Suspense fallback={<PageLoadingSpinner />}>
-                <WorkflowManagementWrapper />
-              </Suspense>
-            </FullWidthLayout>
-          }
-        />
-        
-        <Route
-          path="/super-admin/notifications"
-          element={
-            <FullWidthLayout>
-              <Suspense fallback={<PageLoadingSpinner />}>
-                <NotificationCenterWrapper />
-              </Suspense>
-            </FullWidthLayout>
-          }
-        />
-        
-        <Route
-          path="/super-admin/advanced-analytics"
-          element={
-            <FullWidthLayout>
-              <Suspense fallback={<PageLoadingSpinner />}>
-                <AdvancedAnalyticsWrapper />
-              </Suspense>
-            </FullWidthLayout>
-          }
-        />
-        
-        <Route
-          path="/super-admin/security-compliance"
-          element={
-            <FullWidthLayout>
-              <Suspense fallback={<PageLoadingSpinner />}>
-                <SecurityComplianceWrapper />
-              </Suspense>
-            </FullWidthLayout>
-          }
-        />
-        
-        <Route
-          path="/super-admin/performance-optimization"
-          element={
-            <FullWidthLayout>
-              <Suspense fallback={<PageLoadingSpinner />}>
-                <PerformanceOptimizationWrapper />
-              </Suspense>
-            </FullWidthLayout>
-          }
-        />
         
         <Route
           path="/advanced-user-management"
           element={
             <FullWidthLayout>
-              <AdvancedUserManagement />
+              <UserManagementWrapper />
             </FullWidthLayout>
           }
         />
         
-        <Route
-          path="/super-admin/workflow-designer"
-          element={
-            <FullWidthLayout>
-              <WorkflowDesigner />
-            </FullWidthLayout>
-          }
-        />
         
         <Route
           path="/workflow-designer"
@@ -1005,14 +969,6 @@ function App() {
           }
         />
         
-        <Route
-          path="/super-admin/monitoring"
-          element={
-            <FullWidthLayout>
-              <SystemMonitoringDashboard />
-            </FullWidthLayout>
-          }
-        />
         
         <Route
           path="/system-monitoring"
@@ -1023,32 +979,6 @@ function App() {
           }
         />
         
-        <Route
-          path="/super-admin/analytics"
-          element={
-            <FullWidthLayout>
-              <SuperAdminAnalytics />
-            </FullWidthLayout>
-          }
-        />
-        
-        <Route
-          path="/super-admin/audit-logs"
-          element={
-            <FullWidthLayout>
-              <SuperAdminAuditLogs />
-            </FullWidthLayout>
-          }
-        />
-        
-        <Route
-          path="/super-admin/table-management"
-          element={
-            <FullWidthLayout>
-              <TableManagementDashboard />
-            </FullWidthLayout>
-          }
-        />
 
         {/* Test Routes */}
         </Routes>
