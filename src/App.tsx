@@ -3,6 +3,7 @@ import { Suspense, useEffect } from 'react';
 import { useAuth } from './contexts/AuthContextFixed';
 import { WhatsAppIntegrationService } from './services/whatsapp-integration-service';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
+import './styles/mobile.css';
 import { LoginPage } from './components/Auth/LoginPage';
 import { DashboardLayout } from './components/Layout/DashboardLayout';
 import { FullWidthLayout } from './components/Layout/FullWidthLayout';

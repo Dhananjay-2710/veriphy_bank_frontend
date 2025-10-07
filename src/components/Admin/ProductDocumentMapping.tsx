@@ -403,21 +403,21 @@ export function ProductDocumentMapping({ onBack }: ProductDocumentMappingProps) 
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={onBack}>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+          <Button variant="outline" onClick={onBack} className="w-full sm:w-auto">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Product Document Mapping</h1>
-            <p className="text-gray-600">Manage document requirements for products and sub-products</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Product Document Mapping</h1>
+            <p className="text-sm sm:text-base text-gray-600 mt-1">Manage document requirements for products and sub-products</p>
           </div>
         </div>
-        <div className="flex space-x-3">
-          <Button variant="outline" onClick={loadData}>
+        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
+          <Button variant="outline" onClick={loadData} className="w-full sm:w-auto">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -425,7 +425,7 @@ export function ProductDocumentMapping({ onBack }: ProductDocumentMappingProps) 
             setEditingMapping(null);
             resetMappingForm();
             setShowCreateForm(true);
-          }}>
+          }} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             Add Mapping
           </Button>
@@ -433,7 +433,7 @@ export function ProductDocumentMapping({ onBack }: ProductDocumentMappingProps) 
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Product Mappings</CardTitle>
@@ -529,7 +529,7 @@ export function ProductDocumentMapping({ onBack }: ProductDocumentMappingProps) 
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="flex space-x-4">
+            <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -542,7 +542,7 @@ export function ProductDocumentMapping({ onBack }: ProductDocumentMappingProps) 
                   />
                 </div>
               </div>
-              <div className="w-48">
+              <div className="w-full sm:w-48">
                 <select
                   value={selectedProduct}
                   onChange={(e) => setSelectedProduct(e.target.value)}
@@ -559,7 +559,7 @@ export function ProductDocumentMapping({ onBack }: ProductDocumentMappingProps) 
                   }
                 </select>
               </div>
-              <div className="w-48">
+              <div className="w-full sm:w-48">
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
@@ -574,8 +574,8 @@ export function ProductDocumentMapping({ onBack }: ProductDocumentMappingProps) 
             </div>
             
             {/* Pagination Controls */}
-            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-              <div className="flex items-center space-x-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-4 border-t border-gray-200">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className="flex items-center space-x-2">
                   <label htmlFor="itemsPerPage" className="text-sm font-medium text-gray-700">
                     Show:

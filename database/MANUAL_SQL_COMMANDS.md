@@ -745,6 +745,414 @@ INSERT INTO notifications (type, notifiable_type, notifiable_id, data, read_at, 
 ON CONFLICT DO NOTHING;
 ```
 
+#### **15. Insert Sub-Products for Each Product**
+```sql
+-- Clear existing sub-products first
+DELETE FROM sub_products WHERE organization_id = 1;
+
+-- Insert comprehensive sub-products for each main product
+INSERT INTO sub_products (organization_id, product_id, name, code, description, status, metadata, created_at, updated_at) VALUES
+
+-- HOME LOAN SUB-PRODUCTS (Product ID: 1)
+(1, 1, 'Prime Home Loan', 'HOME-PRIME', 'Premium home loan with lowest interest rates for high-income customers', 'active', '{"min_income": 500000, "max_ltv": 90, "special_features": ["Pre-approved", "Fast processing", "Flexible repayment"]}', NOW(), NOW()),
+(1, 1, 'Standard Home Loan', 'HOME-STD', 'Standard home loan for salaried individuals', 'active', '{"min_income": 300000, "max_ltv": 80, "special_features": ["Standard processing", "Normal documentation"]}', NOW(), NOW()),
+(1, 1, 'Affordable Home Loan', 'HOME-AFF', 'Affordable home loan for first-time buyers', 'active', '{"min_income": 200000, "max_ltv": 75, "special_features": ["Subsidy eligible", "Lower down payment"]}', NOW(), NOW()),
+(1, 1, 'NRI Home Loan', 'HOME-NRI', 'Home loan specifically designed for Non-Resident Indians', 'active', '{"min_income": 400000, "max_ltv": 85, "special_features": ["NRI documentation", "Foreign income accepted"]}', NOW(), NOW()),
+(1, 1, 'Plot Purchase Loan', 'HOME-PLOT', 'Loan for purchasing residential plots', 'active', '{"min_income": 250000, "max_ltv": 70, "special_features": ["Plot specific", "Construction timeline"]}', NOW(), NOW()),
+
+-- PERSONAL LOAN SUB-PRODUCTS (Product ID: 2)
+(1, 2, 'Instant Personal Loan', 'PERS-INST', 'Quick personal loan with instant approval', 'active', '{"min_income": 150000, "max_amount": 500000, "special_features": ["Instant approval", "Minimal documentation", "Same day disbursal"]}', NOW(), NOW()),
+(1, 2, 'Premium Personal Loan', 'PERS-PREM', 'High-value personal loan for high-income customers', 'active', '{"min_income": 500000, "max_amount": 2000000, "special_features": ["Higher limits", "Lower rates", "Priority processing"]}', NOW(), NOW()),
+(1, 2, 'Medical Emergency Loan', 'PERS-MED', 'Personal loan for medical emergencies', 'active', '{"min_income": 100000, "max_amount": 1000000, "special_features": ["Fast approval", "Medical documentation", "Flexible repayment"]}', NOW(), NOW()),
+(1, 2, 'Wedding Loan', 'PERS-WED', 'Personal loan for wedding expenses', 'active', '{"min_income": 200000, "max_amount": 1500000, "special_features": ["Wedding specific", "Flexible tenure", "Special rates"]}', NOW(), NOW()),
+(1, 2, 'Education Loan', 'PERS-EDU', 'Personal loan for education expenses', 'active', '{"min_income": 180000, "max_amount": 800000, "special_features": ["Education specific", "Moratorium period", "Lower rates"]}', NOW(), NOW()),
+
+-- BUSINESS LOAN SUB-PRODUCTS (Product ID: 3)
+(1, 3, 'Working Capital Loan', 'BIZ-WC', 'Short-term loan for business working capital needs', 'active', '{"min_turnover": 1000000, "max_amount": 5000000, "special_features": ["Quick disbursal", "Flexible usage", "Renewable"]}', NOW(), NOW()),
+(1, 3, 'Term Loan', 'BIZ-TERM', 'Long-term loan for business expansion', 'active', '{"min_turnover": 2000000, "max_amount": 10000000, "special_features": ["Long tenure", "Fixed rates", "Collateral required"]}', NOW(), NOW()),
+(1, 3, 'Equipment Finance', 'BIZ-EQUIP', 'Loan for purchasing business equipment', 'active', '{"min_turnover": 500000, "max_amount": 3000000, "special_features": ["Equipment specific", "Asset-based", "Lower rates"]}', NOW(), NOW()),
+(1, 3, 'Startup Loan', 'BIZ-START', 'Loan for new business startups', 'active', '{"min_turnover": 0, "max_amount": 2000000, "special_features": ["Startup friendly", "Mentorship", "Flexible terms"]}', NOW(), NOW()),
+(1, 3, 'Export Finance', 'BIZ-EXP', 'Loan for export-oriented businesses', 'active', '{"min_turnover": 5000000, "max_amount": 20000000, "special_features": ["Export specific", "Foreign exchange", "Government schemes"]}', NOW(), NOW()),
+
+-- CAR LOAN SUB-PRODUCTS (Product ID: 4)
+(1, 4, 'New Car Loan', 'CAR-NEW', 'Loan for purchasing new cars', 'active', '{"min_income": 200000, "max_amount": 5000000, "special_features": ["New car specific", "Lower rates", "Extended warranty"]}', NOW(), NOW()),
+(1, 4, 'Used Car Loan', 'CAR-USED', 'Loan for purchasing used cars', 'active', '{"min_income": 150000, "max_amount": 2000000, "special_features": ["Used car specific", "Higher rates", "Age restrictions"]}', NOW(), NOW()),
+(1, 4, 'Luxury Car Loan', 'CAR-LUX', 'High-value loan for luxury cars', 'active', '{"min_income": 800000, "max_amount": 10000000, "special_features": ["Luxury specific", "Premium service", "Higher limits"]}', NOW(), NOW()),
+(1, 4, 'Commercial Vehicle Loan', 'CAR-COMM', 'Loan for commercial vehicles', 'active', '{"min_income": 300000, "max_amount": 8000000, "special_features": ["Commercial use", "Business documentation", "Higher limits"]}', NOW(), NOW()),
+(1, 4, 'Two-Wheeler Loan', 'CAR-2W', 'Loan for two-wheelers', 'active', '{"min_income": 100000, "max_amount": 500000, "special_features": ["Two-wheeler specific", "Quick processing", "Minimal documentation"]}', NOW(), NOW()),
+
+-- EDUCATION LOAN SUB-PRODUCTS (Product ID: 5)
+(1, 5, 'Undergraduate Loan', 'EDU-UG', 'Education loan for undergraduate studies', 'active', '{"min_income": 200000, "max_amount": 1000000, "special_features": ["UG specific", "Moratorium period", "Lower rates"]}', NOW(), NOW()),
+(1, 5, 'Postgraduate Loan', 'EDU-PG', 'Education loan for postgraduate studies', 'active', '{"min_income": 300000, "max_amount": 2000000, "special_features": ["PG specific", "Higher limits", "Flexible repayment"]}', NOW(), NOW()),
+(1, 5, 'Study Abroad Loan', 'EDU-ABROAD', 'Education loan for international studies', 'active', '{"min_income": 500000, "max_amount": 5000000, "special_features": ["International", "Foreign exchange", "Higher limits"]}', NOW(), NOW()),
+(1, 5, 'Professional Course Loan', 'EDU-PROF', 'Loan for professional courses and certifications', 'active', '{"min_income": 150000, "max_amount": 500000, "special_features": ["Professional specific", "Short tenure", "Quick approval"]}', NOW(), NOW()),
+(1, 5, 'Skill Development Loan', 'EDU-SKILL', 'Loan for skill development and vocational training', 'active', '{"min_income": 100000, "max_amount": 300000, "special_features": ["Skill specific", "Government schemes", "Lower rates"]}', NOW(), NOW()),
+
+-- GOLD LOAN SUB-PRODUCTS (Product ID: 6)
+(1, 6, 'Gold Jewelry Loan', 'GOLD-JEWEL', 'Loan against gold jewelry', 'active', '{"min_income": 50000, "max_amount": 1000000, "special_features": ["Jewelry specific", "Quick disbursal", "Flexible tenure"]}', NOW(), NOW()),
+(1, 6, 'Gold Coin Loan', 'GOLD-COIN', 'Loan against gold coins and bars', 'active', '{"min_income": 50000, "max_amount": 500000, "special_features": ["Coin specific", "Higher LTV", "Secure storage"]}', NOW(), NOW()),
+(1, 6, 'Gold ETF Loan', 'GOLD-ETF', 'Loan against gold ETF holdings', 'active', '{"min_income": 100000, "max_amount": 2000000, "special_features": ["ETF specific", "Digital gold", "Higher limits"]}', NOW(), NOW()),
+(1, 6, 'Gold Savings Loan', 'GOLD-SAVE', 'Regular gold savings with loan facility', 'active', '{"min_income": 30000, "max_amount": 300000, "special_features": ["Savings linked", "Regular deposits", "Lower rates"]}', NOW(), NOW()),
+(1, 6, 'Gold Overdraft', 'GOLD-OD', 'Overdraft facility against gold', 'active', '{"min_income": 100000, "max_amount": 1000000, "special_features": ["Overdraft facility", "Interest on usage", "Flexible repayment"]}', NOW(), NOW())
+
+ON CONFLICT DO NOTHING;
+```
+
+#### **16. Insert Sub-Product Document Mappings**
+```sql
+-- Clear existing sub-product document mappings first
+DELETE FROM doc_against_sub_product WHERE organization_id = 1;
+
+-- Insert document mappings for all sub-products
+-- Each sub-product will inherit document requirements from its parent product plus some specific ones
+
+-- HOME LOAN SUB-PRODUCTS DOCUMENT MAPPINGS
+INSERT INTO doc_against_sub_product (organization_id, sub_product_id, document_type_id, mandatory, notes, created_at, updated_at) VALUES
+
+-- Prime Home Loan (ID: 1) - All documents mandatory
+(1, 1, 1, true, 'Aadhaar required for Prime Home Loan', NOW(), NOW()),
+(1, 1, 2, true, 'PAN required for Prime Home Loan', NOW(), NOW()),
+(1, 1, 6, true, 'Bank statements required for Prime Home Loan', NOW(), NOW()),
+(1, 1, 7, true, 'Salary slips required for Prime Home Loan', NOW(), NOW()),
+(1, 1, 8, true, 'Form 16 required for Prime Home Loan', NOW(), NOW()),
+(1, 1, 9, true, 'ITR returns required for Prime Home Loan', NOW(), NOW()),
+(1, 1, 17, true, 'Property documents required for Prime Home Loan', NOW(), NOW()),
+(1, 1, 18, true, 'Property valuation required for Prime Home Loan', NOW(), NOW()),
+(1, 1, 21, true, 'Employment letter required for Prime Home Loan', NOW(), NOW()),
+(1, 1, 24, true, 'Photograph required for Prime Home Loan', NOW(), NOW()),
+(1, 1, 25, true, 'Signature specimen required for Prime Home Loan', NOW(), NOW()),
+(1, 1, 26, true, 'Address proof required for Prime Home Loan', NOW(), NOW()),
+
+-- Standard Home Loan (ID: 2) - Standard documents
+(1, 2, 1, true, 'Aadhaar required for Standard Home Loan', NOW(), NOW()),
+(1, 2, 2, true, 'PAN required for Standard Home Loan', NOW(), NOW()),
+(1, 2, 6, true, 'Bank statements required for Standard Home Loan', NOW(), NOW()),
+(1, 2, 7, true, 'Salary slips required for Standard Home Loan', NOW(), NOW()),
+(1, 2, 8, true, 'Form 16 required for Standard Home Loan', NOW(), NOW()),
+(1, 2, 17, true, 'Property documents required for Standard Home Loan', NOW(), NOW()),
+(1, 2, 18, true, 'Property valuation required for Standard Home Loan', NOW(), NOW()),
+(1, 2, 21, true, 'Employment letter required for Standard Home Loan', NOW(), NOW()),
+(1, 2, 24, true, 'Photograph required for Standard Home Loan', NOW(), NOW()),
+(1, 2, 25, true, 'Signature specimen required for Standard Home Loan', NOW(), NOW()),
+(1, 2, 26, true, 'Address proof required for Standard Home Loan', NOW(), NOW()),
+
+-- Affordable Home Loan (ID: 3) - Basic documents
+(1, 3, 1, true, 'Aadhaar required for Affordable Home Loan', NOW(), NOW()),
+(1, 3, 2, true, 'PAN required for Affordable Home Loan', NOW(), NOW()),
+(1, 3, 6, true, 'Bank statements required for Affordable Home Loan', NOW(), NOW()),
+(1, 3, 7, true, 'Salary slips required for Affordable Home Loan', NOW(), NOW()),
+(1, 3, 17, true, 'Property documents required for Affordable Home Loan', NOW(), NOW()),
+(1, 3, 21, true, 'Employment letter required for Affordable Home Loan', NOW(), NOW()),
+(1, 3, 24, true, 'Photograph required for Affordable Home Loan', NOW(), NOW()),
+(1, 3, 25, true, 'Signature specimen required for Affordable Home Loan', NOW(), NOW()),
+(1, 3, 26, true, 'Address proof required for Affordable Home Loan', NOW(), NOW()),
+
+-- NRI Home Loan (ID: 4) - NRI specific documents
+(1, 4, 1, true, 'Aadhaar required for NRI Home Loan', NOW(), NOW()),
+(1, 4, 2, true, 'PAN required for NRI Home Loan', NOW(), NOW()),
+(1, 4, 3, true, 'Passport required for NRI Home Loan', NOW(), NOW()),
+(1, 4, 6, true, 'Bank statements required for NRI Home Loan', NOW(), NOW()),
+(1, 4, 7, true, 'Salary slips required for NRI Home Loan', NOW(), NOW()),
+(1, 4, 17, true, 'Property documents required for NRI Home Loan', NOW(), NOW()),
+(1, 4, 18, true, 'Property valuation required for NRI Home Loan', NOW(), NOW()),
+(1, 4, 21, true, 'Employment letter required for NRI Home Loan', NOW(), NOW()),
+(1, 4, 24, true, 'Photograph required for NRI Home Loan', NOW(), NOW()),
+(1, 4, 25, true, 'Signature specimen required for NRI Home Loan', NOW(), NOW()),
+(1, 4, 26, true, 'Address proof required for NRI Home Loan', NOW(), NOW()),
+
+-- Plot Purchase Loan (ID: 5) - Plot specific documents
+(1, 5, 1, true, 'Aadhaar required for Plot Purchase Loan', NOW(), NOW()),
+(1, 5, 2, true, 'PAN required for Plot Purchase Loan', NOW(), NOW()),
+(1, 5, 6, true, 'Bank statements required for Plot Purchase Loan', NOW(), NOW()),
+(1, 5, 7, true, 'Salary slips required for Plot Purchase Loan', NOW(), NOW()),
+(1, 5, 17, true, 'Property documents required for Plot Purchase Loan', NOW(), NOW()),
+(1, 5, 18, true, 'Property valuation required for Plot Purchase Loan', NOW(), NOW()),
+(1, 5, 19, true, 'NOC from builder required for Plot Purchase Loan', NOW(), NOW()),
+(1, 5, 20, true, 'Sale agreement required for Plot Purchase Loan', NOW(), NOW()),
+(1, 5, 21, true, 'Employment letter required for Plot Purchase Loan', NOW(), NOW()),
+(1, 5, 24, true, 'Photograph required for Plot Purchase Loan', NOW(), NOW()),
+(1, 5, 25, true, 'Signature specimen required for Plot Purchase Loan', NOW(), NOW()),
+(1, 5, 26, true, 'Address proof required for Plot Purchase Loan', NOW(), NOW()),
+
+-- PERSONAL LOAN SUB-PRODUCTS DOCUMENT MAPPINGS
+-- Instant Personal Loan (ID: 6) - Minimal documents
+(1, 6, 1, true, 'Aadhaar required for Instant Personal Loan', NOW(), NOW()),
+(1, 6, 2, true, 'PAN required for Instant Personal Loan', NOW(), NOW()),
+(1, 6, 6, true, 'Bank statements required for Instant Personal Loan', NOW(), NOW()),
+(1, 6, 7, true, 'Salary slips required for Instant Personal Loan', NOW(), NOW()),
+(1, 6, 21, true, 'Employment letter required for Instant Personal Loan', NOW(), NOW()),
+(1, 6, 24, true, 'Photograph required for Instant Personal Loan', NOW(), NOW()),
+(1, 6, 25, true, 'Signature specimen required for Instant Personal Loan', NOW(), NOW()),
+(1, 6, 26, true, 'Address proof required for Instant Personal Loan', NOW(), NOW()),
+
+-- Premium Personal Loan (ID: 7) - Comprehensive documents
+(1, 7, 1, true, 'Aadhaar required for Premium Personal Loan', NOW(), NOW()),
+(1, 7, 2, true, 'PAN required for Premium Personal Loan', NOW(), NOW()),
+(1, 7, 6, true, 'Bank statements required for Premium Personal Loan', NOW(), NOW()),
+(1, 7, 7, true, 'Salary slips required for Premium Personal Loan', NOW(), NOW()),
+(1, 7, 8, true, 'Form 16 required for Premium Personal Loan', NOW(), NOW()),
+(1, 7, 9, true, 'ITR returns required for Premium Personal Loan', NOW(), NOW()),
+(1, 7, 21, true, 'Employment letter required for Premium Personal Loan', NOW(), NOW()),
+(1, 7, 24, true, 'Photograph required for Premium Personal Loan', NOW(), NOW()),
+(1, 7, 25, true, 'Signature specimen required for Premium Personal Loan', NOW(), NOW()),
+(1, 7, 26, true, 'Address proof required for Premium Personal Loan', NOW(), NOW()),
+
+-- Medical Emergency Loan (ID: 8) - Medical documents
+(1, 8, 1, true, 'Aadhaar required for Medical Emergency Loan', NOW(), NOW()),
+(1, 8, 2, true, 'PAN required for Medical Emergency Loan', NOW(), NOW()),
+(1, 8, 6, true, 'Bank statements required for Medical Emergency Loan', NOW(), NOW()),
+(1, 8, 7, true, 'Salary slips required for Medical Emergency Loan', NOW(), NOW()),
+(1, 8, 21, true, 'Employment letter required for Medical Emergency Loan', NOW(), NOW()),
+(1, 8, 24, true, 'Photograph required for Medical Emergency Loan', NOW(), NOW()),
+(1, 8, 25, true, 'Signature specimen required for Medical Emergency Loan', NOW(), NOW()),
+(1, 8, 26, true, 'Address proof required for Medical Emergency Loan', NOW(), NOW()),
+
+-- Wedding Loan (ID: 9) - Standard documents
+(1, 9, 1, true, 'Aadhaar required for Wedding Loan', NOW(), NOW()),
+(1, 9, 2, true, 'PAN required for Wedding Loan', NOW(), NOW()),
+(1, 9, 6, true, 'Bank statements required for Wedding Loan', NOW(), NOW()),
+(1, 9, 7, true, 'Salary slips required for Wedding Loan', NOW(), NOW()),
+(1, 9, 21, true, 'Employment letter required for Wedding Loan', NOW(), NOW()),
+(1, 9, 24, true, 'Photograph required for Wedding Loan', NOW(), NOW()),
+(1, 9, 25, true, 'Signature specimen required for Wedding Loan', NOW(), NOW()),
+(1, 9, 26, true, 'Address proof required for Wedding Loan', NOW(), NOW()),
+
+-- Education Personal Loan (ID: 10) - Education documents
+(1, 10, 1, true, 'Aadhaar required for Education Personal Loan', NOW(), NOW()),
+(1, 10, 2, true, 'PAN required for Education Personal Loan', NOW(), NOW()),
+(1, 10, 6, true, 'Bank statements required for Education Personal Loan', NOW(), NOW()),
+(1, 10, 7, true, 'Salary slips required for Education Personal Loan', NOW(), NOW()),
+(1, 10, 21, true, 'Employment letter required for Education Personal Loan', NOW(), NOW()),
+(1, 10, 24, true, 'Photograph required for Education Personal Loan', NOW(), NOW()),
+(1, 10, 25, true, 'Signature specimen required for Education Personal Loan', NOW(), NOW()),
+(1, 10, 26, true, 'Address proof required for Education Personal Loan', NOW(), NOW()),
+
+-- BUSINESS LOAN SUB-PRODUCTS DOCUMENT MAPPINGS
+-- Working Capital Loan (ID: 11) - Business documents
+(1, 11, 1, true, 'Aadhaar required for Working Capital Loan', NOW(), NOW()),
+(1, 11, 2, true, 'PAN required for Working Capital Loan', NOW(), NOW()),
+(1, 11, 6, true, 'Bank statements required for Working Capital Loan', NOW(), NOW()),
+(1, 11, 9, true, 'ITR returns required for Working Capital Loan', NOW(), NOW()),
+(1, 11, 10, true, 'Balance sheet required for Working Capital Loan', NOW(), NOW()),
+(1, 11, 11, true, 'Profit loss statement required for Working Capital Loan', NOW(), NOW()),
+(1, 11, 12, true, 'GST registration required for Working Capital Loan', NOW(), NOW()),
+(1, 11, 13, true, 'GST returns required for Working Capital Loan', NOW(), NOW()),
+(1, 11, 14, true, 'Business registration required for Working Capital Loan', NOW(), NOW()),
+(1, 11, 24, true, 'Photograph required for Working Capital Loan', NOW(), NOW()),
+(1, 11, 25, true, 'Signature specimen required for Working Capital Loan', NOW(), NOW()),
+(1, 11, 26, true, 'Address proof required for Working Capital Loan', NOW(), NOW()),
+
+-- Term Loan (ID: 12) - Comprehensive business documents
+(1, 12, 1, true, 'Aadhaar required for Term Loan', NOW(), NOW()),
+(1, 12, 2, true, 'PAN required for Term Loan', NOW(), NOW()),
+(1, 12, 6, true, 'Bank statements required for Term Loan', NOW(), NOW()),
+(1, 12, 9, true, 'ITR returns required for Term Loan', NOW(), NOW()),
+(1, 12, 10, true, 'Balance sheet required for Term Loan', NOW(), NOW()),
+(1, 12, 11, true, 'Profit loss statement required for Term Loan', NOW(), NOW()),
+(1, 12, 12, true, 'GST registration required for Term Loan', NOW(), NOW()),
+(1, 12, 13, true, 'GST returns required for Term Loan', NOW(), NOW()),
+(1, 12, 14, true, 'Business registration required for Term Loan', NOW(), NOW()),
+(1, 12, 15, true, 'Partnership deed required for Term Loan', NOW(), NOW()),
+(1, 12, 16, true, 'Company incorporation required for Term Loan', NOW(), NOW()),
+(1, 12, 24, true, 'Photograph required for Term Loan', NOW(), NOW()),
+(1, 12, 25, true, 'Signature specimen required for Term Loan', NOW(), NOW()),
+(1, 12, 26, true, 'Address proof required for Term Loan', NOW(), NOW()),
+
+-- Equipment Finance (ID: 13) - Equipment specific documents
+(1, 13, 1, true, 'Aadhaar required for Equipment Finance', NOW(), NOW()),
+(1, 13, 2, true, 'PAN required for Equipment Finance', NOW(), NOW()),
+(1, 13, 6, true, 'Bank statements required for Equipment Finance', NOW(), NOW()),
+(1, 13, 9, true, 'ITR returns required for Equipment Finance', NOW(), NOW()),
+(1, 13, 10, true, 'Balance sheet required for Equipment Finance', NOW(), NOW()),
+(1, 13, 12, true, 'GST registration required for Equipment Finance', NOW(), NOW()),
+(1, 13, 14, true, 'Business registration required for Equipment Finance', NOW(), NOW()),
+(1, 13, 24, true, 'Photograph required for Equipment Finance', NOW(), NOW()),
+(1, 13, 25, true, 'Signature specimen required for Equipment Finance', NOW(), NOW()),
+(1, 13, 26, true, 'Address proof required for Equipment Finance', NOW(), NOW()),
+
+-- Startup Loan (ID: 14) - Startup specific documents
+(1, 14, 1, true, 'Aadhaar required for Startup Loan', NOW(), NOW()),
+(1, 14, 2, true, 'PAN required for Startup Loan', NOW(), NOW()),
+(1, 14, 6, true, 'Bank statements required for Startup Loan', NOW(), NOW()),
+(1, 14, 14, true, 'Business registration required for Startup Loan', NOW(), NOW()),
+(1, 14, 15, true, 'Partnership deed required for Startup Loan', NOW(), NOW()),
+(1, 14, 16, true, 'Company incorporation required for Startup Loan', NOW(), NOW()),
+(1, 14, 24, true, 'Photograph required for Startup Loan', NOW(), NOW()),
+(1, 14, 25, true, 'Signature specimen required for Startup Loan', NOW(), NOW()),
+(1, 14, 26, true, 'Address proof required for Startup Loan', NOW(), NOW()),
+
+-- Export Finance (ID: 15) - Export specific documents
+(1, 15, 1, true, 'Aadhaar required for Export Finance', NOW(), NOW()),
+(1, 15, 2, true, 'PAN required for Export Finance', NOW(), NOW()),
+(1, 15, 6, true, 'Bank statements required for Export Finance', NOW(), NOW()),
+(1, 15, 9, true, 'ITR returns required for Export Finance', NOW(), NOW()),
+(1, 15, 10, true, 'Balance sheet required for Export Finance', NOW(), NOW()),
+(1, 15, 11, true, 'Profit loss statement required for Export Finance', NOW(), NOW()),
+(1, 15, 12, true, 'GST registration required for Export Finance', NOW(), NOW()),
+(1, 15, 13, true, 'GST returns required for Export Finance', NOW(), NOW()),
+(1, 15, 14, true, 'Business registration required for Export Finance', NOW(), NOW()),
+(1, 15, 24, true, 'Photograph required for Export Finance', NOW(), NOW()),
+(1, 15, 25, true, 'Signature specimen required for Export Finance', NOW(), NOW()),
+(1, 15, 26, true, 'Address proof required for Export Finance', NOW(), NOW()),
+
+-- CAR LOAN SUB-PRODUCTS DOCUMENT MAPPINGS
+-- New Car Loan (ID: 16) - Standard car loan documents
+(1, 16, 1, true, 'Aadhaar required for New Car Loan', NOW(), NOW()),
+(1, 16, 2, true, 'PAN required for New Car Loan', NOW(), NOW()),
+(1, 16, 4, true, 'Driving license required for New Car Loan', NOW(), NOW()),
+(1, 16, 6, true, 'Bank statements required for New Car Loan', NOW(), NOW()),
+(1, 16, 7, true, 'Salary slips required for New Car Loan', NOW(), NOW()),
+(1, 16, 21, true, 'Employment letter required for New Car Loan', NOW(), NOW()),
+(1, 16, 24, true, 'Photograph required for New Car Loan', NOW(), NOW()),
+(1, 16, 25, true, 'Signature specimen required for New Car Loan', NOW(), NOW()),
+(1, 16, 26, true, 'Address proof required for New Car Loan', NOW(), NOW()),
+
+-- Used Car Loan (ID: 17) - Used car specific documents
+(1, 17, 1, true, 'Aadhaar required for Used Car Loan', NOW(), NOW()),
+(1, 17, 2, true, 'PAN required for Used Car Loan', NOW(), NOW()),
+(1, 17, 4, true, 'Driving license required for Used Car Loan', NOW(), NOW()),
+(1, 17, 6, true, 'Bank statements required for Used Car Loan', NOW(), NOW()),
+(1, 17, 7, true, 'Salary slips required for Used Car Loan', NOW(), NOW()),
+(1, 17, 21, true, 'Employment letter required for Used Car Loan', NOW(), NOW()),
+(1, 17, 24, true, 'Photograph required for Used Car Loan', NOW(), NOW()),
+(1, 17, 25, true, 'Signature specimen required for Used Car Loan', NOW(), NOW()),
+(1, 17, 26, true, 'Address proof required for Used Car Loan', NOW(), NOW()),
+
+-- Luxury Car Loan (ID: 18) - Premium documents
+(1, 18, 1, true, 'Aadhaar required for Luxury Car Loan', NOW(), NOW()),
+(1, 18, 2, true, 'PAN required for Luxury Car Loan', NOW(), NOW()),
+(1, 18, 4, true, 'Driving license required for Luxury Car Loan', NOW(), NOW()),
+(1, 18, 6, true, 'Bank statements required for Luxury Car Loan', NOW(), NOW()),
+(1, 18, 7, true, 'Salary slips required for Luxury Car Loan', NOW(), NOW()),
+(1, 18, 8, true, 'Form 16 required for Luxury Car Loan', NOW(), NOW()),
+(1, 18, 9, true, 'ITR returns required for Luxury Car Loan', NOW(), NOW()),
+(1, 18, 21, true, 'Employment letter required for Luxury Car Loan', NOW(), NOW()),
+(1, 18, 24, true, 'Photograph required for Luxury Car Loan', NOW(), NOW()),
+(1, 18, 25, true, 'Signature specimen required for Luxury Car Loan', NOW(), NOW()),
+(1, 18, 26, true, 'Address proof required for Luxury Car Loan', NOW(), NOW()),
+
+-- Commercial Vehicle Loan (ID: 19) - Business vehicle documents
+(1, 19, 1, true, 'Aadhaar required for Commercial Vehicle Loan', NOW(), NOW()),
+(1, 19, 2, true, 'PAN required for Commercial Vehicle Loan', NOW(), NOW()),
+(1, 19, 4, true, 'Driving license required for Commercial Vehicle Loan', NOW(), NOW()),
+(1, 19, 6, true, 'Bank statements required for Commercial Vehicle Loan', NOW(), NOW()),
+(1, 19, 9, true, 'ITR returns required for Commercial Vehicle Loan', NOW(), NOW()),
+(1, 19, 12, true, 'GST registration required for Commercial Vehicle Loan', NOW(), NOW()),
+(1, 19, 14, true, 'Business registration required for Commercial Vehicle Loan', NOW(), NOW()),
+(1, 19, 24, true, 'Photograph required for Commercial Vehicle Loan', NOW(), NOW()),
+(1, 19, 25, true, 'Signature specimen required for Commercial Vehicle Loan', NOW(), NOW()),
+(1, 19, 26, true, 'Address proof required for Commercial Vehicle Loan', NOW(), NOW()),
+
+-- Two-Wheeler Loan (ID: 20) - Minimal documents
+(1, 20, 1, true, 'Aadhaar required for Two-Wheeler Loan', NOW(), NOW()),
+(1, 20, 2, true, 'PAN required for Two-Wheeler Loan', NOW(), NOW()),
+(1, 20, 4, true, 'Driving license required for Two-Wheeler Loan', NOW(), NOW()),
+(1, 20, 6, true, 'Bank statements required for Two-Wheeler Loan', NOW(), NOW()),
+(1, 20, 7, true, 'Salary slips required for Two-Wheeler Loan', NOW(), NOW()),
+(1, 20, 24, true, 'Photograph required for Two-Wheeler Loan', NOW(), NOW()),
+(1, 20, 25, true, 'Signature specimen required for Two-Wheeler Loan', NOW(), NOW()),
+(1, 20, 26, true, 'Address proof required for Two-Wheeler Loan', NOW(), NOW()),
+
+-- EDUCATION LOAN SUB-PRODUCTS DOCUMENT MAPPINGS
+-- Undergraduate Loan (ID: 21) - Education documents
+(1, 21, 1, true, 'Aadhaar required for Undergraduate Loan', NOW(), NOW()),
+(1, 21, 2, true, 'PAN required for Undergraduate Loan', NOW(), NOW()),
+(1, 21, 6, true, 'Bank statements required for Undergraduate Loan', NOW(), NOW()),
+(1, 21, 7, true, 'Salary slips required for Undergraduate Loan', NOW(), NOW()),
+(1, 21, 21, true, 'Employment letter required for Undergraduate Loan', NOW(), NOW()),
+(1, 21, 24, true, 'Photograph required for Undergraduate Loan', NOW(), NOW()),
+(1, 21, 25, true, 'Signature specimen required for Undergraduate Loan', NOW(), NOW()),
+(1, 21, 26, true, 'Address proof required for Undergraduate Loan', NOW(), NOW()),
+
+-- Postgraduate Loan (ID: 22) - Higher education documents
+(1, 22, 1, true, 'Aadhaar required for Postgraduate Loan', NOW(), NOW()),
+(1, 22, 2, true, 'PAN required for Postgraduate Loan', NOW(), NOW()),
+(1, 22, 6, true, 'Bank statements required for Postgraduate Loan', NOW(), NOW()),
+(1, 22, 7, true, 'Salary slips required for Postgraduate Loan', NOW(), NOW()),
+(1, 22, 8, true, 'Form 16 required for Postgraduate Loan', NOW(), NOW()),
+(1, 22, 21, true, 'Employment letter required for Postgraduate Loan', NOW(), NOW()),
+(1, 22, 24, true, 'Photograph required for Postgraduate Loan', NOW(), NOW()),
+(1, 22, 25, true, 'Signature specimen required for Postgraduate Loan', NOW(), NOW()),
+(1, 22, 26, true, 'Address proof required for Postgraduate Loan', NOW(), NOW()),
+
+-- Study Abroad Loan (ID: 23) - International education documents
+(1, 23, 1, true, 'Aadhaar required for Study Abroad Loan', NOW(), NOW()),
+(1, 23, 2, true, 'PAN required for Study Abroad Loan', NOW(), NOW()),
+(1, 23, 3, true, 'Passport required for Study Abroad Loan', NOW(), NOW()),
+(1, 23, 6, true, 'Bank statements required for Study Abroad Loan', NOW(), NOW()),
+(1, 23, 7, true, 'Salary slips required for Study Abroad Loan', NOW(), NOW()),
+(1, 23, 8, true, 'Form 16 required for Study Abroad Loan', NOW(), NOW()),
+(1, 23, 9, true, 'ITR returns required for Study Abroad Loan', NOW(), NOW()),
+(1, 23, 21, true, 'Employment letter required for Study Abroad Loan', NOW(), NOW()),
+(1, 23, 24, true, 'Photograph required for Study Abroad Loan', NOW(), NOW()),
+(1, 23, 25, true, 'Signature specimen required for Study Abroad Loan', NOW(), NOW()),
+(1, 23, 26, true, 'Address proof required for Study Abroad Loan', NOW(), NOW()),
+
+-- Professional Course Loan (ID: 24) - Professional education documents
+(1, 24, 1, true, 'Aadhaar required for Professional Course Loan', NOW(), NOW()),
+(1, 24, 2, true, 'PAN required for Professional Course Loan', NOW(), NOW()),
+(1, 24, 6, true, 'Bank statements required for Professional Course Loan', NOW(), NOW()),
+(1, 24, 7, true, 'Salary slips required for Professional Course Loan', NOW(), NOW()),
+(1, 24, 21, true, 'Employment letter required for Professional Course Loan', NOW(), NOW()),
+(1, 24, 24, true, 'Photograph required for Professional Course Loan', NOW(), NOW()),
+(1, 24, 25, true, 'Signature specimen required for Professional Course Loan', NOW(), NOW()),
+(1, 24, 26, true, 'Address proof required for Professional Course Loan', NOW(), NOW()),
+
+-- Skill Development Loan (ID: 25) - Skill development documents
+(1, 25, 1, true, 'Aadhaar required for Skill Development Loan', NOW(), NOW()),
+(1, 25, 2, true, 'PAN required for Skill Development Loan', NOW(), NOW()),
+(1, 25, 6, true, 'Bank statements required for Skill Development Loan', NOW(), NOW()),
+(1, 25, 7, true, 'Salary slips required for Skill Development Loan', NOW(), NOW()),
+(1, 25, 24, true, 'Photograph required for Skill Development Loan', NOW(), NOW()),
+(1, 25, 25, true, 'Signature specimen required for Skill Development Loan', NOW(), NOW()),
+(1, 25, 26, true, 'Address proof required for Skill Development Loan', NOW(), NOW()),
+
+-- GOLD LOAN SUB-PRODUCTS DOCUMENT MAPPINGS
+-- Gold Jewelry Loan (ID: 26) - Gold specific documents
+(1, 26, 1, true, 'Aadhaar required for Gold Jewelry Loan', NOW(), NOW()),
+(1, 26, 2, true, 'PAN required for Gold Jewelry Loan', NOW(), NOW()),
+(1, 26, 6, true, 'Bank statements required for Gold Jewelry Loan', NOW(), NOW()),
+(1, 26, 24, true, 'Photograph required for Gold Jewelry Loan', NOW(), NOW()),
+(1, 26, 25, true, 'Signature specimen required for Gold Jewelry Loan', NOW(), NOW()),
+(1, 26, 26, true, 'Address proof required for Gold Jewelry Loan', NOW(), NOW()),
+
+-- Gold Coin Loan (ID: 27) - Gold coin specific documents
+(1, 27, 1, true, 'Aadhaar required for Gold Coin Loan', NOW(), NOW()),
+(1, 27, 2, true, 'PAN required for Gold Coin Loan', NOW(), NOW()),
+(1, 27, 6, true, 'Bank statements required for Gold Coin Loan', NOW(), NOW()),
+(1, 27, 24, true, 'Photograph required for Gold Coin Loan', NOW(), NOW()),
+(1, 27, 25, true, 'Signature specimen required for Gold Coin Loan', NOW(), NOW()),
+(1, 27, 26, true, 'Address proof required for Gold Coin Loan', NOW(), NOW()),
+
+-- Gold ETF Loan (ID: 28) - ETF specific documents
+(1, 28, 1, true, 'Aadhaar required for Gold ETF Loan', NOW(), NOW()),
+(1, 28, 2, true, 'PAN required for Gold ETF Loan', NOW(), NOW()),
+(1, 28, 6, true, 'Bank statements required for Gold ETF Loan', NOW(), NOW()),
+(1, 28, 7, true, 'Salary slips required for Gold ETF Loan', NOW(), NOW()),
+(1, 28, 24, true, 'Photograph required for Gold ETF Loan', NOW(), NOW()),
+(1, 28, 25, true, 'Signature specimen required for Gold ETF Loan', NOW(), NOW()),
+(1, 28, 26, true, 'Address proof required for Gold ETF Loan', NOW(), NOW()),
+
+-- Gold Savings Loan (ID: 29) - Savings linked documents
+(1, 29, 1, true, 'Aadhaar required for Gold Savings Loan', NOW(), NOW()),
+(1, 29, 2, true, 'PAN required for Gold Savings Loan', NOW(), NOW()),
+(1, 29, 6, true, 'Bank statements required for Gold Savings Loan', NOW(), NOW()),
+(1, 29, 24, true, 'Photograph required for Gold Savings Loan', NOW(), NOW()),
+(1, 29, 25, true, 'Signature specimen required for Gold Savings Loan', NOW(), NOW()),
+(1, 29, 26, true, 'Address proof required for Gold Savings Loan', NOW(), NOW()),
+
+-- Gold Overdraft (ID: 30) - Overdraft specific documents
+(1, 30, 1, true, 'Aadhaar required for Gold Overdraft', NOW(), NOW()),
+(1, 30, 2, true, 'PAN required for Gold Overdraft', NOW(), NOW()),
+(1, 30, 6, true, 'Bank statements required for Gold Overdraft', NOW(), NOW()),
+(1, 30, 7, true, 'Salary slips required for Gold Overdraft', NOW(), NOW()),
+(1, 30, 24, true, 'Photograph required for Gold Overdraft', NOW(), NOW()),
+(1, 30, 25, true, 'Signature specimen required for Gold Overdraft', NOW(), NOW()),
+(1, 30, 26, true, 'Address proof required for Gold Overdraft', NOW(), NOW())
+
+ON CONFLICT DO NOTHING;
+```
+
 ---
 
 ## **🔍 PART 3: VERIFICATION**

@@ -71,14 +71,14 @@ export function AdminDashboard({}: AdminDashboardProps) {
 
   // Main overview dashboard
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-600">Manage departments, roles, permissions, products, sub-products, documents, and mappings</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">Manage departments, roles, permissions, products, sub-products, documents, and mappings</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={() => window.location.reload()}>
+          <Button variant="outline" onClick={() => window.location.reload()} className="w-full sm:w-auto">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -86,114 +86,114 @@ export function AdminDashboard({}: AdminDashboardProps) {
       </div>
 
       {/* Management Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
         <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveView('departments')}>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-blue-100 text-blue-600">
-                <Building2 className="h-6 w-6" />
+              <div className="p-2 sm:p-3 rounded-lg bg-blue-100 text-blue-600">
+                <Building2 className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-semibold text-gray-900">Department Management</h3>
-                <p className="text-sm text-gray-600">Manage organizational departments and structure</p>
+              <div className="ml-3 sm:ml-4">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Department Management</h3>
+                <p className="text-xs sm:text-sm text-gray-600">Manage organizational departments and structure</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
         <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveView('roles')}>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-green-100 text-green-600">
-                <Shield className="h-6 w-6" />
+              <div className="p-2 sm:p-3 rounded-lg bg-green-100 text-green-600">
+                <Shield className="h-5 w-5 sm:h-6 sm:w-6" />
             </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-semibold text-gray-900">Roles Management</h3>
-                <p className="text-sm text-gray-600">Create and manage user roles and permissions</p>
+              <div className="ml-3 sm:ml-4">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Roles Management</h3>
+                <p className="text-xs sm:text-sm text-gray-600">Create and manage user roles and permissions</p>
                 </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveView('permissions')}>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-purple-100 text-purple-600">
-                <Key className="h-6 w-6" />
+              <div className="p-2 sm:p-3 rounded-lg bg-purple-100 text-purple-600">
+                <Key className="h-5 w-5 sm:h-6 sm:w-6" />
                   </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-semibold text-gray-900">Permissions Management</h3>
-                <p className="text-sm text-gray-600">Configure system permissions and access controls</p>
+              <div className="ml-3 sm:ml-4">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Permissions Management</h3>
+                <p className="text-xs sm:text-sm text-gray-600">Configure system permissions and access controls</p>
               </div>
           </div>
         </CardContent>
       </Card>
 
         <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveView('products')}>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-orange-100 text-orange-600">
-                <Package className="h-6 w-6" />
+              <div className="p-2 sm:p-3 rounded-lg bg-orange-100 text-orange-600">
+                <Package className="h-5 w-5 sm:h-6 sm:w-6" />
             </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-semibold text-gray-900">Products Management</h3>
-                <p className="text-sm text-gray-600">Manage loan products and their configurations</p>
+              <div className="ml-3 sm:ml-4">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Products Management</h3>
+                <p className="text-xs sm:text-sm text-gray-600">Manage loan products and their configurations</p>
                 </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveView('sub-products')}>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-teal-100 text-teal-600">
-                <Layers className="h-6 w-6" />
+              <div className="p-2 sm:p-3 rounded-lg bg-teal-100 text-teal-600">
+                <Layers className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-semibold text-gray-900">Sub-Products Management</h3>
-                <p className="text-sm text-gray-600">Manage sub-products and variants of main products</p>
+              <div className="ml-3 sm:ml-4">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Sub-Products Management</h3>
+                <p className="text-xs sm:text-sm text-gray-600">Manage sub-products and variants of main products</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveView('document-types')}>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-indigo-100 text-indigo-600">
-                <FileType className="h-6 w-6" />
+              <div className="p-2 sm:p-3 rounded-lg bg-indigo-100 text-indigo-600">
+                <FileType className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-semibold text-gray-900">Document Types Management</h3>
-                <p className="text-sm text-gray-600">Manage document types and their configurations</p>
+              <div className="ml-3 sm:ml-4">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Document Types Management</h3>
+                <p className="text-xs sm:text-sm text-gray-600">Manage document types and their configurations</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveView('documents')}>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-pink-100 text-pink-600">
-                <FileText className="h-6 w-6" />
+              <div className="p-2 sm:p-3 rounded-lg bg-pink-100 text-pink-600">
+                <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-semibold text-gray-900">Documents Management</h3>
-                <p className="text-sm text-gray-600">Manage system-wide documents and verification</p>
+              <div className="ml-3 sm:ml-4">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Documents Management</h3>
+                <p className="text-xs sm:text-sm text-gray-600">Manage system-wide documents and verification</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveView('product-document-mapping')}>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-cyan-100 text-cyan-600">
-                <Link className="h-6 w-6" />
+              <div className="p-2 sm:p-3 rounded-lg bg-cyan-100 text-cyan-600">
+                <Link className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-semibold text-gray-900">Product Document Mapping</h3>
-                <p className="text-sm text-gray-600">Manage document requirements for products and sub-products</p>
+              <div className="ml-3 sm:ml-4">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Product Document Mapping</h3>
+                <p className="text-xs sm:text-sm text-gray-600">Manage document requirements for products and sub-products</p>
               </div>
             </div>
           </CardContent>
@@ -206,7 +206,7 @@ export function AdminDashboard({}: AdminDashboardProps) {
           <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Button 
               variant="outline" 
               className="h-20 flex-col"
