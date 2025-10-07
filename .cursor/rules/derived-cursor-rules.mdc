@@ -595,9 +595,9 @@ The admin dashboard has been streamlined to focus on:
 1.  Department Management: Manage organizational departments
 2.  Roles Management: Create and manage user roles and permissions
 3.  Permissions Management: Configure system permissions and access controls
+4.  Products Management: Manage loan products and configurations
+5.  Sub-Products Management: Manage sub-products and variants
 
 All other functionalities have been removed to provide a cleaner and more focused administrative experience. The navigation has been updated accordingly.
 
-### LoginPage.tsx Modifications (Effective 2025-10-05)
-
-The "Show User Debugger" functionality has been removed from the
+### Products and Sub-Products

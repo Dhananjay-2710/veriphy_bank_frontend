@@ -29,6 +29,11 @@ import { Analytics } from './components/Admin/Analytics';
 import { DepartmentManagement } from './components/Admin/DepartmentManagement';
 import { RolesManagement } from './components/Admin/RolesManagement';
 import { PermissionsManagement } from './components/Admin/PermissionsManagement';
+import { ProductsManagement } from './components/Admin/ProductsManagement';
+import { SubProductsManagement } from './components/Admin/SubProductsManagement';
+import { DocumentTypesManagement } from './components/Admin/DocumentTypesManagement';
+import { DocumentsManagement } from './components/Admin/DocumentsManagement';
+import { ProductDocumentMapping } from './components/Admin/ProductDocumentMapping';
 import { FeatureFlagsPage } from './components/Admin/FeatureFlagsPage';
 import { SystemIntegrationsPage } from './components/Admin/SystemIntegrationsPage';
 import { SystemSettingsPage } from './components/Admin/SystemSettingsPage';
@@ -808,33 +813,78 @@ function App() {
           }
         />
         
-        {/* New Admin Management Routes */}
-        <Route
-          path="/admin/departments"
-          element={
-            <DashboardLayout>
-              <DepartmentManagement onBack={() => window.history.back()} />
-            </DashboardLayout>
-          }
-        />
-        
-        <Route
-          path="/admin/roles"
-          element={
-            <DashboardLayout>
-              <RolesManagement onBack={() => window.history.back()} />
-            </DashboardLayout>
-          }
-        />
-        
-        <Route
-          path="/admin/permissions"
-          element={
-            <DashboardLayout>
-              <PermissionsManagement onBack={() => window.history.back()} />
-            </DashboardLayout>
-          }
-        />
+                {/* New Admin Management Routes */}
+                <Route
+                  path="/admin/departments"
+                  element={
+                    <DashboardLayout>
+                      <DepartmentManagement onBack={() => window.history.back()} />
+                    </DashboardLayout>
+                  }
+                />
+                
+                <Route
+                  path="/admin/roles"
+                  element={
+                    <DashboardLayout>
+                      <RolesManagement onBack={() => window.history.back()} />
+                    </DashboardLayout>
+                  }
+                />
+                
+                <Route
+                  path="/admin/permissions"
+                  element={
+                    <DashboardLayout>
+                      <PermissionsManagement onBack={() => window.history.back()} />
+                    </DashboardLayout>
+                  }
+                />
+                
+                <Route
+                  path="/admin/products"
+                  element={
+                    <DashboardLayout>
+                      <ProductsManagement onBack={() => window.history.back()} />
+                    </DashboardLayout>
+                  }
+                />
+                
+                <Route
+                  path="/admin/sub-products"
+                  element={
+                    <DashboardLayout>
+                      <SubProductsManagement onBack={() => window.history.back()} />
+                    </DashboardLayout>
+                  }
+                />
+                
+                <Route
+                  path="/admin/document-types"
+                  element={
+                    <DashboardLayout>
+                      <DocumentTypesManagement onBack={() => window.history.back()} />
+                    </DashboardLayout>
+                  }
+                />
+                
+                <Route
+                  path="/admin/documents"
+                  element={
+                    <DashboardLayout>
+                      <DocumentsManagement onBack={() => window.history.back()} />
+                    </DashboardLayout>
+                  }
+                />
+                
+                <Route
+                  path="/admin/product-document-mapping"
+                  element={
+                    <DashboardLayout>
+                      <ProductDocumentMapping onBack={() => window.history.back()} />
+                    </DashboardLayout>
+                  }
+                />
         
         <Route
           path={ROUTES.LOAN_APPLICATION_MANAGEMENT}

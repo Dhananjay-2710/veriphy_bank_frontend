@@ -3331,7 +3331,7 @@ export class SupabaseDatabaseService {
   // SUB PRODUCTS MANAGEMENT
   // =============================================================================
 
-  static async getSubProducts(filters?: { productId?: string; isActive?: boolean }) {
+  static async getSubProducts(filters?: { productId?: string }) {
     console.log('Fetching sub products with filters:', filters);
     
     let query = supabase
@@ -3342,13 +3342,9 @@ export class SupabaseDatabaseService {
         name,
         code,
         description,
-        interest_rate,
-        min_amount,
-        max_amount,
-        min_tenure,
-        max_tenure,
-        is_active,
+        status,
         metadata,
+        organization_id,
         created_at,
         updated_at,
         products!inner(
@@ -3361,9 +3357,6 @@ export class SupabaseDatabaseService {
 
     if (filters?.productId) {
       query = query.eq('product_id', filters.productId);
-    }
-    if (filters?.isActive !== undefined) {
-      query = query.eq('is_active', filters.isActive);
     }
 
     const { data, error } = await query;
@@ -3388,12 +3381,9 @@ export class SupabaseDatabaseService {
     name: string;
     code: string;
     description: string;
-    interestRate: number;
-    minAmount: number;
-    maxAmount: number;
-    minTenure: number;
-    maxTenure: number;
+    status?: string;
     metadata?: any;
+    organizationId?: number;
   }) {
     console.log('Creating sub product:', subProductData);
     
@@ -3404,13 +3394,9 @@ export class SupabaseDatabaseService {
         name: subProductData.name,
         code: subProductData.code,
         description: subProductData.description,
-        interest_rate: subProductData.interestRate,
-        min_amount: subProductData.minAmount,
-        max_amount: subProductData.maxAmount,
-        min_tenure: subProductData.minTenure,
-        max_tenure: subProductData.maxTenure,
-        is_active: true,
+        status: subProductData.status || 'active',
         metadata: subProductData.metadata,
+        organization_id: subProductData.organizationId || 1,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -3428,12 +3414,7 @@ export class SupabaseDatabaseService {
     name: string;
     code: string;
     description: string;
-    interestRate: number;
-    minAmount: number;
-    maxAmount: number;
-    minTenure: number;
-    maxTenure: number;
-    isActive: boolean;
+    status: string;
     metadata: any;
   }>) {
     console.log('Updating sub product:', subProductId, updates);
@@ -3445,12 +3426,7 @@ export class SupabaseDatabaseService {
     if (updates.name) updateData.name = updates.name;
     if (updates.code) updateData.code = updates.code;
     if (updates.description) updateData.description = updates.description;
-    if (updates.interestRate !== undefined) updateData.interest_rate = updates.interestRate;
-    if (updates.minAmount !== undefined) updateData.min_amount = updates.minAmount;
-    if (updates.maxAmount !== undefined) updateData.max_amount = updates.maxAmount;
-    if (updates.minTenure !== undefined) updateData.min_tenure = updates.minTenure;
-    if (updates.maxTenure !== undefined) updateData.max_tenure = updates.maxTenure;
-    if (updates.isActive !== undefined) updateData.is_active = updates.isActive;
+    if (updates.status) updateData.status = updates.status;
     if (updates.metadata !== undefined) updateData.metadata = updates.metadata;
 
     const { data, error } = await supabase
@@ -3922,8 +3898,7 @@ export class SupabaseDatabaseService {
   static async getDocumentAgainstProduct(filters?: { 
     productId?: string; 
     documentTypeId?: string; 
-    isRequired?: boolean;
-    isActive?: boolean;
+    mandatory?: boolean;
   }) {
     console.log('Fetching document against product with filters:', filters);
     
@@ -3931,12 +3906,11 @@ export class SupabaseDatabaseService {
       .from(SUPABASE_TABLES.DOCUMENT_AGAINST_PRODUCT)
       .select(`
         id,
+        organization_id,
         product_id,
         document_type_id,
-        is_required,
-        priority,
-        validity_period,
-        is_active,
+        mandatory,
+        notes,
         metadata,
         created_at,
         updated_at,
@@ -3963,7 +3937,6 @@ export class SupabaseDatabaseService {
           description,
           is_required,
           priority,
-          validity_period,
           is_active,
           metadata,
           created_at,
@@ -3978,11 +3951,8 @@ export class SupabaseDatabaseService {
     if (filters?.documentTypeId) {
       query = query.eq('document_type_id', filters.documentTypeId);
     }
-    if (filters?.isRequired !== undefined) {
-      query = query.eq('is_required', filters.isRequired);
-    }
-    if (filters?.isActive !== undefined) {
-      query = query.eq('is_active', filters.isActive);
+    if (filters?.mandatory !== undefined) {
+      query = query.eq('mandatory', filters.mandatory);
     }
 
     const { data, error } = await query;
@@ -3998,22 +3968,21 @@ export class SupabaseDatabaseService {
   static async createDocumentAgainstProduct(data: {
     productId: string;
     documentTypeId: string;
-    isRequired: boolean;
-    priority: 'high' | 'medium' | 'low';
-    validityPeriod?: number;
+    mandatory: boolean;
+    notes?: string;
     metadata?: any;
+    organizationId?: number;
   }) {
     console.log('Creating document against product:', data);
     
     const { data: result, error } = await supabase
       .from(SUPABASE_TABLES.DOCUMENT_AGAINST_PRODUCT)
       .insert({
+        organization_id: data.organizationId || 1,
         product_id: data.productId,
         document_type_id: data.documentTypeId,
-        is_required: data.isRequired,
-        priority: data.priority,
-        validity_period: data.validityPeriod,
-        is_active: true,
+        mandatory: data.mandatory,
+        notes: data.notes,
         metadata: data.metadata,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -4029,10 +3998,8 @@ export class SupabaseDatabaseService {
   }
 
   static async updateDocumentAgainstProduct(id: string, updates: Partial<{
-    isRequired?: boolean;
-    priority?: 'high' | 'medium' | 'low';
-    validityPeriod?: number;
-    isActive?: boolean;
+    mandatory?: boolean;
+    notes?: string;
     metadata?: any;
   }>) {
     console.log('Updating document against product:', id, updates);
@@ -4072,8 +4039,7 @@ export class SupabaseDatabaseService {
   static async getDocAgainstSubProduct(filters?: { 
     subProductId?: string; 
     documentTypeId?: string; 
-    isRequired?: boolean;
-    isActive?: boolean;
+    mandatory?: boolean;
   }) {
     console.log('Fetching document against sub product with filters:', filters);
     
@@ -4081,12 +4047,11 @@ export class SupabaseDatabaseService {
       .from(SUPABASE_TABLES.DOC_AGAINST_SUB_PRODUCT)
       .select(`
         id,
+        organization_id,
         sub_product_id,
         document_type_id,
-        is_required,
-        priority,
-        validity_period,
-        is_active,
+        mandatory,
+        notes,
         metadata,
         created_at,
         updated_at,
@@ -4096,13 +4061,9 @@ export class SupabaseDatabaseService {
           name,
           code,
           description,
-          interest_rate,
-          min_amount,
-          max_amount,
-          min_tenure,
-          max_tenure,
-          is_active,
+          status,
           metadata,
+          organization_id,
           created_at,
           updated_at
         ),
@@ -4113,7 +4074,6 @@ export class SupabaseDatabaseService {
           description,
           is_required,
           priority,
-          validity_period,
           is_active,
           metadata,
           created_at,
@@ -4128,11 +4088,8 @@ export class SupabaseDatabaseService {
     if (filters?.documentTypeId) {
       query = query.eq('document_type_id', filters.documentTypeId);
     }
-    if (filters?.isRequired !== undefined) {
-      query = query.eq('is_required', filters.isRequired);
-    }
-    if (filters?.isActive !== undefined) {
-      query = query.eq('is_active', filters.isActive);
+    if (filters?.mandatory !== undefined) {
+      query = query.eq('mandatory', filters.mandatory);
     }
 
     const { data, error } = await query;
@@ -4148,22 +4105,21 @@ export class SupabaseDatabaseService {
   static async createDocAgainstSubProduct(data: {
     subProductId: string;
     documentTypeId: string;
-    isRequired: boolean;
-    priority: 'high' | 'medium' | 'low';
-    validityPeriod?: number;
+    mandatory: boolean;
+    notes?: string;
     metadata?: any;
+    organizationId?: number;
   }) {
     console.log('Creating document against sub product:', data);
     
     const { data: result, error } = await supabase
       .from(SUPABASE_TABLES.DOC_AGAINST_SUB_PRODUCT)
       .insert({
+        organization_id: data.organizationId || 1,
         sub_product_id: data.subProductId,
         document_type_id: data.documentTypeId,
-        is_required: data.isRequired,
-        priority: data.priority,
-        validity_period: data.validityPeriod,
-        is_active: true,
+        mandatory: data.mandatory,
+        notes: data.notes,
         metadata: data.metadata,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -4179,10 +4135,8 @@ export class SupabaseDatabaseService {
   }
 
   static async updateDocAgainstSubProduct(id: string, updates: Partial<{
-    isRequired?: boolean;
-    priority?: 'high' | 'medium' | 'low';
-    validityPeriod?: number;
-    isActive?: boolean;
+    mandatory?: boolean;
+    notes?: string;
     metadata?: any;
   }>) {
     console.log('Updating document against sub product:', id, updates);

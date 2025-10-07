@@ -25,7 +25,9 @@ import {
   GitBranch,
   Monitor,
   UserCog,
-  Key
+  Key,
+  Package,
+  Link
 } from 'lucide-react';
 
 // =============================================================================
@@ -288,48 +290,88 @@ export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
     }
   ],
 
-  'admin': [
-    {
-      id: 'dashboard',
-      label: 'Admin Dashboard',
-      icon: Home,
-      path: ROUTES.DASHBOARD,
-      roles: ['admin'],
-      description: 'Admin dashboard overview'
-    },
-    {
-      id: 'department-management',
-      label: 'Department Management',
-      icon: Building,
-      path: '/admin/departments',
-      roles: ['admin'],
-      description: 'Manage organizational departments'
-    },
-    {
-      id: 'roles-management',
-      label: 'Roles Management',
-      icon: Shield,
-      path: '/admin/roles',
-      roles: ['admin'],
-      description: 'Manage user roles and permissions'
-    },
-    {
-      id: 'permissions-management',
-      label: 'Permissions Management',
-      icon: Key,
-      path: '/admin/permissions',
-      roles: ['admin'],
-      description: 'Configure system permissions'
-    },
-    {
-      id: 'audit-logs',
-      label: 'Audit Logs',
-      icon: FileText,
-      path: ROUTES.AUDIT_LOGS,
-      roles: ['admin'],
-      description: 'Organization audit logs'
-    }
-  ],
+          'admin': [
+            {
+              id: 'dashboard',
+              label: 'Admin Dashboard',
+              icon: Home,
+              path: ROUTES.DASHBOARD,
+              roles: ['admin'],
+              description: 'Admin dashboard overview'
+            },
+            {
+              id: 'department-management',
+              label: 'Department Management',
+              icon: Building,
+              path: '/admin/departments',
+              roles: ['admin'],
+              description: 'Manage organizational departments'
+            },
+            {
+              id: 'roles-management',
+              label: 'Roles Management',
+              icon: Shield,
+              path: '/admin/roles',
+              roles: ['admin'],
+              description: 'Manage user roles and permissions'
+            },
+            {
+              id: 'permissions-management',
+              label: 'Permissions Management',
+              icon: Key,
+              path: '/admin/permissions',
+              roles: ['admin'],
+              description: 'Configure system permissions'
+            },
+            {
+              id: 'products-management',
+              label: 'Products Management',
+              icon: Package,
+              path: '/admin/products',
+              roles: ['admin'],
+              description: 'Manage loan products and configurations'
+            },
+            {
+              id: 'sub-products-management',
+              label: 'Sub-Products Management',
+              icon: Layers,
+              path: '/admin/sub-products',
+              roles: ['admin'],
+              description: 'Manage sub-products and variants'
+            },
+            {
+              id: 'document-types-management',
+              label: 'Document Types Management',
+              icon: FileType,
+              path: '/admin/document-types',
+              roles: ['admin'],
+              description: 'Manage document types and configurations'
+            },
+            {
+              id: 'documents-management',
+              label: 'Documents Management',
+              icon: FileText,
+              path: '/admin/documents',
+              roles: ['admin'],
+              description: 'Manage system-wide documents and verification'
+            },
+            {
+              id: 'product-document-mapping',
+              label: 'Product Document Mapping',
+              icon: Link,
+              path: '/admin/product-document-mapping',
+              roles: ['admin'],
+              description: 'Manage document requirements for products and sub-products'
+            },
+            {
+              id: 'audit-logs',
+              label: 'Audit Logs',
+              icon: FileText,
+              path: ROUTES.AUDIT_LOGS,
+              roles: ['admin'],
+              description: 'Organization audit logs'
+            }
+          ],
 
   'manager': [
     {
