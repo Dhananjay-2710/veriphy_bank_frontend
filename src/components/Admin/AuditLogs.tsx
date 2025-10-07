@@ -104,13 +104,13 @@ export function AuditLogs({ onBack }: AuditLogsProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={onBack}>
+          <Button variant="outline" onClick={onBack} style={{ background: '#ffffff', color: '#374151' }}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Audit Logs & Security</h1>
-            <p className="text-gray-600">System security monitoring and audit trail</p>
+          <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+            <h1 className="text-2xl font-bold text-white">Audit Logs & Security</h1>
+            <p className="text-gray-300">System security monitoring and audit trail</p>
           </div>
         </div>
         <div className="flex space-x-2">
@@ -118,7 +118,7 @@ export function AuditLogs({ onBack }: AuditLogsProps) {
             <Download className="h-4 w-4 mr-2" />
             Export Logs
           </Button>
-          <Button variant="outline" onClick={fetchAuditData} disabled={loading}>
+          <Button variant="outline" onClick={fetchAuditData} disabled={loading} style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>

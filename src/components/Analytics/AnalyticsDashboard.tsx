@@ -241,15 +241,13 @@ export function AnalyticsDashboard({ onBack }: AnalyticsDashboardProps) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={onBack}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h1>
-            <p className="text-gray-600">Team performance and business insights</p>
-          </div>
+        <Button variant="outline" onClick={onBack} className="dashboard-back-button" style={{ background: '#ffffff', color: '#374151' }}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+        <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+          <h1 className="text-2xl font-bold text-white">Analytics Dashboard</h1>
+          <p className="text-gray-300">Team performance and business insights</p>
         </div>
         <div className="flex space-x-3">
           <select
@@ -261,7 +259,7 @@ export function AnalyticsDashboard({ onBack }: AnalyticsDashboardProps) {
             <option value="30d">Last 30 days</option>
             <option value="90d">Last 90 days</option>
           </select>
-          <Button variant="outline" onClick={fetchAnalyticsData}>
+          <Button variant="outline" onClick={fetchAnalyticsData} className="dashboard-refresh-button">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>

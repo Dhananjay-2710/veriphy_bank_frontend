@@ -165,10 +165,10 @@ export function AdminAnalytics({ onBack }: AdminAnalyticsProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Analytics & Reports</h1>
-          <p className="text-gray-600">Comprehensive insights into VERIPHY banking operations</p>
+      <div className="relative flex items-center justify-between">
+        <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+          <h1 className="text-2xl font-bold text-white">Analytics & Reports</h1>
+          <p className="text-gray-300">Comprehensive insights into VERIPHY banking operations</p>
         </div>
         <div className="flex space-x-3">
           <select
@@ -181,16 +181,16 @@ export function AdminAnalytics({ onBack }: AdminAnalyticsProps) {
             <option value="90d">Last 90 days</option>
             <option value="1y">Last year</option>
           </select>
-          <Button variant="outline" onClick={handleExportData}>
+          <Button variant="outline" onClick={handleExportData} style={{ background: '#ffffff', color: '#374151' }}>
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <Button variant="outline" onClick={() => { refetchStats(); refetchDept(); refetchAlerts(); refetchActivities(); refetchMetrics(); refetchAlerts2(); }}>
+          <Button variant="outline" onClick={() => { refetchStats(); refetchDept(); refetchAlerts(); refetchActivities(); refetchMetrics(); refetchAlerts2(); }} style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
           {onBack && (
-            <Button variant="outline" onClick={onBack}>
+            <Button variant="outline" onClick={onBack} style={{ background: '#ffffff', color: '#374151' }}>
               Back to Dashboard
             </Button>
           )}

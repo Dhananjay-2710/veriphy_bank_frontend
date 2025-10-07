@@ -292,13 +292,13 @@ export function PerformanceOptimization({ onBack }: PerformanceOptimizationProps
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={onBack}>
+          <Button variant="outline" onClick={onBack} style={{ background: '#ffffff', color: '#374151' }}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Performance Optimization</h1>
-            <p className="text-gray-600">Monitor and optimize application performance</p>
+          <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+            <h1 className="text-2xl font-bold text-white">Performance Optimization</h1>
+            <p className="text-gray-300">Monitor and optimize application performance</p>
           </div>
         </div>
         <div className="flex space-x-3">
@@ -313,7 +313,7 @@ export function PerformanceOptimization({ onBack }: PerformanceOptimizationProps
             )}
             {isMonitoring ? 'Stop Monitoring' : 'Start Monitoring'}
           </Button>
-          <Button variant="outline" onClick={loadPerformanceData}>
+          <Button variant="outline" onClick={loadPerformanceData} style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>

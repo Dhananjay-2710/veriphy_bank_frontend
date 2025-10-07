@@ -120,10 +120,10 @@ export function SalespersonDashboard({
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Sales Dashboard</h1>
-            <p className="text-gray-600">Performance overview and key metrics</p>
+            <h1 className="text-2xl font-bold text-white">Sales Dashboard</h1>
+            <p className="text-blue-200/80">Performance overview and key metrics</p>
           </div>
-          <Button onClick={handleRefresh} variant="outline">
+          <Button onClick={handleRefresh} variant="outline" className="dashboard-button-outline">
             <RefreshCw className="h-4 w-4 mr-2" />
             Retry
           </Button>
@@ -306,19 +306,19 @@ export function SalespersonDashboard({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Sales Dashboard</h1>
-          <p className="text-gray-600">Performance overview and key metrics</p>
+          <h1 className="text-2xl font-bold text-white">Sales Dashboard</h1>
+          <p className="text-blue-200/80">Performance overview and key metrics</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={handleRefresh} disabled={statsLoading || casesLoading}>
+          <Button variant="outline" onClick={handleRefresh} disabled={statsLoading || casesLoading} className="dashboard-refresh-button">
             <RefreshCw className={`h-4 w-4 mr-2 ${(statsLoading || casesLoading) ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button variant="outline" onClick={() => navigate('/workload')}>
+          <Button variant="outline" onClick={() => navigate('/workload')} className="dashboard-button-outline">
             <Calendar className="h-4 w-4 mr-2" />
             Workload Planner
           </Button>
-          <Button variant="outline" onClick={() => navigate('/cases')}>
+          <Button variant="outline" onClick={() => navigate('/cases')} className="dashboard-button-outline">
             <FileText className="h-4 w-4 mr-2" />
             View All Cases
           </Button>
@@ -343,7 +343,7 @@ export function SalespersonDashboard({
           return (
             <Card 
               key={index} 
-              className="hover:shadow-lg transition-shadow cursor-pointer"
+              className="hover:shadow-lg transition-shadow cursor-pointer dashboard-card"
             >
               <CardContent className="flex items-center">
                 <div
@@ -368,7 +368,7 @@ export function SalespersonDashboard({
       </div>
 
       {/* Performance Metrics */}
-      <Card>
+      <Card className="dashboard-card">
         <CardHeader>
           <CardTitle>Performance Metrics</CardTitle>
         </CardHeader>
@@ -414,11 +414,11 @@ export function SalespersonDashboard({
 
       {/* Recent Activities */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+        <Card className="dashboard-card">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Recent Activities</CardTitle>
-              <Button variant="outline" size="sm" onClick={onNavigateToCases}>
+              <Button variant="outline" size="sm" onClick={onNavigateToCases} className="dashboard-button-outline">
                 View All
               </Button>
             </div>
@@ -451,25 +451,25 @@ export function SalespersonDashboard({
         </Card>
 
         {/* Quick Actions */}
-        <Card>
+        <Card className="dashboard-card">
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
-              <Button variant="outline" className="h-16 flex-col">
+              <Button variant="outline" className="h-16 flex-col dashboard-button-outline">
                 <FileText className="h-6 w-6 mb-1" />
                 <span className="text-xs">Send Document Request</span>
               </Button>
-              <Button variant="outline" className="h-16 flex-col">
+              <Button variant="outline" className="h-16 flex-col dashboard-button-outline">
                 <CheckCircle className="h-6 w-6 mb-1" />
                 <span className="text-xs">Mark Complete</span>
               </Button>
-              <Button variant="outline" className="h-16 flex-col" onClick={onNavigateToWorkload}>
+              <Button variant="outline" className="h-16 flex-col dashboard-button-outline" onClick={onNavigateToWorkload}>
                 <Calendar className="h-6 w-6 mb-1" />
                 <span className="text-xs">Schedule Follow-up</span>
               </Button>
-              <Button variant="outline" className="h-16 flex-col" onClick={onNavigateToCases}>
+              <Button variant="outline" className="h-16 flex-col dashboard-button-outline" onClick={onNavigateToCases}>
                 <Users className="h-4 w-4 mb-1" />
                 <span className="text-xs">Customer Chat</span>
               </Button>
@@ -479,7 +479,7 @@ export function SalespersonDashboard({
       </div>
 
       {/* Today's Priority Tasks */}
-      <Card>
+      <Card className="dashboard-card">
         <CardHeader>
           <CardTitle>Today's Priority Tasks</CardTitle>
         </CardHeader>

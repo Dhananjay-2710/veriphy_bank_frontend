@@ -195,10 +195,10 @@ export function SystemHealthMonitor({ onBack }: SystemHealthMonitorProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">System Health Monitor</h1>
-          <p className="text-gray-600">Real-time monitoring of VERIPHY banking infrastructure</p>
+      <div className="relative flex items-center justify-between">
+        <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+          <h1 className="text-2xl font-bold text-white">System Health Monitor</h1>
+          <p className="text-gray-300">Real-time monitoring of VERIPHY banking infrastructure</p>
         </div>
         <div className="flex space-x-3">
           <div className="flex items-center space-x-2">
@@ -221,12 +221,12 @@ export function SystemHealthMonitor({ onBack }: SystemHealthMonitorProps) {
             <option value={60}>1m</option>
             <option value={300}>5m</option>
           </select>
-          <Button variant="outline" onClick={handleRefresh}>
+          <Button variant="outline" onClick={handleRefresh} style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
           {onBack && (
-            <Button variant="outline" onClick={onBack}>
+            <Button variant="outline" onClick={onBack} style={{ background: '#ffffff', color: '#374151' }}>
               Back to Dashboard
             </Button>
           )}

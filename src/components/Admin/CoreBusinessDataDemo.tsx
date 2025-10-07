@@ -356,16 +356,16 @@ export function CoreBusinessDataDemo({ onBack }: CoreBusinessDataDemoProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={onBack}>
+          <Button variant="outline" onClick={onBack} style={{ background: '#ffffff', color: '#374151' }}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Core Business Data</h1>
-            <p className="text-gray-600">Dynamic data from Supabase core business tables</p>
+          <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+            <h1 className="text-2xl font-bold text-white">Core Business Data</h1>
+            <p className="text-gray-300">Dynamic data from Supabase core business tables</p>
           </div>
         </div>
-        <Button variant="outline" onClick={handleRefresh}>
+        <Button variant="outline" onClick={handleRefresh} style={{ background: '#ffffff', color: '#374151' }}>
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>

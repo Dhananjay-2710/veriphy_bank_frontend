@@ -94,3 +94,153 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* Registration form transparent styling */
+.registration-form .text-gray-700 {
+  color: rgb(219 234 254) !important; /* blue-200 */
+}
+
+.registration-form .text-gray-600 {
+  color: rgb(191 219 254) !important; /* blue-300 */
+}
+
+.registration-form .text-gray-500 {
+  color: rgb(147 197 253) !important; /* blue-400 */
+}
+
+.registration-form .text-red-600 {
+  color: rgb(252 165 165) !important; /* red-300 */
+}
+
+.registration-form .text-red-500 {
+  color: rgb(248 113 113) !important; /* red-400 */
+}
+
+.registration-form input, 
+.registration-form select {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: white !important;
+}
+
+.registration-form input::placeholder, 
+.registration-form select::placeholder {
+  color: rgba(219, 234, 254, 0.6) !important; /* blue-200 with opacity */
+}
+
+.registration-form input:focus, 
+.registration-form select:focus {
+  border-color: rgba(59, 130, 246, 0.5) !important; /* blue-500 with opacity */
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
+}
+
+.registration-form .text-gray-400 {
+  color: rgb(147 197 253) !important; /* blue-400 */
+}
+
+/* Dashboard transparent styling */
+.dashboard-card {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: white !important;
+}
+
+.dashboard-card .text-gray-900 {
+  color: white !important;
+}
+
+.dashboard-card .text-gray-800 {
+  color: rgb(219 234 254) !important; /* blue-200 */
+}
+
+.dashboard-card .text-gray-700 {
+  color: rgb(191 219 254) !important; /* blue-300 */
+}
+
+.dashboard-card .text-gray-600 {
+  color: rgb(147 197 253) !important; /* blue-400 */
+}
+
+.dashboard-card .text-gray-500 {
+  color: rgb(96 165 250) !important; /* blue-500 */
+}
+
+.dashboard-card .text-gray-400 {
+  color: rgb(59 130 246) !important; /* blue-600 */
+}
+
+.dashboard-card .text-gray-300 {
+  color: rgb(37 99 235) !important; /* blue-700 */
+}
+
+.dashboard-card .border-gray-200 {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.dashboard-card .border-gray-300 {
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.dashboard-card .bg-gray-50 {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.dashboard-card .bg-gray-100 {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.dashboard-card .hover\:bg-gray-50:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.dashboard-card .hover\:bg-gray-100:hover {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Dashboard button styling */
+.dashboard-button-outline {
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  background-color: rgba(255, 255, 255, 0.3) !important;
+  color: white !important;
+  backdrop-filter: blur(8px) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+.dashboard-button-outline:hover {
+  background-color: rgba(255, 255, 255, 0.4) !important;
+  border-color: rgba(255, 255, 255, 0.6) !important;
+  color: white !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+.dashboard-button-outline:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
+
+/* Back and Refresh button styling */
+.dashboard-back-button,
+.dashboard-refresh-button {
+  background-color: rgb(107 114 128) !important; /* bg-gray-500 */
+  border-color: rgb(107 114 128) !important;
+  color: white !important;
+}
+
+.dashboard-back-button:hover,
+.dashboard-refresh-button:hover {
+  background-color: rgb(75 85 99) !important; /* bg-gray-600 */
+  border-color: rgb(75 85 99) !important;
+  color: white !important;
+}
+
+.dashboard-back-button:disabled,
+.dashboard-refresh-button:disabled {
+  background-color: rgb(156 163 175) !important; /* bg-gray-400 */
+  border-color: rgb(156 163 175) !important;
+  color: white !important;
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+}

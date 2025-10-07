@@ -120,49 +120,21 @@ export interface NavigationItem {
 // =============================================================================
 
 export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
-  'super-admin': [
+  'super_admin': [
     {
       id: 'dashboard',
       label: 'Super Admin Dashboard',
       icon: Activity,
       path: ROUTES.SUPER_ADMIN_DASHBOARD,
-      roles: ['super-admin'],
-      description: 'Real-time system overview and analytics',
-      isNew: true
-    },
-    {
-      id: 'system-monitoring',
-      label: 'System Monitoring',
-      icon: Monitor,
-      path: ROUTES.SYSTEM_MONITORING,
-      roles: ['super-admin'],
-      description: 'Real-time system performance monitoring',
-      isNew: true
-    },
-    {
-      id: 'user-management',
-      label: 'Advanced User Management',
-      icon: UserCog,
-      path: ROUTES.ADVANCED_USER_MANAGEMENT,
-      roles: ['super-admin'],
-      description: 'Advanced user management with bulk operations',
-      isNew: true
-    },
-    {
-      id: 'workflow-designer',
-      label: 'Workflow Designer',
-      icon: GitBranch,
-      path: ROUTES.WORKFLOW_DESIGNER,
-      roles: ['super-admin'],
-      description: 'Design and manage business workflows',
-      isNew: true
+      roles: ['super_admin'],
+      description: 'Real-time system overview and analytics'
     },
     {
       id: 'organizations',
       label: 'Organizations',
       icon: Building,
       path: '/super-admin/organizations',
-      roles: ['super-admin'],
+      roles: ['super_admin'],
       description: 'Manage all organizations'
     },
     {
@@ -170,7 +142,7 @@ export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
       label: 'Departments',
       icon: Layers,
       path: '/super-admin/departments',
-      roles: ['super-admin'],
+      roles: ['super_admin'],
       description: 'Manage all departments'
     },
     {
@@ -178,115 +150,24 @@ export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
       label: 'Customers',
       icon: Users,
       path: '/super-admin/customers',
-      roles: ['super-admin'],
+      roles: ['super_admin'],
       description: 'Manage all customers'
     },
     {
-      id: 'system-settings',
-      label: 'Global Settings',
-      icon: Shield,
-      path: ROUTES.SYSTEM_SETTINGS,
-      roles: ['super-admin', 'admin'],
-      description: 'System-wide configuration'
+      id: 'users',
+      label: 'Users',
+      icon: UserCog,
+      path: '/super-admin/users',
+      roles: ['super_admin'],
+      description: 'Manage all users'
     },
     {
       id: 'audit-logs',
-      label: 'System Audit',
+      label: 'Audit Logs',
       icon: FileText,
-      path: ROUTES.AUDIT_LOGS,
-      roles: ['super-admin', 'admin', 'auditor'],
-      description: 'System audit logs and compliance'
-    },
-    {
-      id: 'super-admin-audit-logs',
-      label: 'Super Admin Audit Logs',
-      icon: Shield,
       path: '/super-admin/audit-logs',
-      roles: ['super-admin'],
-      description: 'Comprehensive audit logs for Super Admin operations',
-      isNew: true
-    },
-    {
-      id: 'analytics',
-      label: 'Global Analytics',
-      icon: BarChart3,
-      path: ROUTES.ANALYTICS,
-      roles: ['super-admin', 'admin', 'manager'],
-      description: 'System-wide analytics and reporting'
-    },
-    {
-      id: 'admin-tools',
-      label: 'Admin Tools',
-      icon: Settings,
-      path: '/admin',
-      roles: ['super-admin', 'admin'],
-      description: 'Advanced administrative tools',
-      children: [
-        {
-          id: 'loan-applications',
-          label: 'Loan Applications',
-          icon: FileText,
-          path: ROUTES.LOAN_APPLICATION_MANAGEMENT,
-          roles: ['super-admin', 'admin'],
-          description: 'Manage loan applications'
-        },
-        {
-          id: 'task-categories',
-          label: 'Task Categories',
-          icon: Layers,
-          path: ROUTES.TASK_CATEGORY_MANAGEMENT,
-          roles: ['super-admin', 'admin'],
-          description: 'Manage task categories'
-        },
-        {
-          id: 'compliance-issues',
-          label: 'Compliance Issues',
-          icon: AlertTriangle,
-          path: ROUTES.COMPLIANCE_ISSUE_MANAGEMENT,
-          roles: ['super-admin', 'admin', 'compliance'],
-          description: 'Track and manage compliance issues'
-        },
-        {
-          id: 'user-profiles',
-          label: 'User Profiles',
-          icon: UserCheck,
-          path: ROUTES.USER_PROFILE_MANAGEMENT,
-          roles: ['super-admin', 'admin'],
-          description: 'Manage user profiles and accounts'
-        },
-        {
-          id: 'workflow-management',
-          label: 'Workflow Management',
-          icon: Workflow,
-          path: ROUTES.WORKFLOW_MANAGEMENT,
-          roles: ['super-admin', 'admin'],
-          description: 'Configure workflows and processes'
-        },
-        {
-          id: 'background-processing',
-          label: 'Background Processing',
-          icon: Zap,
-          path: ROUTES.BACKGROUND_PROCESSING,
-          roles: ['super-admin', 'admin'],
-          description: 'Monitor background jobs and processes'
-        },
-        {
-          id: 'cache-management',
-          label: 'Cache Management',
-          icon: Database,
-          path: ROUTES.CACHE_MANAGEMENT,
-          roles: ['super-admin', 'admin'],
-          description: 'Manage application caching'
-        },
-        {
-          id: 'entity-management',
-          label: 'Entity Management',
-          icon: Settings,
-          path: ROUTES.ENTITY_MANAGEMENT,
-          roles: ['super-admin', 'admin'],
-          description: 'Manage system entities'
-        }
-      ]
+      roles: ['super_admin'],
+      description: 'System audit logs and compliance'
     }
   ],
 
@@ -615,7 +496,7 @@ export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
       label: 'Audit Logs',
       icon: FileText,
       path: ROUTES.AUDIT_LOGS,
-      roles: ['auditor', 'admin', 'super-admin'],
+      roles: ['auditor', 'admin', 'super_admin'],
       description: 'System audit logs'
     },
     {

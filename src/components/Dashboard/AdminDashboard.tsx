@@ -72,13 +72,13 @@ export function AdminDashboard({}: AdminDashboardProps) {
   // Main overview dashboard
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-sm sm:text-base text-gray-600 mt-1">Manage departments, roles, permissions, products, sub-products, documents, and mappings</p>
+      <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Admin Dashboard</h1>
+          <p className="text-sm sm:text-base text-gray-300 mt-1">Manage departments, roles, permissions, products, sub-products, documents, and mappings</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={() => window.location.reload()} className="w-full sm:w-auto">
+          <Button variant="outline" onClick={() => window.location.reload()} className="w-full sm:w-auto" style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>

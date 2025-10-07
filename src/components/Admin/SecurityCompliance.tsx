@@ -311,17 +311,17 @@ export function SecurityCompliance({ onBack }: SecurityComplianceProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={onBack}>
+          <Button variant="outline" onClick={onBack} style={{ background: '#ffffff', color: '#374151' }}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Security & Compliance</h1>
-            <p className="text-gray-600">Monitor security events and compliance status</p>
+          <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+            <h1 className="text-2xl font-bold text-white">Security & Compliance</h1>
+            <p className="text-gray-300">Monitor security events and compliance status</p>
           </div>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={loadSecurityData}>
+          <Button variant="outline" onClick={loadSecurityData} style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>

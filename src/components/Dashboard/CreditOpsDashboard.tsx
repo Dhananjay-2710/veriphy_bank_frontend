@@ -268,7 +268,7 @@ export function CreditOpsDashboard({
           <p className="text-gray-600">Review and approve loan applications</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={() => { refetchStats(); refetchCases(); refetchApproval(); fetchApprovalData(); }}>
+          <Button variant="outline" onClick={() => { refetchStats(); refetchCases(); refetchApproval(); fetchApprovalData(); }} className="dashboard-refresh-button">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>

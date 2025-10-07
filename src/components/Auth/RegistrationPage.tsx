@@ -291,31 +291,31 @@ export function RegistrationPage({
         </div>
 
         <div className="max-w-md w-full space-y-4 relative z-10">
-          <Card className="backdrop-blur-sm bg-white/95 border-0 shadow-2xl">
+          <Card className="backdrop-blur-xl bg-white/10 border-white/20 shadow-2xl">
             <CardContent className="p-6 text-center">
               <div className="flex justify-center mb-4">
-                <div className="bg-green-100 p-3 rounded-full animate-bounce">
-                  <CheckCircle className="h-10 w-10 text-green-600" />
+                <div className="bg-green-500/20 p-3 rounded-full animate-bounce backdrop-blur-sm">
+                  <CheckCircle className="h-10 w-10 text-green-300" />
                 </div>
               </div>
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">
+              <h1 className="text-xl sm:text-2xl font-bold text-white mb-3">
                 Registration Successful!
               </h1>
               {emailConfirmRequired ? (
                 <div className="space-y-3">
-                  <p className="text-gray-600 text-sm">
+                  <p className="text-blue-200 text-sm">
                     We've sent a confirmation email to{" "}
-                    <span className="font-medium text-blue-600">{registrationData.email}</span>.{" "}
+                    <span className="font-medium text-blue-300">{registrationData.email}</span>.{" "}
                     Please check your inbox and confirm your account before logging in.
                   </p>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-xs text-blue-800">
+                  <div className="bg-blue-500/20 border border-blue-400/30 rounded-lg p-3 backdrop-blur-sm">
+                    <p className="text-xs text-blue-200">
                       💌 Check your email and click the confirmation link to activate your account.
                     </p>
                   </div>
                 </div>
               ) : (
-                <p className="text-gray-600 text-sm">
+                <p className="text-blue-200 text-sm">
                   Your account has been created and you are ready to log in immediately.
                 </p>
               )}
@@ -382,23 +382,23 @@ export function RegistrationPage({
             <img 
               src={veriphyLogo} 
               alt="Veriphy Logo" 
-              className="h-16 w-16 sm:h-20 sm:w-20 object-contain transform hover:scale-105 transition-transform duration-300 animate-float"
+              className="h-32 w-32 sm:h-40 sm:w-40 md:h-48 md:w-48 object-contain transform hover:scale-105 transition-transform duration-300 animate-float"
             />
           </div>
-          <h1 className="mt-2 text-xl sm:text-2xl font-bold text-white">Create Account</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Create Account</h1>
           <p className="text-blue-200/80 text-xs sm:text-sm">Join Veriphy Bank of India</p>
         </div>
 
-        <Card className="backdrop-blur-sm bg-white/95 border-0 shadow-2xl">
+        <Card className="backdrop-blur-xl bg-white/10 border-white/20 shadow-2xl">
           <CardHeader className="pb-2 sm:pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <div className="p-1.5 sm:p-2 rounded-lg bg-blue-100">
-                  <UserPlus className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                <div className="p-1.5 sm:p-2 rounded-lg bg-blue-500/20 backdrop-blur-sm">
+                  <UserPlus className="h-4 w-4 sm:h-5 sm:w-5 text-blue-300" />
                 </div>
-                <CardTitle className="text-base sm:text-lg font-semibold text-gray-900">Account Registration</CardTitle>
+                <CardTitle className="text-base sm:text-lg font-semibold text-white">Account Registration</CardTitle>
               </div>
-              <Button variant="outline" size="sm" onClick={onBackToLogin} className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm px-2 sm:px-3">
+              <Button variant="outline" size="sm" onClick={onBackToLogin} className="text-white border-white/50 bg-white/30 backdrop-blur-sm hover:border-white/60 hover:bg-white/40 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200 text-xs sm:text-sm px-2 sm:px-3">
                 <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                 <span className="hidden sm:inline">Back to Login</span>
                 <span className="sm:hidden">Back</span>
@@ -406,7 +406,7 @@ export function RegistrationPage({
             </div>
           </CardHeader>
           <CardContent className="p-3 sm:p-6">
-            <form onSubmit={handleSubmit(completeRegistration)} className="space-y-3">
+            <form onSubmit={handleSubmit(completeRegistration)} className="space-y-3 registration-form">
               {/* Validation Summary - Compact */}
               <ValidationSummary 
                 errors={{
@@ -539,7 +539,7 @@ export function RegistrationPage({
         </Card>
 
         {/* Footer - Compact */}
-        <div className="text-center space-y-1">
+        <div className="text-center space-y-1 pt-4 sm:pt-6">
           <div className="flex items-center justify-center space-x-2 text-blue-300/80 text-xs">
             <Shield className="h-3 w-3" />
             <span className="hidden sm:inline">Bank-grade security • Email confirmation</span>

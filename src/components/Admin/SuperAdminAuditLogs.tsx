@@ -302,7 +302,7 @@ export function SuperAdminAuditLogs({ onBack }: SuperAdminAuditLogsProps) {
             <p className="text-lg font-semibold">Error Loading Audit Logs</p>
             <p className="text-sm text-gray-600 mt-2">{error}</p>
           </div>
-          <Button onClick={handleRefresh}>
+          <Button onClick={handleRefresh} style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Retry
           </Button>
@@ -314,19 +314,17 @@ export function SuperAdminAuditLogs({ onBack }: SuperAdminAuditLogsProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={onBack}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Super Admin Audit Logs</h1>
-            <p className="text-gray-600">Comprehensive audit trail of all system operations</p>
-          </div>
+      <div className="relative flex items-center justify-between">
+        <Button variant="outline" onClick={onBack} className="dashboard-back-button" style={{ background: '#ffffff', color: '#374151' }}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+        <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+          <h1 className="text-2xl font-bold text-white">Super Admin Audit Logs</h1>
+          <p className="text-gray-300">Comprehensive audit trail of all system operations</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={handleRefresh}>
+          <Button variant="outline" onClick={handleRefresh} className="dashboard-refresh-button" style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>

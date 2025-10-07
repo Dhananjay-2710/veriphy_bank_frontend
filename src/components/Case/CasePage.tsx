@@ -151,7 +151,7 @@ export function CasePage({ caseId, onBack }: CasePageProps) {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Button variant="outline" onClick={onBack}>
+            <Button variant="outline" onClick={onBack} className="dashboard-back-button" style={{ background: '#ffffff', color: '#374151' }}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
@@ -160,7 +160,7 @@ export function CasePage({ caseId, onBack }: CasePageProps) {
               <p className="text-gray-600">Error loading case information</p>
             </div>
           </div>
-          <Button onClick={handleRefresh} variant="outline">
+          <Button onClick={handleRefresh} variant="outline" className="dashboard-refresh-button" style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Retry
           </Button>
@@ -185,7 +185,7 @@ export function CasePage({ caseId, onBack }: CasePageProps) {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Button variant="outline" onClick={onBack}>
+            <Button variant="outline" onClick={onBack} className="dashboard-back-button" style={{ background: '#ffffff', color: '#374151' }}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
@@ -206,18 +206,16 @@ export function CasePage({ caseId, onBack }: CasePageProps) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={onBack}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Case #{case_.caseNumber}</h1>
-            <p className="text-gray-600">{case_.customer.name}</p>
-          </div>
+        <Button variant="outline" onClick={onBack} className="dashboard-back-button" style={{ background: '#ffffff', color: '#374151' }}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+        <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+          <h1 className="text-2xl font-bold text-white">Case #{case_.caseNumber}</h1>
+          <p className="text-gray-300">{case_.customer.name}</p>
         </div>
         <div className="flex items-center space-x-3">
-          <Button variant="outline" onClick={handleRefresh} disabled={caseLoading || docsLoading || messagesLoading || logsLoading}>
+          <Button variant="outline" onClick={handleRefresh} disabled={caseLoading || docsLoading || messagesLoading || logsLoading} className="dashboard-refresh-button" style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className={`h-4 w-4 mr-2 ${(caseLoading || docsLoading || messagesLoading || logsLoading) ? 'animate-spin' : ''}`} />
             Refresh
           </Button>

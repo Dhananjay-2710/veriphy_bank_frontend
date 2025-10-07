@@ -3,7 +3,7 @@ import { AuditLogger } from '../utils/audit-logger';
 import { 
   SUPABASE_TABLES, 
   mapCaseToLoanApplication, 
-  mapDocumentStatus, 
+  // mapDocumentStatus, // Not used in this file
   mapTaskPriority,
   mapRoleData,
   mapPermissionData,
@@ -1222,18 +1222,25 @@ export class SupabaseDatabaseService {
   // =============================================================================
 
   static async getDocuments(caseId?: string) {
+    console.log('Fetching documents with caseId:', caseId);
+    
     let query = supabase
       .from(SUPABASE_TABLES.DOCUMENTS)
       .select(`
         id,
+        organization_id,
         customer_id,
         document_type_id,
         file_id,
         status,
         uploaded_by,
         submitted_at,
+        review_started_at,
+        review_completed_at,
         verified_by,
         verified_on,
+        expiry_date,
+        metadata,
         created_at,
         updated_at,
         document_types!inner(
@@ -1243,9 +1250,25 @@ export class SupabaseDatabaseService {
           description,
           is_required,
           priority
+        ),
+        customers!inner(
+          id,
+          full_name,
+          email,
+          mobile
+        ),
+        uploaded_user:users!documents_uploaded_by_fkey(
+          id,
+          full_name,
+          email
+        ),
+        verified_user:users!documents_verified_by_fkey(
+          id,
+          full_name,
+          email
         )
       `)
-      .order('created_at', { ascending: false });
+      .order('submitted_at', { ascending: false });
 
     // Only filter by customer_id if provided and not empty
     if (caseId && caseId.trim() !== '') {
@@ -1259,27 +1282,56 @@ export class SupabaseDatabaseService {
       return [];
     }
 
+    console.log('Raw documents data:', data);
+
     return data?.map(doc => {
       const docType = Array.isArray(doc.document_types) ? doc.document_types[0] : doc.document_types;
+      const customer = Array.isArray(doc.customers) ? doc.customers[0] : doc.customers;
+      const uploadedUser = Array.isArray(doc.uploaded_user) ? doc.uploaded_user[0] : doc.uploaded_user;
+      const verifiedUser = Array.isArray(doc.verified_user) ? doc.verified_user[0] : doc.verified_user;
       
       return {
         id: doc.id.toString(),
-        name: docType?.name || `Document ${doc.id}`,
-        type: docType?.category || 'other',
-        status: mapDocumentStatus(doc.status) as "rejected" | "verified" | "pending" | "received",
-        required: docType?.is_required || false,
-        uploadedAt: doc.submitted_at || doc.created_at,
-        verifiedAt: doc.verified_on,
-        reviewedAt: doc.verified_on,
-        reviewedBy: doc.verified_by ? doc.verified_by.toString() : undefined,
-        rejectionReason: undefined, // rejection_reason doesn't exist in our schema
-        fileUrl: undefined, // file_path doesn't exist in our schema
-        notes: undefined, // notes doesn't exist in our schema
-        category: (docType?.category as 'identity' | 'financial' | 'business' | 'property' | 'employment' | 'other') || 'other',
-        priority: (docType?.priority as 'high' | 'medium' | 'low') || 'medium',
-        fileSize: undefined, // file_size doesn't exist in our schema
-        fileType: undefined, // file_type doesn't exist in our schema
-        file_id: doc.file_id
+        organizationId: doc.organization_id,
+        customerId: doc.customer_id,
+        documentTypeId: doc.document_type_id,
+        fileId: doc.file_id,
+        status: doc.status,
+        uploadedBy: doc.uploaded_by,
+        submittedAt: doc.submitted_at,
+        reviewStartedAt: doc.review_started_at,
+        reviewCompletedAt: doc.review_completed_at,
+        verifiedBy: doc.verified_by,
+        verifiedOn: doc.verified_on,
+        expiryDate: doc.expiry_date,
+        metadata: doc.metadata,
+        createdAt: doc.created_at,
+        updatedAt: doc.updated_at,
+        // Related data
+        documentType: docType ? {
+          id: docType.id,
+          name: docType.name,
+          category: docType.category,
+          description: docType.description,
+          isRequired: docType.is_required,
+          priority: docType.priority
+        } : null,
+        customer: customer ? {
+          id: customer.id,
+          fullName: customer.full_name,
+          email: customer.email,
+          mobile: customer.mobile
+        } : null,
+        uploadedByUser: uploadedUser ? {
+          id: uploadedUser.id,
+          fullName: uploadedUser.full_name,
+          email: uploadedUser.email
+        } : null,
+        verifiedByUser: verifiedUser ? {
+          id: verifiedUser.id,
+          fullName: verifiedUser.full_name,
+          email: verifiedUser.email
+        } : null
       };
     }) || [];
   }

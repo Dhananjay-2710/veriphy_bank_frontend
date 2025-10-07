@@ -525,10 +525,10 @@ export function WorkflowManagementPage({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Workflow Management</h1>
-          <p className="text-gray-600">Manage case workflows, status history, and assignment settings</p>
+      <div className="relative flex items-center justify-between">
+        <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+          <h1 className="text-2xl font-bold text-white">Workflow Management</h1>
+          <p className="text-gray-300">Manage case workflows, status history, and assignment settings</p>
         </div>
         <div className="flex space-x-3">
           <Button variant="outline" onClick={() => {
@@ -536,7 +536,7 @@ export function WorkflowManagementPage({
             refetchStages();
             refetchSettings();
             refetchPermissions();
-          }}>
+          }} style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh All
           </Button>

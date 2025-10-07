@@ -141,19 +141,17 @@ export function ComplianceReview({ onBack, onNavigateToCase }: ComplianceReviewP
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={onBack}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Compliance Review</h1>
-            <p className="text-gray-600">Monitor and resolve compliance issues</p>
-          </div>
+      <div className="relative flex items-center justify-between">
+        <Button variant="outline" onClick={onBack} className="dashboard-back-button" style={{ background: '#ffffff', color: '#374151' }}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+        <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+          <h1 className="text-2xl font-bold text-white">Compliance Review</h1>
+          <p className="text-gray-300">Monitor and resolve compliance issues</p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm" onClick={refetchIssues} disabled={issuesLoading}>
+          <Button variant="outline" size="sm" onClick={refetchIssues} disabled={issuesLoading} style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className={`h-4 w-4 mr-2 ${issuesLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>

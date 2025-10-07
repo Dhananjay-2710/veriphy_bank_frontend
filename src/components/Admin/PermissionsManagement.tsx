@@ -215,19 +215,17 @@ export function PermissionsManagement({ onBack }: PermissionsManagementProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={onBack}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Permissions Management</h1>
-            <p className="text-gray-600">Manage system permissions and access controls</p>
-          </div>
+      <div className="relative flex items-center justify-between">
+        <Button variant="outline" onClick={onBack} style={{ background: '#ffffff', color: '#374151' }}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+        <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+          <h1 className="text-2xl font-bold text-white">Permissions Management</h1>
+          <p className="text-gray-300">Manage system permissions and access controls</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={loadData}>
+          <Button variant="outline" onClick={loadData} style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>

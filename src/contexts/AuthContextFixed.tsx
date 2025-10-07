@@ -22,8 +22,11 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<AppUser>;
   logout: () => Promise<void>;
+  softLogout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   register: (data: RegistrationData) => Promise<AppUser>;
+  sessionTimeout: number | null;
+  setSessionTimeout: (timeout: number | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,6 +34,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionTimeout, setSessionTimeout] = useState<number | null>(null);
 
   // ✅ Login - Works with both Supabase Auth and database users
   const login = async (email: string, password: string) => {
@@ -181,10 +185,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
-  // ✅ Logout
+  // ✅ Hard Logout - Complete session termination
   const logout = async () => {
+    console.log('Performing hard logout...');
+    
+    // Clear session timeout
+    if (sessionTimeout) {
+      clearTimeout(sessionTimeout);
+      setSessionTimeout(null);
+    }
+    
+    // Sign out from Supabase
     await supabase.auth.signOut();
-    localStorage.removeItem('veriphy_user');
+    
+    // Clear all local storage
+    localStorage.clear();
+    
+    // Clear user context
+    setUser(null);
+  };
+
+  // ✅ Soft Logout - Keep session data for quick re-login
+  const softLogout = async () => {
+    console.log('Performing soft logout...');
+    
+    // Clear session timeout
+    if (sessionTimeout) {
+      clearTimeout(sessionTimeout);
+      setSessionTimeout(null);
+    }
+    
+    // Preserve user preferences
+    const userPreferences = localStorage.getItem('user_preferences');
+    
+    // Clear local storage but keep session info
+    localStorage.clear();
+    
+    if (userPreferences) {
+      localStorage.setItem('user_preferences', userPreferences);
+    }
+    
+    // Store session info for quick re-login
+    if (user) {
+      const sessionInfo = {
+        email: user.email,
+        lastLogin: new Date().toISOString(),
+        softLogout: true
+      };
+      localStorage.setItem('veriphy_session_info', JSON.stringify(sessionInfo));
+    }
+    
+    // Clear user context but don't sign out from Supabase
     setUser(null);
   };
 
@@ -387,7 +438,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser, register }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      loading, 
+      login, 
+      logout, 
+      softLogout, 
+      refreshUser, 
+      register, 
+      sessionTimeout, 
+      setSessionTimeout 
+    }}>
       {children}
     </AuthContext.Provider>
   );

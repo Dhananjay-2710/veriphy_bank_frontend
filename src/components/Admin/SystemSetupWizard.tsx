@@ -237,8 +237,8 @@ export function SystemSetupWizard() {
     <div className="space-y-6">
       {/* Header */}
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900">System Setup Wizard</h1>
-        <p className="text-gray-600 mt-2">Configure your VERIPHY banking system step by step</p>
+        <h1 className="text-3xl font-bold text-white">System Setup Wizard</h1>
+        <p className="text-gray-300 mt-2">Configure your VERIPHY banking system step by step</p>
       </div>
 
       {/* Progress Overview */}

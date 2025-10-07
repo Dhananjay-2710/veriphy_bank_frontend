@@ -118,17 +118,17 @@ export function SystemSettings({ onBack }: SystemSettingsProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={onBack}>
+          <Button variant="outline" onClick={onBack} style={{ background: '#ffffff', color: '#374151' }}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">System Settings</h1>
-            <p className="text-gray-600">Configure system parameters and integrations</p>
+          <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+            <h1 className="text-2xl font-bold text-white">System Settings</h1>
+            <p className="text-gray-300">Configure system parameters and integrations</p>
           </div>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" onClick={refreshSystemHealth} disabled={healthLoading}>
+          <Button variant="outline" onClick={refreshSystemHealth} disabled={healthLoading} style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className={`h-4 w-4 mr-2 ${healthLoading ? 'animate-spin' : ''}`} />
             Refresh Status
           </Button>

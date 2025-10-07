@@ -154,13 +154,13 @@ export function TaskCategoryManagement({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Task Category Management</h1>
-          <p className="text-gray-600">Manage task categories and their properties</p>
+      <div className="relative flex items-center justify-between">
+        <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+          <h1 className="text-2xl font-bold text-white">Task Category Management</h1>
+          <p className="text-gray-300">Manage task categories and their properties</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={refetch}>
+          <Button variant="outline" onClick={refetch} style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>

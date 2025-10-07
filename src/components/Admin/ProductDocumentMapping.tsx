@@ -407,17 +407,17 @@ export function ProductDocumentMapping({ onBack }: ProductDocumentMappingProps) 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
-          <Button variant="outline" onClick={onBack} className="w-full sm:w-auto">
+          <Button variant="outline" onClick={onBack} className="w-full sm:w-auto" style={{ background: '#ffffff', color: '#374151' }}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Product Document Mapping</h1>
-            <p className="text-sm sm:text-base text-gray-600 mt-1">Manage document requirements for products and sub-products</p>
+          <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+            <h1 className="text-xl sm:text-2xl font-bold text-white">Product Document Mapping</h1>
+            <p className="text-sm sm:text-base text-gray-300 mt-1">Manage document requirements for products and sub-products</p>
           </div>
         </div>
         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-          <Button variant="outline" onClick={loadData} className="w-full sm:w-auto">
+          <Button variant="outline" onClick={loadData} className="w-full sm:w-auto" style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>

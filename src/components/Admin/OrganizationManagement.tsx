@@ -122,7 +122,7 @@ export function OrganizationManagement({ onBack }: OrganizationManagementProps) 
             <p className="text-lg font-semibold">Error Loading Organizations</p>
             <p className="text-sm text-gray-600 mt-2">{error}</p>
           </div>
-          <Button onClick={handleRefresh}>
+          <Button onClick={handleRefresh} style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Retry
           </Button>
@@ -133,14 +133,17 @@ export function OrganizationManagement({ onBack }: OrganizationManagementProps) 
 
   return (
     <div className="p-6 bg-white rounded-lg shadow-md">
-      <div className="flex items-center justify-between mb-6">
-        <Button variant="outline" onClick={onBack} className="flex items-center">
+      <div className="relative flex items-center justify-between mb-6">
+        <Button variant="outline" onClick={onBack} className="dashboard-back-button flex items-center" style={{ background: '#ffffff', color: '#374151' }}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
-          </Button>
-        <h2 className="text-2xl font-semibold text-gray-800">Organization Management</h2>
+        </Button>
+        <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+          <h2 className="text-2xl font-bold text-white">Organization Management</h2>
+          <p className="text-gray-300">Manage organizations and their settings</p>
+        </div>
         <Button onClick={handleCreateOrganization} className="flex items-center">
           <Plus className="h-4 w-4 mr-2" /> Add New Organization
-          </Button>
+        </Button>
       </div>
 
       {/* Filters */}
@@ -173,7 +176,7 @@ export function OrganizationManagement({ onBack }: OrganizationManagementProps) 
               ]}
             />
 
-            <Button variant="outline" onClick={handleRefresh}>
+            <Button variant="outline" onClick={handleRefresh} className="dashboard-refresh-button" style={{ background: '#ffffff', color: '#374151' }}>
               <RefreshCw className="h-4 w-4 mr-2" /> Refresh
             </Button>
           </div>

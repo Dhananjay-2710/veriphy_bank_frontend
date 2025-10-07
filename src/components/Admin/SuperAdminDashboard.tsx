@@ -76,16 +76,16 @@ export function SuperAdminDashboard({
   return (
     <div className="space-y-6">
       {/* Header */}
-          <div className="flex items-center justify-between">
-              <div>
-          <h1 className="text-2xl font-bold text-gray-900">Super Admin Dashboard</h1>
-          <p className="text-gray-600">Manage all organizations, departments, and system-wide settings</p>
-              </div>
+          <div className="relative flex items-center justify-between">
+        <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+          <h1 className="text-2xl font-bold text-white">Super Admin Dashboard</h1>
+          <p className="text-gray-300">Manage all organizations, departments, and system-wide settings</p>
+        </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={handleRefresh} disabled={loading}>
+          <Button variant="outline" onClick={handleRefresh} disabled={loading} className="dashboard-refresh-button" style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 Refresh
-              </Button>
+          </Button>
         </div>
       </div>
 

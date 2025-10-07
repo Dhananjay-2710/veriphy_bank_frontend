@@ -166,14 +166,14 @@ export function DatabaseManagement() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+      <div className="relative flex items-center justify-between">
+        <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+          <h1 className="text-2xl font-bold text-white flex items-center justify-center">
             <Database className="h-8 w-8 mr-3 text-blue-600" />
             Database Management
           </h1>
           <div className="flex items-center space-x-2">
-            <p className="text-gray-600">Manage your Supabase database tables and data</p>
+            <p className="text-gray-300">Manage your Supabase database tables and data</p>
             {autoRefreshEnabled && (
               <div className="flex items-center space-x-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
@@ -195,7 +195,7 @@ export function DatabaseManagement() {
               Auto-refresh (30s)
             </label>
           </div>
-          <Button variant="outline" onClick={refresh}>
+          <Button variant="outline" onClick={refresh} style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>

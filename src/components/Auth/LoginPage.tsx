@@ -44,6 +44,26 @@ export function LoginPage() {
 
   const { login, user, loading: authLoading } = useAuth();
 
+  // Check for soft logout session info on component mount
+  useEffect(() => {
+    const sessionInfo = localStorage.getItem('veriphy_session_info');
+    if (sessionInfo) {
+      try {
+        const parsed = JSON.parse(sessionInfo);
+        if (parsed.softLogout && parsed.email) {
+          setEmail(parsed.email);
+          // Show a subtle notification about soft logout
+          toast.info('Welcome back! Your session was preserved for quick login.', {
+            position: "top-center",
+            autoClose: 3000,
+          });
+        }
+      } catch (error) {
+        console.error('Error parsing session info:', error);
+      }
+    }
+  }, []);
+
   const redirectByRole = (role?: string | null) => {
     console.log("User role:", role);
     // Just navigate to root - App.tsx will handle role-based rendering
@@ -218,7 +238,7 @@ export function LoginPage() {
               className="h-32 w-32 sm:h-40 sm:w-40 md:h-48 md:w-48 object-contain transform hover:scale-105 transition-transform duration-300 animate-float"
             />
           </div>
-          <div className="space-y-1 sm:space-y-2">
+          <div>
             {/* <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent animate-glow">
               VERIPHY
             </h1> */}
@@ -374,7 +394,7 @@ export function LoginPage() {
         </Card>
 
         {/* Footer */}
-        <div className="text-center space-y-1 sm:space-y-2">
+        <div className="text-center space-y-1 sm:space-y-2 pt-4 sm:pt-6">
           <div className="flex items-center justify-center space-x-2 text-blue-300/80 text-xs sm:text-sm">
             <Lock className="h-3 w-3 sm:h-4 sm:w-4" />
             <span className="hidden sm:inline">Bank-grade security • End-to-end encryption</span>

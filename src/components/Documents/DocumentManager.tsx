@@ -82,15 +82,16 @@ export function DocumentManager({ caseId, onBack, onSendMessage }: DocumentManag
   if (!caseId) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={onBack}>
+        <div className="relative flex items-center justify-between">
+          <Button variant="outline" onClick={onBack} style={{ background: '#ffffff', color: '#374151' }}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Document Manager</h1>
-            <p className="text-gray-600">Select a case to manage documents</p>
+          <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+            <h1 className="text-2xl font-bold text-white">Document Manager</h1>
+            <p className="text-gray-300">Select a case to manage documents</p>
           </div>
+          <div></div>
         </div>
 
         <Card>
@@ -283,15 +284,16 @@ export function DocumentManager({ caseId, onBack, onSendMessage }: DocumentManag
   if (reviewMode && selectedDocument) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={() => setReviewMode(false)}>
+        <div className="relative flex items-center justify-between">
+          <Button variant="outline" onClick={() => setReviewMode(false)} style={{ background: '#ffffff', color: '#374151' }}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Review Document</h1>
-            <p className="text-gray-600">{selectedDocument.name}</p>
+          <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+            <h1 className="text-2xl font-bold text-white">Review Document</h1>
+            <p className="text-gray-300">{selectedDocument.name}</p>
           </div>
+          <div></div>
         </div>
 
         <Card>
@@ -359,7 +361,7 @@ export function DocumentManager({ caseId, onBack, onSendMessage }: DocumentManag
     return (
       <div className="min-h-screen bg-gray-50 p-6">
         <div className="flex items-center gap-4 mb-6">
-          <Button variant="outline" size="sm" onClick={onBack}>
+          <Button variant="outline" size="sm" onClick={onBack} className="dashboard-back-button" style={{ background: '#ffffff', color: '#374151' }}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
@@ -379,7 +381,7 @@ export function DocumentManager({ caseId, onBack, onSendMessage }: DocumentManag
     return (
       <div className="min-h-screen bg-gray-50 p-6">
         <div className="flex items-center gap-4 mb-6">
-          <Button variant="outline" size="sm" onClick={onBack}>
+          <Button variant="outline" size="sm" onClick={onBack} className="dashboard-back-button" style={{ background: '#ffffff', color: '#374151' }}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
@@ -399,7 +401,7 @@ export function DocumentManager({ caseId, onBack, onSendMessage }: DocumentManag
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={onBack}>
+          <Button variant="outline" onClick={onBack} className="dashboard-back-button">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
@@ -413,7 +415,7 @@ export function DocumentManager({ caseId, onBack, onSendMessage }: DocumentManag
             <Upload className="h-4 w-4 mr-2" />
             Upload Document
           </Button>
-          <Button variant="outline" onClick={refetch} disabled={documentsLoading}>
+          <Button variant="outline" onClick={refetch} disabled={documentsLoading} className="dashboard-refresh-button">
             <RefreshCw className={`h-4 w-4 mr-2 ${documentsLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>

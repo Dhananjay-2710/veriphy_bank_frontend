@@ -137,10 +137,10 @@ export function SystemSettingsPage({ onNavigateToIntegrations }: SystemSettingsP
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">System Settings</h1>
-          <p className="text-gray-600">Manage global system configuration</p>
+      <div className="relative flex items-center justify-between">
+        <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+          <h1 className="text-2xl font-bold text-white">System Settings</h1>
+          <p className="text-gray-300">Manage global system configuration</p>
         </div>
         <div className="flex space-x-3">
           <Button variant="outline" onClick={refetch}>

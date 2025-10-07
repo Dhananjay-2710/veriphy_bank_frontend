@@ -395,13 +395,13 @@ export function WorkflowDesigner() {
     return (
       <div className="space-y-6">
         {/* Designer Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Workflow Designer</h1>
-            <p className="text-gray-600">Designing: {selectedWorkflow.name}</p>
+        <div className="relative flex items-center justify-between">
+          <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+            <h1 className="text-2xl font-bold text-white">Workflow Designer</h1>
+            <p className="text-gray-300">Designing: {selectedWorkflow.name}</p>
           </div>
           <div className="flex space-x-3">
-            <Button variant="outline" onClick={() => setIsDesigning(false)}>
+            <Button variant="outline" onClick={() => setIsDesigning(false)} style={{ background: '#ffffff', color: '#374151' }}>
               Cancel
             </Button>
             <Button onClick={saveWorkflow} className="bg-blue-600 hover:bg-blue-700 text-white">
@@ -477,13 +477,13 @@ export function WorkflowDesigner() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Workflow Management</h1>
-          <p className="text-gray-600">Design and manage business process workflows</p>
+      <div className="relative flex items-center justify-between">
+        <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+          <h1 className="text-2xl font-bold text-white">Workflow Management</h1>
+          <p className="text-gray-300">Design and manage business process workflows</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={() => setShowTemplates(!showTemplates)}>
+          <Button variant="outline" onClick={() => setShowTemplates(!showTemplates)} style={{ background: '#ffffff', color: '#374151' }}>
             <Copy className="h-4 w-4 mr-2" />
             Templates
           </Button>

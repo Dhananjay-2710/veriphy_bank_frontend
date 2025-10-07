@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, Plus, Edit, Trash2, Search, RefreshCw, AlertTriangle, BarChart3, TrendingUp, Shield, Clock, Eye, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, FileText, Plus, Edit, Trash2, Search, RefreshCw, AlertTriangle, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -34,24 +34,24 @@ interface Document {
     id: string;
     name: string;
     email: string;
-  };
+  } | null;
   documentType?: {
     id: string;
     name: string;
     category: string;
     isRequired: boolean;
     priority: string;
-  };
+  } | null;
   uploadedByUser?: {
     id: string;
     name: string;
     email: string;
-  };
+  } | null;
   verifiedByUser?: {
     id: string;
     name: string;
     email: string;
-  };
+  } | null;
 }
 
 interface DocumentsManagementProps {
@@ -130,28 +130,46 @@ export function DocumentsManagement({ onBack }: DocumentsManagementProps) {
       console.log('🔍 Document types loaded:', documentTypesData.length);
       console.log('🔍 Users loaded:', usersData.length);
       
-      // Map documents data to match interface
+      // Use the documents data directly as it now includes all related data
       const mappedDocuments = documentsData.map(doc => ({
         id: doc.id,
-        customerId: doc.customerId || doc.customer_id,
-        documentTypeId: doc.documentTypeId || doc.document_type_id,
-        fileId: doc.fileId || doc.file_id,
-        uploadedBy: doc.uploadedBy || doc.uploaded_by,
+        customerId: doc.customerId,
+        documentTypeId: doc.documentTypeId,
+        fileId: doc.fileId,
+        uploadedBy: doc.uploadedBy,
         status: doc.status,
-        submittedAt: doc.submittedAt || doc.submitted_at,
-        reviewStartedAt: doc.reviewStartedAt || doc.review_started_at,
-        reviewCompletedAt: doc.reviewCompletedAt || doc.review_completed_at,
-        verifiedBy: doc.verifiedBy || doc.verified_by,
-        verifiedOn: doc.verifiedOn || doc.verified_on,
-        expiryDate: doc.expiryDate || doc.expiry_date,
+        submittedAt: doc.submittedAt,
+        reviewStartedAt: doc.reviewStartedAt,
+        reviewCompletedAt: doc.reviewCompletedAt,
+        verifiedBy: doc.verifiedBy,
+        verifiedOn: doc.verifiedOn,
+        expiryDate: doc.expiryDate,
         metadata: doc.metadata,
-        createdAt: doc.createdAt || doc.created_at,
-        updatedAt: doc.updatedAt || doc.updated_at,
-        // Add related data
-        customer: customersData.find(c => c.id === (doc.customerId || doc.customer_id)),
-        documentType: documentTypesData.find(dt => dt.id === (doc.documentTypeId || doc.document_type_id)),
-        uploadedByUser: usersData.find(u => u.id === (doc.uploadedBy || doc.uploaded_by)),
-        verifiedByUser: usersData.find(u => u.id === (doc.verifiedBy || doc.verified_by))
+        createdAt: doc.createdAt,
+        updatedAt: doc.updatedAt,
+        // Use the related data that's already included
+        customer: doc.customer ? {
+          id: doc.customer.id,
+          name: doc.customer.fullName || 'Unknown Customer',
+          email: doc.customer.email
+        } : null,
+        documentType: doc.documentType ? {
+          id: doc.documentType.id,
+          name: doc.documentType.name,
+          category: doc.documentType.category,
+          isRequired: doc.documentType.isRequired,
+          priority: doc.documentType.priority
+        } : null,
+        uploadedByUser: doc.uploadedByUser ? {
+          id: doc.uploadedByUser.id,
+          name: doc.uploadedByUser.fullName || 'Unknown User',
+          email: doc.uploadedByUser.email
+        } : null,
+        verifiedByUser: doc.verifiedByUser ? {
+          id: doc.verifiedByUser.id,
+          name: doc.verifiedByUser.fullName || 'Unknown User',
+          email: doc.verifiedByUser.email
+        } : null
       }));
       
       setDocuments(mappedDocuments);
@@ -304,7 +322,7 @@ export function DocumentsManagement({ onBack }: DocumentsManagementProps) {
             <p className="text-lg font-semibold">Error Loading Documents</p>
             <p className="text-sm text-gray-600 mt-2">{error}</p>
           </div>
-          <Button onClick={loadData}>
+          <Button onClick={loadData} style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Retry
           </Button>
@@ -316,19 +334,17 @@ export function DocumentsManagement({ onBack }: DocumentsManagementProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={onBack}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Documents Management</h1>
-            <p className="text-gray-600">Manage system-wide documents and verification</p>
-          </div>
+      <div className="relative flex items-center justify-between">
+        <Button variant="outline" onClick={onBack} style={{ background: '#ffffff', color: '#374151' }}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+        <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+          <h1 className="text-2xl font-bold text-white">Documents Management</h1>
+          <p className="text-gray-300">Manage system-wide documents and verification</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={loadData}>
+          <Button variant="outline" onClick={loadData} style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -619,7 +635,7 @@ export function DocumentsManagement({ onBack }: DocumentsManagementProps) {
                         {document.documentType?.isRequired && (
                           <Badge variant="error">Required</Badge>
                         )}
-                        <Badge variant="outline">{document.documentType?.category}</Badge>
+                        <Badge variant="info">{document.documentType?.category}</Badge>
                       </div>
                       <div className="text-sm text-gray-600 space-y-1">
                         <p><strong>Customer:</strong> {document.customer?.name || 'Unknown Customer'}</p>
@@ -630,7 +646,7 @@ export function DocumentsManagement({ onBack }: DocumentsManagementProps) {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
                           <div>
                             <p className="font-medium text-gray-700">Submitted</p>
-                            <p className="text-sm">{new Date(document.submittedAt).toLocaleDateString()}</p>
+                            <p className="text-sm">{document.submittedAt ? new Date(document.submittedAt).toLocaleDateString() : 'Invalid Date'}</p>
                           </div>
                           <div>
                             <p className="font-medium text-gray-700">Status</p>

@@ -3,6 +3,7 @@ import { Suspense, useEffect } from 'react';
 import { useAuth } from './contexts/AuthContextFixed';
 import { WhatsAppIntegrationService } from './services/whatsapp-integration-service';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
+import { SessionTimeoutProvider } from './components/Layout/SessionTimeoutProvider';
 import './styles/mobile.css';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -463,7 +464,8 @@ function App() {
       }}
     >
       <NavigationProvider>
-        <Routes>
+        <SessionTimeoutProvider>
+          <Routes>
         <Route path="/" element={<AppContent />} />
         <Route path="/login" element={<LoginPage />} />
         
@@ -1035,6 +1037,7 @@ function App() {
 
         {/* Test Routes */}
         </Routes>
+        </SessionTimeoutProvider>
       </NavigationProvider>
       
       {/* Global Toast Container */}
