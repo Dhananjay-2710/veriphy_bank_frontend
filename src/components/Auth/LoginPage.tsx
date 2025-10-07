@@ -1,9 +1,10 @@
-import { useState, Suspense, lazy } from "react";
-import { Shield, User, UserPlus } from "lucide-react";
+import { useState, Suspense, lazy, useEffect } from "react";
+import { UserPlus, Eye, EyeOff, Lock, Mail, ArrowRight, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContextFixed";
 import { Button } from "../ui/Button";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/Card";
 import { useNavigate } from "react-router-dom";
+import veriphyLogo from "../../assets/images/veriphy.io.png";
 
 // Lazy load heavy components
 const RegistrationPage = lazy(() =>
@@ -33,6 +34,10 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
   const navigate = useNavigate();
 
   const { login, user } = useAuth();
@@ -47,11 +52,14 @@ export function LoginPage() {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
       setError("Please enter both email and password");
+      setIsAnimating(true);
+      setTimeout(() => setIsAnimating(false), 500);
       return;
     }
 
     setIsSubmitting(true);
     setError("");
+    setIsAnimating(true);
 
     try {
       const profile = await login(email.trim().toLowerCase(), password);
@@ -61,10 +69,19 @@ export function LoginPage() {
     } catch (err: any) {
       console.error("LoginPage error:", err);
       setError(err?.message || "Something went wrong. Please try again.");
+      setIsAnimating(true);
+      setTimeout(() => setIsAnimating(false), 500);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // Add entrance animation
+  useEffect(() => {
+    setIsAnimating(true);
+    const timer = setTimeout(() => setIsAnimating(false), 300);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleRegistrationComplete = (data: RegistrationData) => {
     console.log("Registration completed with data:", data);
@@ -109,106 +126,160 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Animated background elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse hidden sm:block"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl animate-pulse delay-1000 hidden sm:block"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-500 hidden sm:block"></div>
+        {/* Mobile-optimized background elements */}
+        <div className="absolute top-10 right-10 w-32 h-32 bg-blue-500/20 rounded-full blur-2xl animate-pulse sm:hidden"></div>
+        <div className="absolute bottom-10 left-10 w-32 h-32 bg-indigo-500/20 rounded-full blur-2xl animate-pulse delay-1000 sm:hidden"></div>
+      </div>
+
+      <div className={`max-w-md w-full space-y-6 sm:space-y-8 relative z-10 transition-all duration-500 ${isAnimating ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
         {/* Header */}
-        <div className="text-center">
+        <div className="text-center animate-fadeInUp">
           <div className="flex justify-center">
-            <div className="bg-blue-600 p-3 rounded-full">
-              <Shield className="h-12 w-12 text-white" />
-            </div>
+            <img 
+              src={veriphyLogo} 
+              alt="Veriphy Logo" 
+              className="h-32 w-32 sm:h-40 sm:w-40 md:h-48 md:w-48 object-contain transform hover:scale-105 transition-transform duration-300 animate-float"
+            />
           </div>
-          <h1 className="mt-4 text-3xl font-bold text-gray-900">VERIPHY</h1>
-          <p className="text-gray-600 mt-2">Happy Bank of India</p>
-          <p className="text-sm text-gray-500 mt-1">
-            Secure Document Workflow Platform
-          </p>
+          <div className="space-y-1 sm:space-y-2">
+            {/* <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent animate-glow">
+              VERIPHY
+            </h1> */}
+            <p className="text-blue-200 text-base sm:text-lg font-medium animate-slideInRight">Happy Bank of India</p>
+            <p className="text-blue-300/80 text-xs sm:text-sm animate-slideInRight px-4">
+              Secure Document Workflow Platform
+            </p>
+          </div>
         </div>
 
         {/* Login Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-center">Sign In</CardTitle>
+        <Card className="backdrop-blur-xl bg-white/10 border-white/20 shadow-2xl mx-2 sm:mx-0">
+          <CardHeader className="text-center pb-4 sm:pb-6">
+            <CardTitle className="text-xl sm:text-2xl font-bold text-white">Welcome Back</CardTitle>
+            <p className="text-blue-200/80 text-xs sm:text-sm mt-2">Sign in to your account</p>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+          <CardContent className="px-4 sm:px-6">
+            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
               {/* Error Display */}
               {error && (
-                <div className="text-red-600 text-sm text-center bg-red-50 p-2 rounded-md">
-                  {error}
+                <div className="flex items-center space-x-2 text-red-300 text-xs sm:text-sm bg-red-500/20 p-3 rounded-lg border border-red-500/30 animate-shake">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  <span className="break-words">{error}</span>
+                </div>
+              )}
+
+              {/* Registration success */}
+              {registrationSuccess && (
+                <div className="flex items-center space-x-2 text-green-300 text-xs sm:text-sm bg-green-500/20 p-3 rounded-lg border border-green-500/30">
+                  <CheckCircle className="h-4 w-4 flex-shrink-0" />
+                  <span className="break-words">Registration successful! You can now login with your credentials.</span>
                 </div>
               )}
 
               {/* Email */}
-              <div>
+              <div className="space-y-2">
                 <label
                   htmlFor="email"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block text-xs sm:text-sm font-medium text-blue-200 transition-colors duration-200"
                 >
                   Email Address
                 </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-gray-400" />
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">
+                    <Mail className={`h-4 w-4 sm:h-5 sm:w-5 transition-all duration-200 ${emailFocused ? 'text-blue-400 scale-110' : 'text-blue-300/60'}`} />
                   </div>
                   <input
                     id="email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    onFocus={() => setEmailFocused(true)}
+                    onBlur={() => setEmailFocused(false)}
+                    className="block w-full pl-10 sm:pl-12 pr-4 py-2.5 sm:py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-blue-300/60 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200 backdrop-blur-sm hover:bg-white/15 group-hover:border-white/30 text-sm sm:text-base"
                     placeholder="Enter your email"
                     required
                   />
+                  {email && (
+                    <div className="absolute inset-y-0 right-0 pr-3 sm:pr-4 flex items-center">
+                      <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-400 animate-fadeInUp" />
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Password */}
-              <div>
+              <div className="space-y-2">
                 <label
                   htmlFor="password"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block text-xs sm:text-sm font-medium text-blue-200 transition-colors duration-200"
                 >
                   Password
                 </label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter your password"
-                  required
-                />
-              </div>
-
-              {/* Registration success */}
-              {registrationSuccess && (
-                <div className="text-green-600 text-sm text-center bg-green-50 p-2 rounded-md">
-                  Registration successful! You can now login with your
-                  credentials.
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">
+                    <Lock className={`h-4 w-4 sm:h-5 sm:w-5 transition-all duration-200 ${passwordFocused ? 'text-blue-400 scale-110' : 'text-blue-300/60'}`} />
+                  </div>
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onFocus={() => setPasswordFocused(true)}
+                    onBlur={() => setPasswordFocused(false)}
+                    className="block w-full pl-10 sm:pl-12 pr-10 sm:pr-12 py-2.5 sm:py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-blue-300/60 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200 backdrop-blur-sm hover:bg-white/15 group-hover:border-white/30 text-sm sm:text-base"
+                    placeholder="Enter your password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 sm:pr-4 flex items-center text-blue-300/60 hover:text-blue-300 transition-all duration-200 hover:scale-110"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" /> : <Eye className="h-4 w-4 sm:h-5 sm:w-5" />}
+                  </button>
+                  {password && (
+                    <div className="absolute inset-y-0 right-8 sm:right-12 pr-1 sm:pr-2 flex items-center">
+                      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
 
               {/* Submit button */}
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-2.5 sm:py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-sm sm:text-base"
                 size="lg"
                 disabled={isSubmitting || !email.trim() || !password.trim()}
               >
-                {isSubmitting ? "Signing in..." : "Sign In"}
+                {isSubmitting ? (
+                  <div className="flex items-center justify-center space-x-2">
+                    <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+                    <span>Signing in...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center space-x-2">
+                    <span>Sign In</span>
+                    <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </div>
+                )}
               </Button>
 
               {/* Registration options */}
-              <div className="space-y-3">
+              <div className="space-y-3 sm:space-y-4 pt-3 sm:pt-4">
                 <div className="text-center">
                   <button
                     type="button"
                     onClick={() => setShowRegistration(true)}
-                    className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center justify-center w-full"
+                    className="text-blue-300 hover:text-white text-xs sm:text-sm font-medium flex items-center justify-center w-full py-2 px-3 sm:px-4 rounded-lg hover:bg-white/10 transition-all duration-200 group"
                   >
-                    <UserPlus className="h-4 w-4 mr-2" />
+                    <UserPlus className="h-3 w-3 sm:h-4 sm:w-4 mr-2 group-hover:scale-110 transition-transform duration-200" />
                     Create New Account
                   </button>
                 </div>
@@ -219,9 +290,9 @@ export function LoginPage() {
                     <button
                       type="button"
                       onClick={() => setShowRoleBasedRegistration(true)}
-                      className="text-green-600 hover:text-green-800 text-sm font-medium flex items-center justify-center w-full"
+                      className="text-green-300 hover:text-green-200 text-xs sm:text-sm font-medium flex items-center justify-center w-full py-2 px-3 sm:px-4 rounded-lg hover:bg-green-500/10 transition-all duration-200 group"
                     >
-                      <UserPlus className="h-4 w-4 mr-2" />
+                      <UserPlus className="h-3 w-3 sm:h-4 sm:w-4 mr-2 group-hover:scale-110 transition-transform duration-200" />
                       Add New User
                     </button>
                   </div>
@@ -231,11 +302,14 @@ export function LoginPage() {
           </CardContent>
         </Card>
 
-
         {/* Footer */}
-        <div className="text-center text-xs text-gray-500">
-          <p>🔒 Bank-grade security • End-to-end encryption</p>
-          <p className="mt-1">
+        <div className="text-center space-y-1 sm:space-y-2">
+          <div className="flex items-center justify-center space-x-2 text-blue-300/80 text-xs sm:text-sm">
+            <Lock className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Bank-grade security • End-to-end encryption</span>
+            <span className="sm:hidden">Secure & Encrypted</span>
+          </div>
+          <p className="text-blue-400/60 text-xs">
             © 2025 Happy Bank of India. All rights reserved.
           </p>
         </div>
