@@ -1,5 +1,5 @@
-import React from 'react';
-import { AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useEffect, memo, useCallback } from 'react';
+import { AlertCircle, CheckCircle, Eye, EyeOff, Phone } from 'lucide-react';
 
 // =============================================================================
 // FORM FIELD WRAPPER
@@ -87,7 +87,7 @@ interface ValidatedInputProps extends Omit<React.InputHTMLAttributes<HTMLInputEl
   containerClassName?: string;
 }
 
-export function ValidatedInput({
+export const ValidatedInput = memo(function ValidatedInput({
   label,
   error,
   success,
@@ -143,7 +143,7 @@ export function ValidatedInput({
       </div>
     </FormField>
   );
-}
+});
 
 // =============================================================================
 // VALIDATED TEXTAREA
@@ -245,7 +245,7 @@ interface ValidatedSelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelec
   placeholder?: string;
 }
 
-export function ValidatedSelect({
+export const ValidatedSelect = memo(function ValidatedSelect({
   label,
   error,
   success,
@@ -306,7 +306,7 @@ export function ValidatedSelect({
       </select>
     </FormField>
   );
-}
+});
 
 // =============================================================================
 // PASSWORD INPUT WITH VISIBILITY TOGGLE
@@ -491,3 +491,125 @@ export function ValidationSummary({ errors, className = '' }: ValidationSummaryP
     </div>
   );
 }
+
+// =============================================================================
+// INDIAN MOBILE INPUT COMPONENT
+// =============================================================================
+
+interface IndianMobileInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  onBlur?: () => void;
+  error?: string;
+  required?: boolean;
+  placeholder?: string;
+  className?: string;
+  disabled?: boolean;
+}
+
+export const IndianMobileInput = memo(function IndianMobileInput({
+  value,
+  onChange,
+  onBlur,
+  error,
+  required = false,
+  placeholder = "Enter 10-digit mobile number",
+  className = "",
+  disabled = false
+}: IndianMobileInputProps) {
+  const [displayValue, setDisplayValue] = useState(value);
+  const [isFocused, setIsFocused] = useState(false);
+
+  // Update display value when prop value changes
+  useEffect(() => {
+    setDisplayValue(value);
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let inputValue = e.target.value;
+    
+    // Remove any non-digit characters
+    inputValue = inputValue.replace(/\D/g, '');
+    
+    // Limit to 10 digits
+    if (inputValue.length > 10) {
+      inputValue = inputValue.substring(0, 10);
+    }
+    
+    setDisplayValue(inputValue);
+    onChange(inputValue);
+  };
+
+  const handleFocus = () => {
+    setIsFocused(true);
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    onBlur?.();
+  };
+
+  const hasError = Boolean(error);
+  const hasValue = Boolean(displayValue);
+
+  return (
+    <div className={`relative ${className}`}>
+      <div className="relative">
+        {/* +91 Prefix */}
+        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 flex items-center">
+          <Phone className="h-4 w-4 text-gray-400 mr-2" />
+          <span className="text-gray-600 font-medium text-sm">+91</span>
+        </div>
+        
+        {/* Input Field */}
+        <input
+          type="tel"
+          value={displayValue}
+          onChange={handleChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          placeholder={placeholder}
+          disabled={disabled}
+          className={`
+            w-full pl-16 pr-10 py-2.5 border rounded-lg text-sm
+            transition-all duration-200 ease-in-out
+            focus:outline-none focus:ring-2 focus:ring-offset-0
+            ${hasError 
+              ? 'border-red-300 bg-red-50 focus:border-red-500 focus:ring-red-500' 
+              : hasValue && !hasError
+                ? 'border-green-300 bg-green-50 focus:border-green-500 focus:ring-green-500'
+                : 'border-gray-300 bg-white focus:border-blue-500 focus:ring-blue-500'
+            }
+            ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}
+            ${isFocused ? 'shadow-sm' : ''}
+          `}
+          maxLength={10}
+        />
+        
+        {/* Status Icons */}
+        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+          {hasError ? (
+            <AlertCircle className="h-4 w-4 text-red-500" />
+          ) : hasValue && !hasError ? (
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          ) : null}
+        </div>
+      </div>
+      
+      {/* Error Message */}
+      {hasError && (
+        <p className="mt-1 text-xs text-red-600 flex items-center">
+          <AlertCircle className="h-3 w-3 mr-1" />
+          {error}
+        </p>
+      )}
+      
+      {/* Help Text */}
+      {!hasError && (
+        <p className="mt-1 text-xs text-gray-500">
+          Enter 10-digit mobile number starting with 6-9
+        </p>
+      )}
+    </div>
+  );
+});

@@ -5,6 +5,8 @@ import { Button } from "../ui/Button";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/Card";
 import { useNavigate } from "react-router-dom";
 import veriphyLogo from "../../assets/images/veriphy.io.png";
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // Lazy load heavy components
 const RegistrationPage = lazy(() =>
@@ -40,7 +42,7 @@ export function LoginPage() {
   const [isAnimating, setIsAnimating] = useState(false);
   const navigate = useNavigate();
 
-  const { login, user } = useAuth();
+  const { login, user, loading: authLoading } = useAuth();
 
   const redirectByRole = (role?: string | null) => {
     console.log("User role:", role);
@@ -51,9 +53,22 @@ export function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
+      toast.error("⚠️ Please enter both email and password", {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
       setError("Please enter both email and password");
       setIsAnimating(true);
       setTimeout(() => setIsAnimating(false), 500);
+      return;
+    }
+
+    // Prevent multiple submissions
+    if (isSubmitting || authLoading) {
       return;
     }
 
@@ -65,12 +80,66 @@ export function LoginPage() {
       const profile = await login(email.trim().toLowerCase(), password);
       console.log("Profile after login:", profile);
       console.log("Role after login:", profile.role);
-      redirectByRole(profile.role);
+      
+      // Show success notification and redirect ONLY on successful login
+      if (profile && profile.id) {
+        toast.success("✅ Login successful! Redirecting to dashboard...", {
+          position: "top-right",
+          autoClose: 2000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+        
+        // Redirect only after successful login
+        setTimeout(() => {
+          redirectByRole(profile.role);
+        }, 1000); // Small delay to show the success message
+      }
     } catch (err: any) {
       console.error("LoginPage error:", err);
-      setError(err?.message || "Something went wrong. Please try again.");
+      
+      // Show error notification based on error type
+      let errorMessage = "Something went wrong. Please try again.";
+      
+      // Check for specific error types
+      const errorMsg = err?.message?.toLowerCase() || '';
+      
+      if (errorMsg.includes("invalid login credentials") || 
+          errorMsg.includes("wrong password") ||
+          errorMsg.includes("invalid password") ||
+          errorMsg.includes("authentication failed") ||
+          errorMsg.includes("invalid credentials") ||
+          errorMsg.includes("incorrect password")) {
+        errorMessage = "❌ Invalid email or password. Please check your credentials and try again.";
+      } else if (errorMsg.includes("user not found") || errorMsg.includes("email not found")) {
+        errorMessage = "❌ No account found with this email address.";
+      } else if (errorMsg.includes("account disabled") || errorMsg.includes("user disabled")) {
+        errorMessage = "❌ Your account has been disabled. Please contact support.";
+      } else if (errorMsg.includes("too many requests") || errorMsg.includes("rate limit")) {
+        errorMessage = "❌ Too many login attempts. Please wait a moment and try again.";
+      } else if (errorMsg.includes("network") || errorMsg.includes("connection")) {
+        errorMessage = "❌ Network error. Please check your connection and try again.";
+      } else if (err?.message) {
+        errorMessage = `❌ ${err.message}`;
+      }
+      
+      toast.error(errorMessage, {
+        position: "top-right",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+      
+      setError(errorMessage);
       setIsAnimating(true);
       setTimeout(() => setIsAnimating(false), 500);
+      
+      // DO NOT redirect on error - stay on login page
+      console.log("Login failed, staying on login page");
     } finally {
       setIsSubmitting(false);
     }
@@ -82,6 +151,8 @@ export function LoginPage() {
     const timer = setTimeout(() => setIsAnimating(false), 300);
     return () => clearTimeout(timer);
   }, []);
+
+  // Remove automatic redirect - only redirect on successful login
 
   const handleRegistrationComplete = (data: RegistrationData) => {
     console.log("Registration completed with data:", data);
@@ -256,9 +327,9 @@ export function LoginPage() {
                 type="submit"
                 className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-2.5 sm:py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-sm sm:text-base"
                 size="lg"
-                disabled={isSubmitting || !email.trim() || !password.trim()}
+                disabled={isSubmitting || authLoading || !email.trim() || !password.trim()}
               >
-                {isSubmitting ? (
+                {(isSubmitting || authLoading) ? (
                   <div className="flex items-center justify-center space-x-2">
                     <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
                     <span>Signing in...</span>
@@ -314,6 +385,24 @@ export function LoginPage() {
           </p>
         </div>
       </div>
+      
+      {/* Toast Notifications */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="dark"
+        toastStyle={{
+          backgroundColor: '#1f2937',
+          color: '#f9fafb',
+        }}
+      />
     </div>
   );
 }

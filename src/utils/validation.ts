@@ -192,9 +192,15 @@ export function isValidEmail(email: string): boolean {
 }
 
 export function isValidPhone(phone: string): boolean {
-  // Indian phone number patterns
+  // Indian phone number patterns - accepts +91, 91, 0, or direct 10-digit
   const phonePattern = /^(?:\+91|91|0)?[6-9]\d{9}$/;
   return phonePattern.test(phone.replace(/[\s-]/g, ''));
+}
+
+export function isValidIndianMobile(mobile: string): boolean {
+  // Strict Indian mobile validation - 10 digits starting with 6-9
+  const mobilePattern = /^[6-9]\d{9}$/;
+  return mobilePattern.test(mobile.replace(/[\s-]/g, ''));
 }
 
 export function isNumeric(value: string): boolean {
@@ -274,6 +280,7 @@ export const VALIDATION_RULES = {
     required: true,
     minLength: 2,
     maxLength: 50,
+    pattern: /^[a-zA-Z\s.'-]+$/,
     customValidator: isValidName,
     message: 'Please enter a valid first name (2-50 characters, letters only)'
   },
@@ -282,6 +289,7 @@ export const VALIDATION_RULES = {
     required: true,
     minLength: 2,
     maxLength: 50,
+    pattern: /^[a-zA-Z\s.'-]+$/,
     customValidator: isValidName,
     message: 'Please enter a valid last name (2-50 characters, letters only)'
   },
@@ -297,14 +305,16 @@ export const VALIDATION_RULES = {
   email: {
     required: true,
     email: true,
+    pattern: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
     maxLength: 100,
     message: 'Please enter a valid email address'
   },
 
   phone: {
     required: true,
-    phone: true,
-    message: 'Please enter a valid 10-digit Indian mobile number'
+    pattern: /^[6-9]\d{9}$/,
+    customValidator: isValidIndianMobile,
+    message: 'Please enter a valid 10-digit Indian mobile number (starting with 6-9)'
   },
 
   password: {

@@ -4,6 +4,8 @@ import { useAuth } from './contexts/AuthContextFixed';
 import { WhatsAppIntegrationService } from './services/whatsapp-integration-service';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 import './styles/mobile.css';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { LoginPage } from './components/Auth/LoginPage';
 import { DashboardLayout } from './components/Layout/DashboardLayout';
 import { FullWidthLayout } from './components/Layout/FullWidthLayout';
@@ -1034,6 +1036,24 @@ function App() {
         {/* Test Routes */}
         </Routes>
       </NavigationProvider>
+      
+      {/* Global Toast Container */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="dark"
+        toastStyle={{
+          backgroundColor: '#1f2937',
+          color: '#f9fafb',
+        }}
+      />
     </BrowserRouter>
   );
 }

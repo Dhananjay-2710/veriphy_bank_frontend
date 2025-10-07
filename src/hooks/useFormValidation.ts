@@ -60,22 +60,25 @@ export function useFormValidation({
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Memoized isValid calculation
+  // Memoized validation rules to prevent re-renders
+  const memoizedValidationRules = useMemo(() => validationRules, [validationRules]);
+
+  // Memoized isValid calculation - only recalculate when values or errors change
   const isValid = useMemo(() => {
     return Object.keys(errors).length === 0 && 
-           Object.keys(validationRules).every(field => {
+           Object.keys(memoizedValidationRules).every(field => {
              const value = values[field] || '';
-             const rules = validationRules[field];
+             const rules = memoizedValidationRules[field];
              return validateField(value, rules).isValid;
            });
-  }, [values, errors, validationRules]);
+  }, [values, errors, memoizedValidationRules]);
 
   // Sanitize input based on field type
   const sanitizeValue = useCallback((field: string, value: string): string => {
     if (!sanitizeOnChange) return value;
 
     // Check validation rules for specific sanitization
-    const rules = validationRules[field];
+    const rules = memoizedValidationRules[field];
     
     if (rules?.email) {
       return sanitizeEmail(value);
@@ -99,7 +102,7 @@ export function useFormValidation({
     }
 
     return sanitizeInput(value);
-  }, [validationRules, sanitizeOnChange]);
+  }, [memoizedValidationRules, sanitizeOnChange]);
 
   // Set field value
   const setValue = useCallback((field: string, value: string) => {
@@ -138,7 +141,7 @@ export function useFormValidation({
   // Validate single field
   const validateSingleField = useCallback((field: string): boolean => {
     const value = values[field] || '';
-    const rules = validationRules[field];
+    const rules = memoizedValidationRules[field];
     
     if (!rules) return true;
 
@@ -151,11 +154,11 @@ export function useFormValidation({
       clearError(field);
       return true;
     }
-  }, [values, validationRules, setError, clearError]);
+  }, [values, memoizedValidationRules, setError, clearError]);
 
   // Validate all fields
   const validateAllFields = useCallback((): boolean => {
-    const result = validateForm(values, validationRules);
+    const result = validateForm(values, memoizedValidationRules);
     
     if (!result.isValid) {
       setErrors(result.errors);
@@ -164,7 +167,7 @@ export function useFormValidation({
       clearAllErrors();
       return true;
     }
-  }, [values, validationRules, clearAllErrors]);
+  }, [values, memoizedValidationRules, clearAllErrors]);
 
   // Handle input change
   const handleChange = useCallback((field: string) => {
@@ -197,7 +200,7 @@ export function useFormValidation({
       e.preventDefault();
       
       // Mark all fields as touched
-      const allFieldsTouched = Object.keys(validationRules).reduce((acc, field) => {
+      const allFieldsTouched = Object.keys(memoizedValidationRules).reduce((acc, field) => {
         acc[field] = true;
         return acc;
       }, {} as Record<string, boolean>);
@@ -218,7 +221,7 @@ export function useFormValidation({
         setIsSubmitting(false);
       }
     };
-  }, [values, validationRules, validateAllFields]);
+  }, [values, memoizedValidationRules, validateAllFields]);
 
   // Reset form
   const reset = useCallback((newInitialValues?: Record<string, string>) => {

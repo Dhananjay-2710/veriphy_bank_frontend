@@ -49,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // User exists in Supabase Auth - fetch their profile from database
         const profile = await fetchProfile(authData.user);
         setUser(profile);
+        setLoading(false);
         return profile;
       }
 
@@ -116,15 +117,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Store user in localStorage for persistence
         localStorage.setItem('veriphy_user', JSON.stringify(profile));
         setUser(profile);
+        setLoading(false);
         return profile;
       }
 
       throw new Error("Login failed. Please check your email and password.");
     } catch (error) {
       console.error("Login error:", error);
-      throw error;
-    } finally {
+      // Clear any stored user data on error
+      localStorage.removeItem('veriphy_user');
+      setUser(null);
       setLoading(false);
+      throw error;
     }
   };
 
