@@ -21,6 +21,7 @@ import { ApprovalQueue } from './components/Approval/ApprovalQueue';
 import { ApprovalQueuePage } from './components/Approval/ApprovalQueuePage';
 import { SystemHealthMonitor } from './components/System/SystemHealthMonitor';
 import { AuditLogs } from './components/Audit/AuditLogs';
+import { AuditLogs as AdminAuditLogs } from './components/Admin/AuditLogs';
 import { CommunicatorPage } from './components/Communicator/CommunicatorPage';
 import { CasesListPage } from './components/Cases/CasesListPage';
 import { DocumentManager } from './components/Documents/DocumentManager';
@@ -317,6 +318,11 @@ function AuditLogsWrapper() {
   return <AuditLogs onBack={() => navigateDirect('/')} />;
 }
 
+function AdminAuditLogsWrapper() {
+  const { navigateDirect } = useNavigation();
+  return <AdminAuditLogs onBack={() => navigateDirect('/')} />;
+}
+
 function AnalyticsWrapper() {
   const { navigateDirect } = useNavigation();
   return <Analytics onBack={() => navigateDirect('/')} />;
@@ -567,7 +573,7 @@ function App() {
           path="/audit-logs"
           element={
             <DashboardLayout>
-              <AuditLogsWrapper />
+              <AdminAuditLogsWrapper />
             </DashboardLayout>
           }
         />
