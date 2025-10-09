@@ -18,7 +18,8 @@ import {
   RefreshCw,
   UserCheck,
   UserX,
-  Download
+  Download,
+  ArrowLeft
 } from 'lucide-react';
 import { Card, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -33,6 +34,7 @@ interface User {
   email_verified_at?: string;
   remember_token?: string;
   department_id?: number;
+  department_name?: string;
   employment_type_id?: number;
   organization_id?: number;
   status: string;
@@ -78,7 +80,11 @@ const USER_ROLES = [
   'auditor'
 ];
 
-export function AdvancedUserManagement() {
+interface AdvancedUserManagementProps {
+  onBack?: () => void;
+}
+
+export function AdvancedUserManagement({ onBack }: AdvancedUserManagementProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
@@ -103,7 +109,23 @@ export function AdvancedUserManagement() {
     try {
       setLoading(true);
       setError(null);
-      const usersData = await SupabaseDatabaseService.getUsers();
+      
+      // Fetch both users and departments in parallel
+      const [usersData, departmentsData] = await Promise.all([
+        SupabaseDatabaseService.getUsers(),
+        SupabaseDatabaseService.getDepartments()
+      ]);
+      
+      // Create a map of department IDs to department names for quick lookup
+      const departmentMap = new Map();
+      departmentsData.forEach((dept: any) => {
+        // Handle both string and numeric IDs
+        departmentMap.set(dept.id, dept.name);
+        departmentMap.set(parseInt(dept.id), dept.name);
+      });
+      
+      console.log('🔍 Department mapping created:', Array.from(departmentMap.entries()));
+      console.log('🔍 Sample departments data:', departmentsData.slice(0, 3));
       
       // Map the data to match our User interface
       const mappedUsers = usersData.map((user: any) => ({
@@ -114,6 +136,7 @@ export function AdvancedUserManagement() {
         email_verified_at: user.email_verified_at || user.emailVerifiedAt,
         remember_token: user.remember_token || user.rememberToken,
         department_id: user.department_id || user.departmentId,
+        department_name: departmentMap.get(user.department_id || user.departmentId) || departmentMap.get(parseInt(user.department_id || user.departmentId)) || 'No Department',
         employment_type_id: user.employment_type_id || user.employmentTypeId,
         organization_id: user.organization_id || user.organizationId,
         status: user.status,
@@ -130,6 +153,15 @@ export function AdvancedUserManagement() {
         is_active: user.is_active !== undefined ? user.is_active : (user.isActive !== undefined ? user.isActive : true),
         last_login_at: user.last_login_at || user.lastLoginAt
       }));
+      
+      console.log('👥 Users with department names mapped:', mappedUsers.map(u => ({
+        name: u.full_name,
+        dept_id: u.department_id,
+        dept_id_type: typeof u.department_id,
+        dept_name: u.department_name
+      })));
+      
+      console.log('🔍 Sample user data from database:', usersData.slice(0, 3));
       
       setUsers(mappedUsers);
       
@@ -379,7 +411,7 @@ export function AdvancedUserManagement() {
             <p className="text-lg font-semibold">Error Loading Users</p>
             <p className="text-sm text-gray-600 mt-2">{error}</p>
           </div>
-          <Button onClick={refetch}>
+          <Button onClick={refetch} style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Retry
           </Button>
@@ -392,16 +424,21 @@ export function AdvancedUserManagement() {
     <div className="space-y-6">
       {/* Header */}
       <div className="relative flex items-center justify-between">
+        {onBack && (
+          <Button variant="outline" onClick={onBack} className="dashboard-back-button flex items-center" style={{ background: '#ffffff', color: '#374151' }}>
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back
+          </Button>
+        )}
         <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
           <h1 className="text-2xl font-bold text-white">User Management</h1>
           <p className="text-gray-300">Manage users, roles, and permissions</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={refetch}>
+          <Button variant="outline" onClick={refetch} style={{ background: '#ffffff', color: '#374151' }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" style={{ background: '#ffffff', color: '#374151' }}>
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
@@ -634,7 +671,7 @@ export function AdvancedUserManagement() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {user.department_id ? `Dept ${user.department_id}` : 'Not assigned'}
+                      {user.department_name || 'Not assigned'}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(user.status)}`}>

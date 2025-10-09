@@ -8,7 +8,8 @@ import {
   FileType,
   FileText,
   Link,
-  RefreshCw
+  RefreshCw,
+  Users
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -21,6 +22,7 @@ import { SubProductsManagement } from '../Admin/SubProductsManagement';
 import { DocumentTypesManagement } from '../Admin/DocumentTypesManagement';
 import { DocumentsManagement } from '../Admin/DocumentsManagement';
 import { ProductDocumentMapping } from '../Admin/ProductDocumentMapping';
+import { AdvancedUserManagement } from '../Admin/AdvancedUserManagement';
 
 interface AdminDashboardProps {
   onNavigateToUserManagement?: () => void;
@@ -29,7 +31,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({}: AdminDashboardProps) {
-  const [activeView, setActiveView] = useState<'overview' | 'departments' | 'roles' | 'permissions' | 'products' | 'sub-products' | 'document-types' | 'documents' | 'product-document-mapping'>('overview');
+  const [activeView, setActiveView] = useState<'overview' | 'users' | 'departments' | 'roles' | 'permissions' | 'products' | 'sub-products' | 'document-types' | 'documents' | 'product-document-mapping'>('overview');
   const { user } = useAuth();
   
   const handleBackToOverview = () => {
@@ -37,6 +39,10 @@ export function AdminDashboard({}: AdminDashboardProps) {
   };
 
   // Show specific management views
+  if (activeView === 'users') {
+    return <AdvancedUserManagement onBack={handleBackToOverview} />;
+  }
+
   if (activeView === 'departments') {
     return <DepartmentManagement onBack={handleBackToOverview} />;
   }
@@ -75,7 +81,7 @@ export function AdminDashboard({}: AdminDashboardProps) {
       <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
           <h1 className="text-xl sm:text-2xl font-bold text-white">Admin Dashboard</h1>
-          <p className="text-sm sm:text-base text-gray-300 mt-1">Manage departments, roles, permissions, products, sub-products, documents, and mappings</p>
+          <p className="text-sm sm:text-base text-gray-300 mt-1">Manage users, departments, roles, permissions, products, sub-products, documents, and mappings</p>
         </div>
         <div className="flex space-x-3">
           <Button variant="outline" onClick={() => window.location.reload()} className="w-full sm:w-auto" style={{ background: '#ffffff', color: '#374151' }}>
@@ -87,10 +93,24 @@ export function AdminDashboard({}: AdminDashboardProps) {
 
       {/* Management Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveView('departments')}>
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveView('users')}>
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-center">
               <div className="p-2 sm:p-3 rounded-lg bg-blue-100 text-blue-600">
+                <Users className="h-5 w-5 sm:h-6 sm:w-6" />
+              </div>
+              <div className="ml-3 sm:ml-4">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">User Management</h3>
+                <p className="text-xs sm:text-sm text-gray-600">Manage users, roles, and permissions across the organization</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveView('departments')}>
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center">
+              <div className="p-2 sm:p-3 rounded-lg bg-indigo-100 text-indigo-600">
                 <Building2 className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
               <div className="ml-3 sm:ml-4">
@@ -207,6 +227,14 @@ export function AdminDashboard({}: AdminDashboardProps) {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Button 
+              variant="outline" 
+              className="h-20 flex-col"
+              onClick={() => setActiveView('users')}
+            >
+              <Users className="h-6 w-6 mb-2" />
+              <span className="text-sm">Manage Users</span>
+            </Button>
             <Button 
               variant="outline" 
               className="h-20 flex-col"

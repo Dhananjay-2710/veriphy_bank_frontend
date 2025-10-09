@@ -29,6 +29,7 @@ import { ComplianceReview } from './components/Compliance/ComplianceReview';
 import { PendingReviews } from './components/Reviews/PendingReviews';
 import { AdminDashboard } from './components/Dashboard/AdminDashboard';
 import { UserManagement } from './components/Admin/UserManagement';
+import { AdvancedUserManagement } from './components/Admin/AdvancedUserManagement';
 import { SystemSettings } from './components/Admin/SystemSettings';
 import { Analytics } from './components/Admin/Analytics';
 import { DepartmentManagement } from './components/Admin/DepartmentManagement';
@@ -893,6 +894,15 @@ function App() {
                   element={
                     <DashboardLayout>
                       <ProductDocumentMapping onBack={() => window.history.back()} />
+                    </DashboardLayout>
+                  }
+                />
+                
+                <Route
+                  path="/admin/user-management"
+                  element={
+                    <DashboardLayout>
+                      <AdvancedUserManagement onBack={() => window.history.back()} />
                     </DashboardLayout>
                   }
                 />

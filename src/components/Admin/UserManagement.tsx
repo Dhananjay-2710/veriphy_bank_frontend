@@ -16,6 +16,7 @@ interface User {
   emailVerifiedAt?: string;
   rememberToken?: string;
   departmentId?: number;
+  departmentName?: string;
   employmentTypeId?: number;
   organizationId?: number;
   status: string;
@@ -51,8 +52,36 @@ export function UserManagement({ onBack }: UserManagementProps) {
     setLoading(true);
     setError(null);
     try {
-      const fetchedUsers = await SupabaseDatabaseService.getUsers();
-      setUsers(fetchedUsers);
+      // Fetch both users and departments in parallel
+      const [fetchedUsers, departmentsData] = await Promise.all([
+        SupabaseDatabaseService.getUsers(),
+        SupabaseDatabaseService.getDepartments()
+      ]);
+      
+      // Create a map of department IDs to department names for quick lookup
+      const departmentMap = new Map();
+      departmentsData.forEach((dept: any) => {
+        // Handle both string and numeric IDs
+        departmentMap.set(dept.id, dept.name);
+        departmentMap.set(parseInt(dept.id), dept.name);
+      });
+      
+      console.log('🔍 Department mapping created:', Array.from(departmentMap.entries()));
+      console.log('🔍 Sample departments data:', departmentsData.slice(0, 3));
+      
+      // Map users with department names
+      const usersWithDepartmentNames = fetchedUsers.map((user: any) => ({
+        ...user,
+        departmentName: departmentMap.get(user.departmentId) || departmentMap.get(parseInt(user.departmentId)) || 'No Department'
+      }));
+      
+      console.log('👥 Users with department names mapped:', usersWithDepartmentNames.map(u => ({
+        name: u.fullName,
+        dept_id: u.departmentId,
+        dept_name: u.departmentName
+      })));
+      
+      setUsers(usersWithDepartmentNames);
       
       // Log user management view for audit purposes
       try {
@@ -260,7 +289,7 @@ export function UserManagement({ onBack }: UserManagementProps) {
                   <p><strong>Email:</strong> {user.email}</p>
                   <p><strong>Mobile:</strong> {user.mobile || 'N/A'}</p>
                   <p><strong>Phone:</strong> {user.phone || 'N/A'}</p>
-                  <p><strong>Department ID:</strong> {user.departmentId || 'N/A'}</p>
+                  <p><strong>Department:</strong> {user.departmentName || 'Not assigned'}</p>
                   <p><strong>Organization ID:</strong> {user.organizationId || 'N/A'}</p>
                   <p><strong>Status:</strong> {user.status}</p>
                   <p><strong>Created:</strong> {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</p>

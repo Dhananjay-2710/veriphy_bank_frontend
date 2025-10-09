@@ -181,6 +181,14 @@ export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
               description: 'Admin dashboard overview'
             },
             {
+              id: 'user-management',
+              label: 'User Management',
+              icon: Users,
+              path: '/admin/user-management',
+              roles: ['admin'],
+              description: 'Manage users, roles, and permissions'
+            },
+            {
               id: 'department-management',
               label: 'Department Management',
               icon: Building,
