@@ -181,24 +181,34 @@ export function ProductsManagement({ onBack }: ProductsManagementProps) {
   // Handle form submission
   const onSubmit = async (values: any) => {
     try {
-      // Convert string values to numbers
+      console.log('📝 Form values received:', values);
+      
+      // Convert string values to numbers and map to database service expected format
       const productData = {
-        ...values,
+        name: values.name,
+        code: values.code,
+        description: values.description || '',
+        category: values.category,
         interestRate: parseFloat(values.interestRate),
         minAmount: parseFloat(values.minAmount),
         maxAmount: parseFloat(values.maxAmount),
         minTenure: parseInt(values.minTenure),
         maxTenure: parseInt(values.maxTenure),
-        isActive: values.isActive === 'true'
+        isActive: values.isActive === 'true',
+        metadata: values.metadata ? JSON.parse(values.metadata) : {}
       };
+      
+      console.log('💾 Mapped product data:', productData);
 
       if (editingProduct) {
         // Update existing product
         await SupabaseDatabaseService.updateProduct(editingProduct.id, productData);
+        console.log('✅ Product updated successfully');
         setEditingProduct(null);
       } else {
         // Create new product
-        await SupabaseDatabaseService.createProduct(productData);
+        const result = await SupabaseDatabaseService.createProduct(productData);
+        console.log('✅ Product created successfully:', result);
       }
       
       resetProductForm();
@@ -215,17 +225,21 @@ export function ProductsManagement({ onBack }: ProductsManagementProps) {
     setEditingProduct(product);
     setShowCreateForm(true);
     
-    // Pre-populate form with existing data
-    handleProductChange({ target: { name: 'name', value: product.name } } as any);
-    handleProductChange({ target: { name: 'code', value: product.code } } as any);
-    handleProductChange({ target: { name: 'description', value: product.description || '' } } as any);
-    handleProductChange({ target: { name: 'category', value: product.category } } as any);
-    handleProductChange({ target: { name: 'interestRate', value: product.interestRate.toString() } } as any);
-    handleProductChange({ target: { name: 'minAmount', value: product.minAmount.toString() } } as any);
-    handleProductChange({ target: { name: 'maxAmount', value: product.maxAmount.toString() } } as any);
-    handleProductChange({ target: { name: 'minTenure', value: product.minTenure.toString() } } as any);
-    handleProductChange({ target: { name: 'maxTenure', value: product.maxTenure.toString() } } as any);
-    handleProductChange({ target: { name: 'isActive', value: product.isActive.toString() } } as any);
+    // Pre-populate form with existing data using reset
+    resetProductForm({
+      name: product.name || '',
+      code: product.code || '',
+      description: product.description || '',
+      category: product.category || 'personal_loan',
+      interestRate: product.interestRate?.toString() || '0',
+      minAmount: product.minAmount?.toString() || '0',
+      maxAmount: product.maxAmount?.toString() || '0',
+      minTenure: product.minTenure?.toString() || '1',
+      maxTenure: product.maxTenure?.toString() || '12',
+      isActive: product.isActive ? 'true' : 'false'
+    });
+    
+    console.log('📝 Editing product:', product);
   };
 
   // Handle delete

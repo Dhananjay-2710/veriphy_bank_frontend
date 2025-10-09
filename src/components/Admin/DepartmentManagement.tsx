@@ -162,20 +162,38 @@ export function DepartmentManagement({ onBack }: DepartmentManagementProps) {
   // Handle form submission
   const onSubmit = async (values: any) => {
     try {
+      console.log('📝 Form values received:', values);
+      
+      // Map form values to database service expected format (camelCase)
+      const departmentData = {
+        name: values.name,
+        code: values.code,
+        description: values.description || '',
+        departmentType: values.department_type,
+        parentDepartmentId: values.parent_department_id || undefined,
+        managerId: values.manager_id || undefined,
+        organizationId: values.organization_id,
+        isActive: values.is_active === 'true'
+      };
+      
+      console.log('💾 Mapped department data:', departmentData);
+      
       if (editingDept) {
         // Update existing department
-        await SupabaseDatabaseService.updateDepartment(editingDept.id, values);
+        await SupabaseDatabaseService.updateDepartment(editingDept.id, departmentData);
+        console.log('✅ Department updated successfully');
         setEditingDept(null);
       } else {
         // Create new department
-        await SupabaseDatabaseService.createDepartment(values);
+        const result = await SupabaseDatabaseService.createDepartment(departmentData);
+        console.log('✅ Department created successfully:', result);
       }
       
       resetDeptForm();
       setShowCreateForm(false);
       await loadData();
     } catch (err: any) {
-      console.error('Error saving department:', err);
+      console.error('❌ Error saving department:', err);
       setError(err.message || 'Failed to save department');
     }
   };
@@ -184,12 +202,21 @@ export function DepartmentManagement({ onBack }: DepartmentManagementProps) {
   const handleEdit = (dept: Department) => {
     setEditingDept(dept);
     setShowCreateForm(true);
-    // Pre-populate form with existing data
-    Object.keys(deptData).forEach(key => {
-      if (dept[key as keyof Department]) {
-        handleDeptChange({ target: { name: key, value: dept[key as keyof Department] } } as any);
-      }
+    
+    // Pre-populate form with existing data using reset
+    resetDeptForm({
+      name: dept.name || '',
+      code: dept.code || '',
+      description: dept.description || '',
+      organization_id: dept.organization_id?.toString() || '',
+      department_type: dept.department_type || 'sales',
+      parent_department_id: dept.parent_department_id?.toString() || '',
+      manager_id: dept.manager_id?.toString() || '',
+      is_active: dept.is_active ? 'true' : 'false',
+      metadata: dept.metadata ? JSON.stringify(dept.metadata) : ''
     });
+    
+    console.log('📝 Editing department:', dept);
   };
 
   // Handle delete

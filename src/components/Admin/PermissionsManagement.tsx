@@ -135,20 +135,35 @@ export function PermissionsManagement({ onBack }: PermissionsManagementProps) {
   // Handle form submission
   const onSubmit = async (values: any) => {
     try {
+      console.log('📝 Form values received:', values);
+      
+      // Map form values to database service expected format (camelCase)
+      const permissionData = {
+        name: values.name,
+        resource: values.resource,
+        action: values.action,
+        description: values.description || '',
+        isActive: values.is_active === 'true'
+      };
+      
+      console.log('💾 Mapped permission data:', permissionData);
+      
       if (editingPermission) {
         // Update existing permission
-        await SupabaseDatabaseService.updatePermission(editingPermission.id, values);
+        await SupabaseDatabaseService.updatePermission(editingPermission.id, permissionData);
+        console.log('✅ Permission updated successfully');
         setEditingPermission(null);
       } else {
         // Create new permission
-        await SupabaseDatabaseService.createPermission(values);
+        const result = await SupabaseDatabaseService.createPermission(permissionData);
+        console.log('✅ Permission created successfully:', result);
       }
       
       resetPermissionForm();
       setShowCreateForm(false);
       await loadData();
     } catch (err: any) {
-      console.error('Error saving permission:', err);
+      console.error('❌ Error saving permission:', err);
       setError(err.message || 'Failed to save permission');
     }
   };
@@ -158,12 +173,16 @@ export function PermissionsManagement({ onBack }: PermissionsManagementProps) {
     setEditingPermission(permission);
     setShowCreateForm(true);
     
-    // Pre-populate form with existing data
-    Object.keys(permissionData).forEach(key => {
-      if (permission[key as keyof Permission]) {
-        handlePermissionChange({ target: { name: key, value: permission[key as keyof Permission] } } as any);
-      }
+    // Pre-populate form with existing data using reset
+    resetPermissionForm({
+      name: permission.name || '',
+      resource: permission.resource || '',
+      action: permission.action || '',
+      description: permission.description || '',
+      is_active: permission.isActive ? 'true' : 'false'
     });
+    
+    console.log('📝 Editing permission:', permission);
   };
 
   // Handle delete

@@ -148,17 +148,27 @@ export function SubProductsManagement({ onBack }: SubProductsManagementProps) {
   // Handle form submission
   const onSubmit = async (values: any) => {
     try {
+      console.log('📝 Form values received:', values);
+      
       const subProductData = {
-        ...values,
+        name: values.name,
+        code: values.code,
+        description: values.description || '',
+        productId: values.productId,
+        status: values.status,
         organizationId: 1 // Assuming organization ID 1
       };
+      
+      console.log('💾 Mapped sub-product data:', subProductData);
 
       if (editingSubProduct) {
         // Update existing sub-product
         await SupabaseDatabaseService.updateSubProduct(editingSubProduct.id, subProductData);
+        console.log('✅ Sub-product updated successfully');
       } else {
         // Create new sub-product
-        await SupabaseDatabaseService.createSubProduct(subProductData);
+        const result = await SupabaseDatabaseService.createSubProduct(subProductData);
+        console.log('✅ Sub-product created successfully:', result);
       }
       
       resetSubProductForm();
@@ -176,12 +186,16 @@ export function SubProductsManagement({ onBack }: SubProductsManagementProps) {
     setEditingSubProduct(subProduct);
     setShowCreateForm(true);
     
-    // Pre-populate form
-    handleSubProductChange({ target: { name: 'name', value: subProduct.name } } as any);
-    handleSubProductChange({ target: { name: 'code', value: subProduct.code } } as any);
-    handleSubProductChange({ target: { name: 'description', value: subProduct.description || '' } } as any);
-    handleSubProductChange({ target: { name: 'productId', value: subProduct.productId } } as any);
-    handleSubProductChange({ target: { name: 'status', value: subProduct.status } } as any);
+    // Pre-populate form with existing data using reset
+    resetSubProductForm({
+      name: subProduct.name || '',
+      code: subProduct.code || '',
+      description: subProduct.description || '',
+      productId: subProduct.productId || '',
+      status: subProduct.status || 'active'
+    });
+    
+    console.log('📝 Editing sub-product:', subProduct);
   };
 
   // Handle delete

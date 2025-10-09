@@ -154,9 +154,22 @@ export function RolesManagement({ onBack }: RolesManagementProps) {
   // Handle form submission
   const onSubmit = async (values: any) => {
     try {
+      console.log('📝 Form values received:', values);
+      
+      // Map form values to database service expected format (camelCase)
+      const roleData = {
+        name: values.name,
+        description: values.description || '',
+        permissions: selectedPermissions,
+        isActive: values.is_active === 'true'
+      };
+      
+      console.log('💾 Mapped role data:', roleData);
+      
       if (editingRole) {
         // Update existing role
-        await SupabaseDatabaseService.updateRole(editingRole.id, values);
+        await SupabaseDatabaseService.updateRole(editingRole.id, roleData);
+        console.log('✅ Role updated successfully');
         
         // Update role permissions (simplified - just log for now)
         console.log('Updating role permissions for role:', editingRole.id, 'with permissions:', selectedPermissions);
@@ -164,7 +177,8 @@ export function RolesManagement({ onBack }: RolesManagementProps) {
         setEditingRole(null);
       } else {
         // Create new role
-        const newRole = await SupabaseDatabaseService.createRole(values);
+        const newRole = await SupabaseDatabaseService.createRole(roleData);
+        console.log('✅ Role created successfully:', newRole);
         
         // Assign permissions to new role (simplified - just log for now)
         console.log('Assigning permissions to new role:', newRole.id, 'with permissions:', selectedPermissions);
@@ -186,12 +200,14 @@ export function RolesManagement({ onBack }: RolesManagementProps) {
     setShowCreateForm(true);
     setSelectedPermissions(role.permissions?.map(p => p.id) || []);
     
-    // Pre-populate form with existing data
-    Object.keys(roleData).forEach(key => {
-      if (role[key as keyof Role]) {
-        handleRoleChange({ target: { name: key, value: role[key as keyof Role] } } as any);
-      }
+    // Pre-populate form with existing data using reset
+    resetRoleForm({
+      name: role.name || '',
+      description: role.description || '',
+      is_active: role.is_active ? 'true' : 'false'
     });
+    
+    console.log('📝 Editing role:', role);
   };
 
   // Handle delete

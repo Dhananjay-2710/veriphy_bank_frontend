@@ -21,6 +21,12 @@ export function UserManagementModal({ isOpen, onClose, user }: UserManagementMod
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  
+  // Dropdown data states
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [employmentTypes, setEmploymentTypes] = useState<any[]>([]);
+  const [loadingDropdowns, setLoadingDropdowns] = useState(true);
 
   const isEditing = !!user;
 
@@ -56,13 +62,41 @@ export function UserManagementModal({ isOpen, onClose, user }: UserManagementMod
     }
   });
 
+  // Fetch dropdown data when modal opens
   useEffect(() => {
     if (isOpen) {
+      fetchDropdownData();
       resetForm();
       setError(null);
       setSuccess(null);
     }
   }, [isOpen, user]);
+
+  const fetchDropdownData = async () => {
+    setLoadingDropdowns(true);
+    try {
+      const [orgsData, deptsData, empTypesData] = await Promise.all([
+        SupabaseDatabaseService.getOrganizations(),
+        SupabaseDatabaseService.getDepartments(),
+        SupabaseDatabaseService.getEmploymentTypes()
+      ]);
+      
+      setOrganizations(orgsData || []);
+      setDepartments(deptsData || []);
+      setEmploymentTypes(empTypesData || []);
+      
+      console.log('📋 Dropdown data loaded:', {
+        organizations: orgsData?.length,
+        departments: deptsData?.length,
+        employmentTypes: empTypesData?.length
+      });
+    } catch (err) {
+      console.error('Error fetching dropdown data:', err);
+      setError('Failed to load dropdown options');
+    } finally {
+      setLoadingDropdowns(false);
+    }
+  };
 
   const handleClose = () => {
     if (!loading) {
@@ -75,7 +109,7 @@ export function UserManagementModal({ isOpen, onClose, user }: UserManagementMod
     
     // Check if form is valid
     if (!isValid) {
-      setError('Please fix validation errors');
+      setError('Please fix validation errors before submitting');
       return;
     }
 
@@ -100,11 +134,19 @@ export function UserManagementModal({ isOpen, onClose, user }: UserManagementMod
         status: values.status
       };
 
+      console.log('💾 Submitting user data:', {
+        action: isEditing ? 'UPDATE' : 'CREATE',
+        userId: user?.id,
+        userData
+      });
+
       if (isEditing) {
         await SupabaseDatabaseService.updateUser(user.id, userData);
+        console.log('✅ User updated successfully:', user.id);
         setSuccess('User updated successfully!');
       } else {
-        await SupabaseDatabaseService.createUser(userData);
+        const createdUser = await SupabaseDatabaseService.createUser(userData);
+        console.log('✅ User created successfully:', createdUser);
         setSuccess('User created successfully!');
       }
 
@@ -112,8 +154,9 @@ export function UserManagementModal({ isOpen, onClose, user }: UserManagementMod
         handleClose();
       }, 1500);
     } catch (err: any) {
-      console.error('Error saving user:', err);
-      setError(err.message || 'Failed to save user');
+      console.error('❌ Error saving user:', err);
+      const errorMessage = err.message || 'Failed to save user. Please check your input and try again.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -142,6 +185,16 @@ export function UserManagementModal({ isOpen, onClose, user }: UserManagementMod
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Loading Dropdowns Indicator */}
+          {loadingDropdowns && (
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                <p className="text-sm text-blue-800">Loading form options...</p>
+              </div>
+            </div>
+          )}
+
           {/* Error/Success Messages */}
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-md p-4">
@@ -253,31 +306,49 @@ export function UserManagementModal({ isOpen, onClose, user }: UserManagementMod
           required
                 />
 
-                <ValidatedInput
-                  label="Department ID"
-                  name="departmentId"
-                  type="number"
-                  value={values.departmentId}
-                  onChange={(e) => setValue('departmentId', e.target.value)}
-                  placeholder="Department ID"
-                />
-
-                <ValidatedInput
-                  label="Organization ID"
+                <ValidatedSelect
+                  label="Organization"
                   name="organizationId"
-                  type="number"
                   value={values.organizationId}
                   onChange={(e) => setValue('organizationId', e.target.value)}
-                  placeholder="Organization ID"
+                  options={[
+                    { value: '', label: 'Select Organization' },
+                    ...organizations.map(org => ({
+                      value: org.id.toString(),
+                      label: org.name
+                    }))
+                  ]}
+                  disabled={loadingDropdowns}
                 />
 
-                <ValidatedInput
-                  label="Employment Type ID"
+                <ValidatedSelect
+                  label="Department"
+                  name="departmentId"
+                  value={values.departmentId}
+                  onChange={(e) => setValue('departmentId', e.target.value)}
+                  options={[
+                    { value: '', label: 'Select Department' },
+                    ...departments.map(dept => ({
+                      value: dept.id.toString(),
+                      label: dept.name
+                    }))
+                  ]}
+                  disabled={loadingDropdowns}
+                />
+
+                <ValidatedSelect
+                  label="Employment Type"
                   name="employmentTypeId"
-                  type="number"
                   value={values.employmentTypeId}
                   onChange={(e) => setValue('employmentTypeId', e.target.value)}
-                  placeholder="Employment Type ID"
+                  options={[
+                    { value: '', label: 'Select Employment Type' },
+                    ...employmentTypes.map(empType => ({
+                      value: empType.id.toString(),
+                      label: empType.name
+                    }))
+                  ]}
+                  disabled={loadingDropdowns}
         />
 
         <ValidatedSelect
@@ -308,21 +379,26 @@ export function UserManagementModal({ isOpen, onClose, user }: UserManagementMod
           </Card>
 
           {/* Security */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Security</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <ValidatedInput
-                label="Password Hash"
-                name="passwordHash"
-                type="password"
-                value={values.passwordHash}
-                onChange={(e) => setValue('passwordHash', e.target.value)}
-                placeholder="Enter password hash"
-              />
-            </CardContent>
-          </Card>
+          {!isEditing && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Security</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <ValidatedInput
+                  label="Password"
+                  name="passwordHash"
+                  type="password"
+                  value={values.passwordHash}
+                  onChange={(e) => setValue('passwordHash', e.target.value)}
+                  placeholder="Enter initial password (optional - defaults to 'default123')"
+                />
+                <p className="text-sm text-gray-500">
+                  💡 Leave blank to use default password. User will be prompted to change on first login.
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Validation Summary */}
           <ValidationSummary errors={errors} />
@@ -333,15 +409,15 @@ export function UserManagementModal({ isOpen, onClose, user }: UserManagementMod
               type="button"
               variant="outline"
               onClick={handleClose}
-              disabled={loading}
+              disabled={loading || loadingDropdowns}
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={loading || !isValid}
+              disabled={loading || !isValid || loadingDropdowns}
             >
-              {loading ? 'Saving...' : (isEditing ? 'Update User' : 'Create User')}
+              {loading ? 'Saving...' : loadingDropdowns ? 'Loading...' : (isEditing ? 'Update User' : 'Create User')}
             </Button>
           </div>
         </form>
