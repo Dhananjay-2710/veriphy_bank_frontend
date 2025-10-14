@@ -24,7 +24,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../contexts/AuthContextFixed';
-import { useDashboardStats, useCases, useTeamMembers } from '../../hooks/useDashboardData';
+import { useDashboardStats, useCases, useTeamMembers, useCustomers } from '../../hooks/useDashboardData';
 import { SupabaseDatabaseService } from '../../services/supabase-database';
 import { CaseAssignmentModal } from '../modals/CaseAssignmentModal';
 
@@ -45,12 +45,12 @@ export function ManagerDashboard({
   const [teamData, setTeamData] = useState<any[]>([]);
   const [teamStats, setTeamStats] = useState<any>({});
   const [highPriorityCases, setHighPriorityCases] = useState<any[]>([]);
-  const [loadingTeam, setLoadingTeam] = useState(false);
   const [assigningCase, setAssigningCase] = useState<string | null>(null);
   const [showCreateCase, setShowCreateCase] = useState(false);
   const [editingCase, setEditingCase] = useState<string | null>(null);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [selectedCaseForAssignment, setSelectedCaseForAssignment] = useState<any>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [newCase, setNewCase] = useState({
     title: '',
     description: '',
@@ -60,6 +60,12 @@ export function ManagerDashboard({
     loanAmount: 0,
     customerId: ''
   });
+
+  // Toast notification helper
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
   
   // Get real data from Supabase
   const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useDashboardStats(user?.id || '', user?.role || '');
@@ -68,86 +74,75 @@ export function ManagerDashboard({
     showAll: true,
     organizationId: user?.organizationId
   });
-  const { teamMembers, loading: teamLoading, error: teamError, refetch: refetchTeam } = useTeamMembers();
+  const { teamMembers, loading: teamLoading, error: teamError, refetch: refetchTeam } = useTeamMembers(user?.organizationId);
+  const { customers, loading: customersLoading } = useCustomers({ 
+    organizationId: user?.organizationId?.toString() 
+  });
 
-  // Fetch team performance data
-  const fetchTeamData = useCallback(async () => {
-    if (!user?.organizationId) return;
-    
-    setLoadingTeam(true);
-    try {
-      // Get all team members in the organization
-      const teamUsers = await SupabaseDatabaseService.getUsers(user.organizationId);
-      const salesTeam = teamUsers.filter(u => u.role === 'salesperson');
+  // Calculate team stats from team members data
+  useEffect(() => {
+    if (teamMembers.length > 0) {
+      // Filter to only include salespersons and active team members
+      const salesTeam = teamMembers.filter(m => m.role === 'salesperson' || m.role === 'credit-ops');
       
-      // Get cases for each team member
-      const teamWithCases = await Promise.all(
-        salesTeam.map(async (member) => {
-          const memberCases = await SupabaseDatabaseService.getCasesWithDetails({
-            organizationId: user.organizationId,
-            assignedTo: member.id
-          });
-          
-          return {
-            ...member,
-            activeCases: memberCases.filter(c => c.status === 'in-progress').length,
-            completedCases: memberCases.filter(c => c.status === 'approved').length,
-            totalCases: memberCases.length,
-            efficiency: memberCases.length > 0 ? 
-              Math.round((memberCases.filter(c => c.status === 'approved').length / memberCases.length) * 100) : 0,
-            status: memberCases.filter(c => c.status === 'in-progress').length > 5 ? 'busy' : 
-                   memberCases.filter(c => c.status === 'in-progress').length > 0 ? 'active' : 'available'
-          };
-        })
-      );
-      
-      setTeamData(teamWithCases);
+      setTeamData(salesTeam.map(member => ({
+        ...member,
+        activeCases: member.cases || 0,
+        completedCases: member.completedCases || 0,
+        totalCases: member.totalCases || 0,
+        efficiency: member.efficiency || 0,
+        status: (member.cases || 0) > 5 ? 'busy' : 
+               (member.cases || 0) > 0 ? 'active' : 'available'
+      })));
       
       // Calculate team stats
-      const totalActiveCases = teamWithCases.reduce((sum, member) => sum + member.activeCases, 0);
-      const totalCompleted = teamWithCases.reduce((sum, member) => sum + member.completedCases, 0);
-      const avgEfficiency = teamWithCases.length > 0 ? 
-        Math.round(teamWithCases.reduce((sum, member) => sum + member.efficiency, 0) / teamWithCases.length) : 0;
+      const totalActiveCases = salesTeam.reduce((sum, member) => sum + (member.cases || 0), 0);
+      const totalCompleted = salesTeam.reduce((sum, member) => sum + (member.completedCases || 0), 0);
+      const avgEfficiency = salesTeam.length > 0 ? 
+        Math.round(salesTeam.reduce((sum, member) => sum + (member.efficiency || 0), 0) / salesTeam.length) : 0;
       
       setTeamStats({
-        totalMembers: teamWithCases.length,
+        totalMembers: salesTeam.length,
         totalActiveCases,
         totalCompleted,
         avgEfficiency,
-        topPerformer: teamWithCases.reduce((top, member) => 
-          member.efficiency > top.efficiency ? member : top, teamWithCases[0] || {})
+        topPerformer: salesTeam.reduce((top, member) => 
+          (member.efficiency || 0) > (top.efficiency || 0) ? member : top, salesTeam[0] || {})
       });
-      
-      // Get high priority cases
-      const allCases = await SupabaseDatabaseService.getCasesWithDetails({
-        organizationId: user.organizationId,
-        priority: 'high'
-      });
-      setHighPriorityCases(allCases.slice(0, 3));
-      
-    } catch (error) {
-      console.error('Error fetching team data:', error);
-    } finally {
-      setLoadingTeam(false);
     }
-  }, [user?.organizationId, user?.id]);
+  }, [teamMembers]);
 
+  // Fetch high priority cases
   useEffect(() => {
-    if (user?.organizationId) {
-      fetchTeamData();
-    }
-  }, [user?.organizationId, fetchTeamData]);
+    const fetchHighPriorityCases = async () => {
+      if (!user?.organizationId) return;
+      
+      try {
+        const allCases = await SupabaseDatabaseService.getCasesWithDetails({
+          organizationId: user.organizationId.toString(),
+          priority: 'high'
+        });
+        setHighPriorityCases(allCases.slice(0, 3));
+      } catch (error) {
+        console.error('Error fetching high priority cases:', error);
+      }
+    };
+
+    fetchHighPriorityCases();
+  }, [user?.organizationId, cases]);
 
   // Handle case assignment to team members
   const handleAssignCase = async (caseId: string, assignToUserId: string) => {
     try {
       setAssigningCase(caseId);
       await SupabaseDatabaseService.assignCaseToUser(caseId, assignToUserId);
+      showToast('Case assigned successfully!', 'success');
       // Refresh cases and team data
       refetchCases();
-      fetchTeamData();
+      refetchTeam();
     } catch (error) {
       console.error('Error assigning case:', error);
+      showToast(error instanceof Error ? error.message : 'Failed to assign case', 'error');
     } finally {
       setAssigningCase(null);
     }
@@ -161,15 +156,16 @@ export function ManagerDashboard({
 
   // Handle assignment modal completion
   const handleAssignmentComplete = () => {
+    showToast('Case assigned successfully!', 'success');
     refetchCases();
-    fetchTeamData();
+    refetchTeam();
   };
 
   // Handle creating a new case
   const handleCreateCase = async () => {
     try {
       if (!user?.organizationId || !newCase.customerId) {
-        alert('Please fill in all required fields');
+        showToast('Please fill in all required fields', 'error');
         return;
       }
 
@@ -185,6 +181,8 @@ export function ManagerDashboard({
         loanAmount: newCase.loanAmount
       });
 
+      showToast('Case created successfully!', 'success');
+
       // Reset form and refresh data
       setNewCase({
         title: '',
@@ -199,7 +197,7 @@ export function ManagerDashboard({
       refetchCases();
     } catch (error) {
       console.error('Error creating case:', error);
-      alert('Failed to create case. Please try again.');
+      showToast(error instanceof Error ? error.message : 'Failed to create case', 'error');
     }
   };
 
@@ -207,11 +205,12 @@ export function ManagerDashboard({
   const handleUpdateCase = async (caseId: string, updates: any) => {
     try {
       await SupabaseDatabaseService.updateCase(caseId, updates);
+      showToast('Case updated successfully!', 'success');
       setEditingCase(null);
       refetchCases();
     } catch (error) {
       console.error('Error updating case:', error);
-      alert('Failed to update case. Please try again.');
+      showToast(error instanceof Error ? error.message : 'Failed to update case', 'error');
     }
   };
 
@@ -220,10 +219,11 @@ export function ManagerDashboard({
     if (window.confirm('Are you sure you want to delete this case?')) {
       try {
         await SupabaseDatabaseService.deleteCase(caseId);
+        showToast('Case deleted successfully!', 'success');
         refetchCases();
       } catch (error) {
         console.error('Error deleting case:', error);
-        alert('Failed to delete case. Please try again.');
+        showToast(error instanceof Error ? error.message : 'Failed to delete case', 'error');
       }
     }
   };
@@ -326,7 +326,7 @@ export function ManagerDashboard({
   };
 
   // Show loading state
-  if (statsLoading || casesLoading || teamLoading || loadingTeam) {
+  if (statsLoading || casesLoading || teamLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -372,7 +372,6 @@ export function ManagerDashboard({
             refetchStats(); 
             refetchCases(); 
             refetchTeam(); 
-            fetchTeamData(); 
           }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
@@ -567,15 +566,24 @@ export function ManagerDashboard({
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Customer ID *
+                  Customer *
                 </label>
-                <input
-                  type="number"
+                <select
                   value={newCase.customerId}
                   onChange={(e) => setNewCase({...newCase, customerId: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter customer ID"
-                />
+                  disabled={customersLoading}
+                >
+                  <option value="">Select a customer</option>
+                  {customers.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.fullName || customer.name} - {customer.email}
+                    </option>
+                  ))}
+                </select>
+                {customersLoading && (
+                  <p className="text-xs text-gray-500 mt-1">Loading customers...</p>
+                )}
               </div>
 
               <div>
@@ -692,6 +700,26 @@ export function ManagerDashboard({
           teamMembers={teamMembers}
           onAssignmentComplete={handleAssignmentComplete}
         />
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-50 animate-slide-up">
+          <div className={`px-6 py-4 rounded-lg shadow-lg ${
+            toast.type === 'success' 
+              ? 'bg-green-600 text-white' 
+              : 'bg-red-600 text-white'
+          }`}>
+            <div className="flex items-center space-x-2">
+              {toast.type === 'success' ? (
+                <CheckCircle className="h-5 w-5" />
+              ) : (
+                <AlertTriangle className="h-5 w-5" />
+              )}
+              <p className="font-medium">{toast.message}</p>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

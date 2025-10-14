@@ -749,6 +749,25 @@ export interface TaskSlaPolicy {
   updatedAt: string;
 }
 
+export interface Team {
+  id: string;
+  name: string;
+  description?: string;
+  organizationId: number;
+  managerId?: number;
+  teamType: 'sales' | 'credit-ops' | 'compliance' | 'support' | 'admin';
+  isActive: boolean;
+  targetCasesPerMonth: number;
+  metadata?: any;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+  // Computed fields
+  memberCount?: number;
+  activeCases?: number;
+  completedCases?: number;
+}
+
 export interface Department {
   id: string;
   name: string;

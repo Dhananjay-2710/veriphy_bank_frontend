@@ -20,10 +20,8 @@ interface Customer {
   organizationId?: string;
   createdAt: string;
   updatedAt: string;
-  phone?: string;
   panNumber?: string;
   aadhaarNumber?: string;
-  dateOfBirth?: string;
   gender?: string;
   maritalStatus?: string;
   employmentType?: string;
@@ -135,7 +133,6 @@ export function CustomerManagement({ onBack }: CustomerManagementProps) {
       customer.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.mobile?.includes(searchTerm) ||
-      customer.phone?.includes(searchTerm) ||
       customer.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.panNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.aadhaarNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -269,11 +266,9 @@ export function CustomerManagement({ onBack }: CustomerManagementProps) {
                   <p><strong>Full Name:</strong> {customer.fullName}</p>
                   <p><strong>Email:</strong> {customer.email || 'N/A'}</p>
                   <p><strong>Mobile:</strong> {customer.mobile || 'N/A'}</p>
-                  <p><strong>Phone:</strong> {customer.phone || 'N/A'}</p>
                   <p><strong>PAN:</strong> {customer.panNumber || 'N/A'}</p>
                   <p><strong>Aadhaar:</strong> {customer.aadhaarNumber || 'N/A'}</p>
                   <p><strong>DOB:</strong> {customer.dob ? new Date(customer.dob).toLocaleDateString() : 'N/A'}</p>
-                  <p><strong>Date of Birth:</strong> {customer.dateOfBirth ? new Date(customer.dateOfBirth).toLocaleDateString() : 'N/A'}</p>
                   <p><strong>Gender:</strong> {customer.gender || 'N/A'}</p>
                   <p><strong>Marital Status:</strong> {customer.maritalStatus || 'N/A'}</p>
                   <p><strong>Employment:</strong> {customer.employmentType || 'N/A'}</p>

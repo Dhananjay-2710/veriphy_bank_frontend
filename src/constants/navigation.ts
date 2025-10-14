@@ -27,7 +27,8 @@ import {
   UserCog,
   Key,
   Package,
-  Link
+  Link,
+  TrendingUp
 } from 'lucide-react';
 
 // =============================================================================
@@ -339,12 +340,36 @@ export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
       description: 'Personal dashboard'
     },
     {
+      id: 'my-customers',
+      label: 'My Customers',
+      icon: Users,
+      path: '/salesperson/customers',
+      roles: ['salesperson'],
+      description: 'Manage assigned customers'
+    },
+    {
       id: 'cases',
       label: 'My Cases',
       icon: FileText,
       path: ROUTES.CASES,
       roles: ['salesperson'],
       description: 'My assigned cases'
+    },
+    {
+      id: 'my-performance',
+      label: 'My Performance',
+      icon: TrendingUp,
+      path: '/salesperson/performance',
+      roles: ['salesperson'],
+      description: 'View performance metrics'
+    },
+    {
+      id: 'my-team',
+      label: 'My Team',
+      icon: UserCheck,
+      path: '/salesperson/team',
+      roles: ['salesperson'],
+      description: 'View team members'
     },
     {
       id: 'document-manager',
@@ -369,14 +394,6 @@ export const NAVIGATION_MENUS: Record<string, NavigationItem[]> = {
       path: ROUTES.WORKLOAD,
       roles: ['salesperson'],
       description: 'Plan and manage workload'
-    },
-    {
-      id: 'workload-management',
-      label: 'Workload Management',
-      icon: Calendar,
-      path: ROUTES.WORKLOAD_MANAGEMENT,
-      roles: ['salesperson'],
-      description: 'Advanced workload management'
     }
   ],
 

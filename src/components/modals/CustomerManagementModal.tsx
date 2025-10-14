@@ -35,21 +35,18 @@ export function CustomerManagementModal({ isOpen, onClose, customer }: CustomerM
     validationRules: {
       fullName: { required: true, message: 'Full name is required' },
       email: VALIDATION_RULES.email,
-      mobile: VALIDATION_RULES.phone,
-      phone: VALIDATION_RULES.phone
+      mobile: VALIDATION_RULES.phone
     },
     initialValues: {
       fullName: customer?.fullName || '',
       email: customer?.email || '',
       mobile: customer?.mobile || '',
-      phone: customer?.phone || '',
       address: customer?.address || '',
       externalCustomerCode: customer?.externalCustomerCode || '',
       kycStatus: customer?.kycStatus || 'pending',
       organizationId: customer?.organizationId?.toString() || '',
       panNumber: customer?.panNumber || '',
       aadhaarNumber: customer?.aadhaarNumber || '',
-      dateOfBirth: customer?.dateOfBirth || '',
       dob: customer?.dob || '',
       gender: customer?.gender || '',
       maritalStatus: customer?.maritalStatus || '',
@@ -91,14 +88,12 @@ export function CustomerManagementModal({ isOpen, onClose, customer }: CustomerM
         fullName: values.fullName,
         email: values.email || undefined,
         mobile: values.mobile || undefined,
-        phone: values.phone || undefined,
         address: values.address || undefined,
         externalCustomerCode: values.externalCustomerCode || undefined,
         kycStatus: values.kycStatus,
         organizationId: values.organizationId ? parseInt(values.organizationId) : undefined,
         panNumber: values.panNumber || undefined,
         aadhaarNumber: values.aadhaarNumber || undefined,
-        dateOfBirth: values.dateOfBirth || undefined,
         dob: values.dob || undefined,
         gender: values.gender || undefined,
         maritalStatus: values.maritalStatus || undefined,
@@ -208,16 +203,6 @@ export function CustomerManagementModal({ isOpen, onClose, customer }: CustomerM
                 />
 
                 <ValidatedInput
-                  label="Phone"
-                  name="phone"
-                  value={values.phone}
-                  onChange={(e) => setValue('phone', e.target.value)}
-                  onBlur={() => validateField('phone')}
-                  error={errors.phone}
-                  placeholder="+91-9999999999"
-                />
-
-                <ValidatedInput
                   label="Address"
                   name="address"
                   value={values.address}
@@ -261,15 +246,6 @@ export function CustomerManagementModal({ isOpen, onClose, customer }: CustomerM
 
                 <ValidatedInput
                   label="Date of Birth"
-                  name="dateOfBirth"
-                  type="date"
-                  value={values.dateOfBirth}
-                  onChange={(e) => setValue('dateOfBirth', e.target.value)}
-                  placeholder="YYYY-MM-DD"
-                />
-
-                <ValidatedInput
-                  label="DOB (Alternative)"
                   name="dob"
                   type="date"
                   value={values.dob}

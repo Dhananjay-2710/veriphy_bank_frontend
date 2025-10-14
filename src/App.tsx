@@ -69,6 +69,11 @@ import { OrganizationManagement } from './components/Admin/OrganizationManagemen
 import { CustomerManagement } from './components/Admin/CustomerManagement';
 import { SuperAdminAuditLogs } from './components/Admin/SuperAdminAuditLogs';
 
+// Salesperson Components
+import { MyCustomers } from './components/Salesperson/MyCustomers';
+import { MyTeam } from './components/Salesperson/MyTeam';
+import { MyPerformance } from './components/Salesperson/MyPerformance';
+
 // Navigation Constants
 import { ROUTES } from './constants/navigation';
 
@@ -327,6 +332,21 @@ function AdminAuditLogsWrapper() {
 function AnalyticsWrapper() {
   const { navigateDirect } = useNavigation();
   return <Analytics onBack={() => navigateDirect('/')} />;
+}
+
+function MyCustomersWrapper() {
+  const { navigateDirect } = useNavigation();
+  return <MyCustomers onBack={() => navigateDirect('/')} />;
+}
+
+function MyTeamWrapper() {
+  const { navigateDirect } = useNavigation();
+  return <MyTeam onBack={() => navigateDirect('/')} />;
+}
+
+function MyPerformanceWrapper() {
+  const { navigateDirect } = useNavigation();
+  return <MyPerformance onBack={() => navigateDirect('/')} />;
 }
 
 function AppContent() {
@@ -1050,6 +1070,39 @@ function App() {
           }
         />
         
+        {/* Salesperson Routes */}
+        <Route
+          path="/salesperson/customers"
+          element={
+            <DashboardLayout>
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <MyCustomersWrapper />
+              </Suspense>
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path="/salesperson/team"
+          element={
+            <DashboardLayout>
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <MyTeamWrapper />
+              </Suspense>
+            </DashboardLayout>
+          }
+        />
+        
+        <Route
+          path="/salesperson/performance"
+          element={
+            <DashboardLayout>
+              <Suspense fallback={<PageLoadingSpinner />}>
+                <MyPerformanceWrapper />
+              </Suspense>
+            </DashboardLayout>
+          }
+        />
 
         {/* Test Routes */}
         </Routes>

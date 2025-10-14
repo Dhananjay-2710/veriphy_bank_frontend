@@ -1,11 +1,31 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Clock, CheckCircle, AlertTriangle, Calendar, Plus, TrendingUp, Target, Award, Users, RefreshCw } from 'lucide-react';
+import { 
+  FileText, 
+  Clock, 
+  CheckCircle, 
+  AlertTriangle, 
+  Calendar, 
+  Plus, 
+  TrendingUp, 
+  Target, 
+  Award, 
+  Users, 
+  RefreshCw,
+  Trophy,
+  UserCheck,
+  Briefcase
+} from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../contexts/AuthContextFixed';
-import { useDashboardStats, useCases } from '../../hooks/useDashboardData';
+import { 
+  useSalespersonStats, 
+  useSalespersonPerformance,
+  useTeamLeaderboard,
+  useCases 
+} from '../../hooks/useDashboardData';
 import { NewCaseForm } from '../Case/NewCaseForm';
 
 interface SalespersonDashboardProps {
@@ -26,14 +46,21 @@ export function SalespersonDashboard({
   const navigate = useNavigate();
   const { user } = useAuth();
   const [showNewCaseForm, setShowNewCaseForm] = useState(false);
-  const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useDashboardStats(user?.id || '', user?.role || '');
+  
+  // Fetch real Supabase data using new hooks
+  const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useSalespersonStats(user?.id?.toString() || '');
+  const { performance, loading: perfLoading, refetch: refetchPerformance } = useSalespersonPerformance(user?.id?.toString() || '');
+  const { leaderboard, loading: leaderboardLoading } = useTeamLeaderboard({
+    organizationId: user?.organization_id,
+    limit: 10
+  });
   const { cases, loading: casesLoading, error: casesError, refetch: refetchCases } = useCases({
-    assignedTo: user?.id,
-    status: 'in-progress'
+    assignedTo: user?.id?.toString(),
+    organizationId: user?.organization_id
   });
 
-  // Show loading state while data is being fetched
-  if (statsLoading) {
+  // Show loading state while initial data is being fetched
+  if (statsLoading && perfLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -43,14 +70,14 @@ export function SalespersonDashboard({
       </div>
     );
   }
+
   const handleStatDoubleClick = (statType: string) => {
     switch (statType) {
       case 'active-cases':
         navigate('/cases');
         break;
       case 'pending-documents':
-        // Navigate to the first active case's document manager
-        if (cases.length > 0) {
+        if (cases && cases.length > 0) {
           navigate(`/document-manager/${cases[0].id}`);
         } else {
           navigate('/document-manager');
@@ -72,23 +99,22 @@ export function SalespersonDashboard({
   };
 
   const handleCustomerDoubleClick = (_customerName: string, _phone: string) => {
-    // Navigate to WhatsApp-style conversation view
     onNavigateToCommunicator();
   };
 
   const handleMetricDoubleClick = (metricType: string) => {
     switch (metricType) {
       case 'monthly-target':
-        onNavigateToCases();
+        navigate('/salesperson/performance');
         break;
       case 'conversion-rate':
-        onNavigateToCases();
+        navigate('/salesperson/performance');
         break;
       case 'customer-satisfaction':
-        onNavigateToCommunicator();
+        navigate('/salesperson/customers');
         break;
       case 'team-ranking':
-        onNavigateToCases();
+        navigate('/salesperson/team');
         break;
       default:
         break;
@@ -101,6 +127,7 @@ export function SalespersonDashboard({
 
   const handleRefresh = () => {
     refetchStats();
+    refetchPerformance();
     refetchCases();
   };
 
@@ -110,9 +137,7 @@ export function SalespersonDashboard({
 
   const handleCaseCreated = (caseData: any) => {
     console.log('New case created:', caseData);
-    // Refresh dashboard data
     handleRefresh();
-    // You could also show a success notification here
   };
 
   if (statsError || casesError) {
@@ -143,6 +168,7 @@ export function SalespersonDashboard({
     );
   }
 
+  // Dashboard stats from real Supabase data
   const dashboardStats = [
     { 
       label: 'Active Cases', 
@@ -150,7 +176,7 @@ export function SalespersonDashboard({
       icon: FileText, 
       color: 'blue', 
       type: 'active-cases', 
-      details: `Home Loans: ${cases.filter(c => c.customer?.loanType?.includes('Home')).length}, Personal Loans: ${cases.filter(c => c.customer?.loanType?.includes('Personal')).length}, Car Loans: ${cases.filter(c => c.customer?.loanType?.includes('Car')).length}, Business Loans: ${cases.filter(c => c.customer?.loanType?.includes('Business')).length}` 
+      details: `${stats?.activeCases || 0} cases currently in progress` 
     },
     { 
       label: 'Pending Documents', 
@@ -158,7 +184,7 @@ export function SalespersonDashboard({
       icon: Clock, 
       color: 'yellow', 
       type: 'pending-documents', 
-      details: 'GST Returns: 4, Bank Statements: 3, Property Docs: 2, Others: 3' 
+      details: 'Documents awaiting verification' 
     },
     { 
       label: 'Completed Today', 
@@ -166,7 +192,7 @@ export function SalespersonDashboard({
       icon: CheckCircle, 
       color: 'green', 
       type: 'completed-today', 
-      details: 'Recent completions will appear here' 
+      details: 'Cases completed today' 
     },
     { 
       label: 'Overdue Tasks', 
@@ -178,64 +204,64 @@ export function SalespersonDashboard({
     }
   ];
 
+  // Performance metrics from real Supabase data
   const performanceMetrics = [
     {
       label: 'Monthly Target',
-      value: '₹2.5Cr',
-      achieved: '₹1.8Cr',
-      percentage: 72,
+      value: `₹${((performance?.achievedThisMonth || 0) / 100000).toFixed(2)}L`,
+      target: `₹${((performance?.monthlyTarget || 2500000) / 100000).toFixed(2)}L`,
+      percentage: parseFloat(performance?.targetAchievement || '0'),
       icon: Target,
-      trend: '+15%',
+      trend: `${parseFloat(performance?.targetAchievement || '0').toFixed(1)}%`,
       type: 'monthly-target',
-      details: 'Target: ₹2.5Cr | Achieved: ₹1.8Cr | Remaining: ₹0.7Cr | Days left: 22'
+      details: `Target: ₹${((performance?.monthlyTarget || 0) / 100000).toFixed(2)}L | Achieved: ₹${((performance?.achievedThisMonth || 0) / 100000).toFixed(2)}L`
     },
     {
       label: 'Conversion Rate',
-      value: '89%',
-      achieved: '89%',
-      percentage: 89,
+      value: `${parseFloat(performance?.conversionRate || '0').toFixed(1)}%`,
+      achieved: `${performance?.completedCases || 0}/${performance?.totalCases || 0}`,
+      percentage: parseFloat(performance?.conversionRate || '0'),
       icon: TrendingUp,
-      trend: '+5%',
+      trend: `${performance?.completedCases || 0} closed`,
       type: 'conversion-rate',
-      details: 'Applications: 45 | Approved: 40 | Rejected: 3 | Pending: 2'
+      details: `Total: ${performance?.totalCases || 0} | Closed: ${performance?.completedCases || 0} | Active: ${performance?.activeCases || 0}`
     },
     {
-      label: 'Customer Satisfaction',
-      value: '4.8/5',
-      achieved: '4.8/5',
-      percentage: 96,
-      icon: Award,
-      trend: '+0.2',
+      label: 'My Customers',
+      value: `${performance?.totalCustomers || 0}`,
+      achieved: `${performance?.verifiedCustomers || 0} verified`,
+      percentage: performance?.totalCustomers ? ((performance.verifiedCustomers || 0) / performance.totalCustomers) * 100 : 0,
+      icon: Users,
+      trend: `+${performance?.pendingKycCustomers || 0} pending`,
       type: 'customer-satisfaction',
-      details: '5 Star: 85% | 4 Star: 12% | 3 Star: 3% | Total Reviews: 67'
+      details: `Total: ${performance?.totalCustomers || 0} | Verified: ${performance?.verifiedCustomers || 0} | Pending KYC: ${performance?.pendingKycCustomers || 0}`
     },
     {
       label: 'Team Ranking',
-      value: '#2',
-      achieved: '#2',
+      value: (leaderboard || []).find(l => l.userId === user?.id?.toString())?.teamRank ? `#${(leaderboard || []).find(l => l.userId === user?.id?.toString())?.teamRank}` : 'N/A',
+      achieved: (leaderboard || []).find(l => l.userId === user?.id?.toString())?.overallRank ? `#${(leaderboard || []).find(l => l.userId === user?.id?.toString())?.overallRank} overall` : '',
       percentage: 85,
-      icon: Users,
-      trend: '↑1',
+      icon: Trophy,
+      trend: (leaderboard || []).find(l => l.userId === user?.id?.toString())?.teamName || 'No team',
       type: 'team-ranking',
-      details: 'Rank: #2/12 | Score: 94.5 | Above: Vikram (96.2) | Below: Meera (91.8)'
+      details: `Team rank: #${(leaderboard || []).find(l => l.userId === user?.id?.toString())?.teamRank || 'N/A'} | Overall: #${(leaderboard || []).find(l => l.userId === user?.id?.toString())?.overallRank || 'N/A'}`
     }
   ];
 
-  // Helper functions (defined before use)
-  const getActivityAction = (case_: any, type: string) => {
-    switch (type) {
-      case 'document_received':
-        return 'uploaded required documents';
-      case 'case_updated':
-        return `case status updated to ${case_.status}`;
-      case 'follow_up':
-        return 'follow-up call scheduled';
-      case 'document_pending':
-        return 'pending document upload';
-      default:
-        return 'case activity';
-    }
-  };
+  // Get recent activities from actual cases (with safe navigation)
+  const recentActivities = (cases || []).slice(0, 5).map((case_, index) => {
+    const activityTypes = ['document_received', 'case_updated', 'follow_up', 'document_pending'];
+    
+    return {
+      id: case_.id,
+      type: activityTypes[index % activityTypes.length],
+      customer: case_.customer?.name || 'Unknown Customer',
+      action: `Case ${case_.status} - ${case_.caseNumber}`,
+      time: getTimeAgo(case_.updatedAt || case_.createdAt),
+      status: case_.status === 'closed' ? 'success' : case_.status === 'in_progress' ? 'pending' : 'warning',
+      caseId: case_.id
+    };
+  });
 
   const getTimeAgo = (dateString: string) => {
     const now = new Date();
@@ -246,32 +272,6 @@ export function SalespersonDashboard({
     if (diffInHours < 24) return `${diffInHours} hours ago`;
     const diffInDays = Math.floor(diffInHours / 24);
     return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
-  };
-
-  // Generate recent activities from cases data
-  const recentActivities = cases.slice(0, 4).map((case_, index) => {
-    const activityTypes = ['document_received', 'case_updated', 'follow_up', 'document_pending'];
-    const statuses = ['success', 'pending', 'warning'];
-    
-    return {
-      id: `activity-${index + 1}`,
-      type: activityTypes[index % activityTypes.length],
-      customer: case_.customer?.name || 'Unknown Customer',
-      action: getActivityAction(case_, activityTypes[index % activityTypes.length]),
-      time: getTimeAgo(case_.updatedAt || case_.createdAt),
-      status: statuses[index % statuses.length]
-    };
-  });
-
-  const getNextAction = (status: string) => {
-    switch (status) {
-      case 'new': return 'Initial document collection';
-      case 'in-progress': return 'Follow up on pending documents';
-      case 'review': return 'Awaiting credit approval';
-      case 'approved': return 'Loan disbursement';
-      case 'rejected': return 'Customer notification sent';
-      default: return 'Review case status';
-    }
   };
 
   const getActivityIcon = (type: string) => {
@@ -294,7 +294,7 @@ export function SalespersonDashboard({
       case 'success':
         return <Badge variant="success" size="sm">Completed</Badge>;
       case 'pending':
-        return <Badge variant="warning" size="sm">Pending</Badge>;
+        return <Badge variant="warning" size="sm">In Progress</Badge>;
       case 'warning':
         return <Badge variant="error" size="sm">Action Required</Badge>;
       default:
@@ -302,25 +302,43 @@ export function SalespersonDashboard({
     }
   };
 
+  const getNextAction = (status: string) => {
+    switch (status) {
+      case 'open': return 'Initial document collection';
+      case 'in_progress': return 'Follow up on pending documents';
+      case 'review': return 'Awaiting credit approval';
+      case 'closed': return 'Case closed';
+      case 'rejected': return 'Customer notification sent';
+      default: return 'Review case status';
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Header with Quick Stats */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Sales Dashboard</h1>
-          <p className="text-blue-200/80">Performance overview and key metrics</p>
+          <p className="text-blue-200/80">Welcome back, {user?.full_name || user?.email}</p>
+          {performance?.teamId && (
+            <p className="text-sm text-blue-300/70 mt-1">
+              Team Rank: #{(leaderboard || []).find(l => l.userId === user?.id?.toString())?.teamRank || 'N/A'} | 
+              Overall Rank: #{(leaderboard || []).find(l => l.userId === user?.id?.toString())?.overallRank || 'N/A'}
+            </p>
+          )}
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={handleRefresh} disabled={statsLoading || casesLoading} className="dashboard-refresh-button">
-            <RefreshCw className={`h-4 w-4 mr-2 ${(statsLoading || casesLoading) ? 'animate-spin' : ''}`} />
+          <Button variant="outline" onClick={handleRefresh} disabled={statsLoading || casesLoading || perfLoading} className="dashboard-refresh-button">
+            <RefreshCw className={`h-4 w-4 mr-2 ${(statsLoading || casesLoading || perfLoading) ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button variant="outline" onClick={() => navigate('/workload')} className="dashboard-button-outline">
-            <Calendar className="h-4 w-4 mr-2" />
-            Workload Planner
+          <Button variant="outline" onClick={() => navigate('/salesperson/customers')} className="dashboard-button-outline">
+            <Users className="h-4 w-4 mr-2" />
+            My Customers
           </Button>
           <Button variant="outline" onClick={() => navigate('/cases')} className="dashboard-button-outline">
             <FileText className="h-4 w-4 mr-2" />
-            View All Cases
+            All Cases
           </Button>
           <Button onClick={handleNewCase}>
             <Plus className="h-4 w-4 mr-2" />
@@ -358,7 +376,7 @@ export function SalespersonDashboard({
                   <div className="ml-4">
                     <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
                     <p className="text-sm text-gray-600">{stat.label}</p>
-                    <p className="text-xs text-gray-500 mt-1">Double-click for details</p>
+                    <p className="text-xs text-gray-500 mt-1">Click for details</p>
                   </div>
                 </div>
               </CardContent>
@@ -370,7 +388,17 @@ export function SalespersonDashboard({
       {/* Performance Metrics */}
       <Card className="dashboard-card">
         <CardHeader>
-          <CardTitle>Performance Metrics</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Performance Metrics</CardTitle>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => navigate('/salesperson/performance')}
+              className="dashboard-button-outline"
+            >
+              View Details
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -382,7 +410,7 @@ export function SalespersonDashboard({
                   className="p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
                   onClick={() => handleMetricClick(metric.type)}
                   onDoubleClick={() => handleMetricDoubleClick(metric.type)}
-                  title={`Double-click to view details: ${metric.details}`}
+                  title={`Click to view: ${metric.details}`}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-3">
@@ -398,11 +426,13 @@ export function SalespersonDashboard({
                       <span className="text-sm font-medium text-green-600">{metric.trend}</span>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500 mb-2">Double-click for breakdown</p>
+                  {metric.achieved && (
+                    <p className="text-xs text-gray-500 mb-2">{metric.achieved}</p>
+                  )}
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
                       className="bg-blue-600 h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${metric.percentage}%` }}
+                      style={{ width: `${Math.min(metric.percentage, 100)}%` }}
                     ></div>
                   </div>
                 </div>
@@ -412,8 +442,9 @@ export function SalespersonDashboard({
         </CardContent>
       </Card>
 
-      {/* Recent Activities */}
+      {/* Recent Activities and Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Activities */}
         <Card className="dashboard-card">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -425,27 +456,34 @@ export function SalespersonDashboard({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentActivities.map((activity) => (
-                <div 
-                  key={activity.id} 
-                  className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
-                  onDoubleClick={() => onNavigateToCase('case-001')}
-                  title="Double-click to view case details"
-                >
-                  <div className="flex-shrink-0">
-                    {getActivityIcon(activity.type)}
+              {recentActivities.length > 0 ? (
+                recentActivities.map((activity) => (
+                  <div 
+                    key={activity.id} 
+                    className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                    onClick={() => onNavigateToCase(activity.caseId)}
+                    title="Click to view case details"
+                  >
+                    <div className="flex-shrink-0">
+                      {getActivityIcon(activity.type)}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">{activity.customer}</p>
+                      <p className="text-sm text-gray-600">{activity.action}</p>
+                      <p className="text-xs text-gray-500">{activity.time}</p>
+                    </div>
+                    <div>
+                      {getActivityBadge(activity.status)}
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">{activity.customer}</p>
-                    <p className="text-sm text-gray-600">{activity.action}</p>
-                    <p className="text-xs text-gray-500">{activity.time}</p>
-                    <p className="text-xs text-blue-500">Double-click to view case</p>
-                  </div>
-                  <div>
-                    {getActivityBadge(activity.status)}
-                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <FileText className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                  <p>No recent activities</p>
+                  <p className="text-sm">Your case activities will appear here</p>
                 </div>
-              ))}
+              )}
             </div>
           </CardContent>
         </Card>
@@ -457,80 +495,106 @@ export function SalespersonDashboard({
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
-              <Button variant="outline" className="h-16 flex-col dashboard-button-outline">
-                <FileText className="h-6 w-6 mb-1" />
-                <span className="text-xs">Send Document Request</span>
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col dashboard-button-outline"
+                onClick={handleNewCase}
+              >
+                <Plus className="h-6 w-6 mb-1" />
+                <span className="text-xs">New Case</span>
               </Button>
-              <Button variant="outline" className="h-16 flex-col dashboard-button-outline">
-                <CheckCircle className="h-6 w-6 mb-1" />
-                <span className="text-xs">Mark Complete</span>
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col dashboard-button-outline"
+                onClick={() => navigate('/salesperson/customers')}
+              >
+                <Users className="h-6 w-6 mb-1" />
+                <span className="text-xs">My Customers</span>
               </Button>
-              <Button variant="outline" className="h-16 flex-col dashboard-button-outline" onClick={onNavigateToWorkload}>
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col dashboard-button-outline" 
+                onClick={onNavigateToWorkload}
+              >
                 <Calendar className="h-6 w-6 mb-1" />
-                <span className="text-xs">Schedule Follow-up</span>
+                <span className="text-xs">Workload</span>
               </Button>
-              <Button variant="outline" className="h-16 flex-col dashboard-button-outline" onClick={onNavigateToCases}>
-                <Users className="h-4 w-4 mb-1" />
-                <span className="text-xs">Customer Chat</span>
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col dashboard-button-outline" 
+                onClick={() => navigate('/document-manager')}
+              >
+                <FileText className="h-6 w-6 mb-1" />
+                <span className="text-xs">Documents</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col dashboard-button-outline"
+                onClick={() => navigate('/salesperson/team')}
+              >
+                <UserCheck className="h-6 w-6 mb-1" />
+                <span className="text-xs">My Team</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col dashboard-button-outline"
+                onClick={() => navigate('/salesperson/performance')}
+              >
+                <Briefcase className="h-6 w-6 mb-1" />
+                <span className="text-xs">Performance</span>
               </Button>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Today's Priority Tasks */}
+      {/* Top Priority Cases */}
       <Card className="dashboard-card">
         <CardHeader>
-          <CardTitle>Today's Priority Tasks</CardTitle>
+          <CardTitle>Today's Priority Cases</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {cases.filter(c => c.priority === 'high').slice(0, 2).map((case_, index) => (
-              <div 
-                key={case_.id}
-                className={`flex items-center justify-between p-4 ${
-                  index === 0 ? 'bg-red-50 border-red-200 hover:bg-red-100' : 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100'
-                } border rounded-lg cursor-pointer transition-colors`}
-                onClick={() => onNavigateToCase(case_.id)}
-                onDoubleClick={() => onNavigateToCase(case_.id)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  handleCustomerDoubleClick(case_.customer.name, case_.customer.phone);
-                }}
-              >
-                <div className="flex items-center space-x-3">
-                  {index === 0 ? (
-                    <AlertTriangle className="h-5 w-5 text-red-600" />
-                  ) : (
-                    <Clock className="h-5 w-5 text-yellow-600" />
-                  )}
-                  <div>
-                    <p className={`font-medium ${index === 0 ? 'text-red-900' : 'text-yellow-900'}`}>
-                      {index === 0 ? 'Follow up:' : 'Schedule call:'} {case_.customer.name}
-                    </p>
-                    <p className={`text-sm ${index === 0 ? 'text-red-700' : 'text-yellow-700'}`}>
-                      {case_.customer.loanType} - {getNextAction(case_.status)} - ₹{(case_.customer.loanAmount / 100000).toFixed(0)}L
-                    </p>
-                    <p className={`text-xs ${index === 0 ? 'text-red-600' : 'text-yellow-600'}`}>
-                      {index === 0 ? 'Click or double-click to view case' : 'Double-click to schedule'}
-                    </p>
-                    <p className="text-xs text-blue-500">Right-click for WhatsApp chat</p>
-                  </div>
-                </div>
-                <Badge 
-                  variant={index === 0 ? "error" : "warning"} 
-                  size="sm"
+            {(cases || []).filter(c => c.priority === 'high').slice(0, 3).length > 0 ? (
+              (cases || []).filter(c => c.priority === 'high').slice(0, 3).map((case_, index) => (
+                <div 
+                  key={case_.id}
+                  className={`flex items-center justify-between p-4 ${
+                    index === 0 ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'
+                  } border rounded-lg cursor-pointer transition-colors hover:shadow-md`}
+                  onClick={() => onNavigateToCase(case_.id)}
                 >
-                  {index === 0 ? 'High Priority' : 'Today'}
-                </Badge>
-              </div>
-            ))}
-            
-            {cases.filter(c => c.priority === 'high').length === 0 && (
+                  <div className="flex items-center space-x-3">
+                    {index === 0 ? (
+                      <AlertTriangle className="h-5 w-5 text-red-600" />
+                    ) : (
+                      <Clock className="h-5 w-5 text-yellow-600" />
+                    )}
+                    <div>
+                      <p className={`font-medium ${index === 0 ? 'text-red-900' : 'text-yellow-900'}`}>
+                        {case_.customer?.name || 'Unknown Customer'}
+                      </p>
+                      <p className={`text-sm ${index === 0 ? 'text-red-700' : 'text-yellow-700'}`}>
+                        {case_.caseNumber} - {getNextAction(case_.status)}
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        Click to view case details
+                      </p>
+                    </div>
+                  </div>
+                  <Badge 
+                    variant={index === 0 ? "error" : "warning"} 
+                    size="sm"
+                  >
+                    {index === 0 ? 'Urgent' : 'High Priority'}
+                  </Badge>
+                </div>
+              ))
+            ) : (
               <div className="text-center py-8 text-gray-500">
-                <Clock className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                <p>No high priority tasks for today</p>
-                <p className="text-sm">All cases are on track!</p>
+                <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-400" />
+                <p>No high priority cases</p>
+                <p className="text-sm">All your cases are on track!</p>
               </div>
             )}
           </div>

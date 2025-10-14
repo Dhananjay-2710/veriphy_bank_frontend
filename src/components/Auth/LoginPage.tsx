@@ -262,7 +262,7 @@ export function LoginPage() {
                 <div className="flex items-center space-x-2 text-red-300 text-xs sm:text-sm bg-red-500/20 p-3 rounded-lg border border-red-500/30 animate-shake">
                   <AlertCircle className="h-4 w-4 flex-shrink-0" />
                   <span className="break-words">{error}</span>
-                </div>
+                </div>                                                                    
               )}
 
               {/* Registration success */}

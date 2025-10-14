@@ -42,6 +42,7 @@ import {
   mapCaseWorkflowStageData,
   mapAssignCaseSettingData,
   mapAssignPermissionData,
+  mapTeamData,
   mapJobData,
   mapJobBatchData,
   mapFailedJobData,
@@ -1221,8 +1222,8 @@ export class SupabaseDatabaseService {
   // DOCUMENT MANAGEMENT
   // =============================================================================
 
-  static async getDocuments(caseId?: string) {
-    console.log('Fetching documents with caseId:', caseId);
+  static async getDocuments(caseId?: string, organizationId?: number) {
+    console.log('Fetching documents with caseId:', caseId, 'organizationId:', organizationId);
     
     let query = supabase
       .from(SUPABASE_TABLES.DOCUMENTS)
@@ -1257,18 +1258,23 @@ export class SupabaseDatabaseService {
           email,
           mobile
         ),
-        uploaded_user:users!documents_uploaded_by_fkey(
+        uploaded_user:users!uploaded_by(
           id,
           full_name,
           email
         ),
-        verified_user:users!documents_verified_by_fkey(
+        verified_user:users!verified_by(
           id,
           full_name,
           email
         )
       `)
       .order('submitted_at', { ascending: false });
+
+    // Filter by organization_id if provided (for security)
+    if (organizationId) {
+      query = query.eq('organization_id', organizationId);
+    }
 
     // Only filter by customer_id if provided and not empty
     if (caseId && caseId.trim() !== '') {
@@ -2514,10 +2520,10 @@ export class SupabaseDatabaseService {
   // TEAM OVERSIGHT (MAPPED TO USERS)
   // =============================================================================
 
-  static async getTeamMembers() {
-    console.log('Fetching team members...');
+  static async getTeamMembers(organizationId?: number) {
+    console.log('Fetching team members for organization:', organizationId);
     
-    const { data, error } = await supabase
+    let query = supabase
       .from(SUPABASE_TABLES.USERS)
       .select(`
         id,
@@ -2526,11 +2532,19 @@ export class SupabaseDatabaseService {
         mobile,
         role,
         status,
+        organization_id,
         created_at,
         updated_at,
         metadata
       `)
       .order('created_at', { ascending: false });
+
+    // Filter by organization if provided
+    if (organizationId) {
+      query = query.eq('organization_id', organizationId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching team members:', error);
@@ -2550,26 +2564,36 @@ export class SupabaseDatabaseService {
       data.map(async (member) => {
         const { data: cases } = await supabase
           .from(SUPABASE_TABLES.CASES)
-          .select('id, status, created_at, updated_at')
-          .eq('assigned_to', member.id);
+          .select('id, status, created_at, updated_at, organization_id')
+          .eq('assigned_to', member.id)
+          .eq('organization_id', organizationId || member.organization_id);
 
-        const activeCases = cases?.filter(c => c.status === 'in_progress').length || 0;
+        const totalCases = cases?.length || 0;
+        const activeCases = cases?.filter(c => c.status === 'in_progress' || c.status === 'open').length || 0;
+        const completedCases = cases?.filter(c => c.status === 'closed').length || 0;
         const completedThisMonth = cases?.filter(c => 
           c.status === 'closed' && 
           new Date(c.updated_at).getMonth() === new Date().getMonth()
         ).length || 0;
 
+        // Calculate efficiency (completed / total * 100)
+        const efficiencyRate = totalCases > 0 ? Math.round((completedCases / totalCases) * 100) : 0;
+
         return {
           id: member.id,
           name: member.full_name || 'Unknown User',
+          fullName: member.full_name || 'Unknown User',
           email: member.email || '',
           phone: member.mobile || '',
           role: member.role || 'user',
           status: member.status || 'active',
+          organizationId: member.organization_id,
           created_at: member.created_at,
           cases: activeCases,
+          totalCases,
+          completedCases,
           capacity: 10, // Default capacity
-          efficiency: '85%', // Calculate based on performance
+          efficiency: efficiencyRate,
           specialization: 'Home Loans', // Get from user profile
           completedThisMonth,
           avgProcessingTime: '2.1 days', // Calculate from actual data
@@ -2581,6 +2605,297 @@ export class SupabaseDatabaseService {
 
     console.log('Team members processed:', teamMembers.length);
     return teamMembers;
+  }
+
+  // =============================================================================
+  // TEAM MANAGEMENT
+  // =============================================================================
+
+  static async getTeams(filters?: { organizationId?: number; isActive?: boolean; teamType?: string }) {
+    console.log('🔍 Fetching teams with filters:', filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.TEAMS)
+      .select(`
+        *,
+        manager:users!manager_id(id, full_name, email)
+      `)
+      .order('created_at', { ascending: false });
+
+    // Apply filters
+    if (filters?.organizationId) {
+      query = query.eq('organization_id', filters.organizationId);
+    }
+    if (filters?.isActive !== undefined) {
+      query = query.eq('is_active', filters.isActive);
+    }
+    if (filters?.teamType) {
+      query = query.eq('team_type', filters.teamType);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching teams:', error);
+      return [];
+    }
+
+    console.log('Found teams:', data?.length || 0);
+
+    // Get member counts and case stats for each team
+    const teamsWithStats = await Promise.all(
+      (data || []).map(async (team) => {
+        // Get team members count
+        const { count: memberCount } = await supabase
+          .from(SUPABASE_TABLES.USERS)
+          .select('*', { count: 'exact', head: true })
+          .eq('team_id', team.id)
+          .eq('is_active', true);
+
+        // Get active cases for team members
+        const { data: teamMembers } = await supabase
+          .from(SUPABASE_TABLES.USERS)
+          .select('id')
+          .eq('team_id', team.id);
+
+        let activeCases = 0;
+        let completedCases = 0;
+
+        if (teamMembers && teamMembers.length > 0) {
+          const memberIds = teamMembers.map(m => m.id);
+          
+          // Get active cases
+          const { count: activeCount } = await supabase
+            .from(SUPABASE_TABLES.CASES)
+            .select('*', { count: 'exact', head: true })
+            .in('assigned_to', memberIds)
+            .in('status', ['open', 'in_progress']);
+
+          // Get completed cases
+          const { count: completedCount } = await supabase
+            .from(SUPABASE_TABLES.CASES)
+            .select('*', { count: 'exact', head: true })
+            .in('assigned_to', memberIds)
+            .eq('status', 'closed');
+
+          activeCases = activeCount || 0;
+          completedCases = completedCount || 0;
+        }
+
+        return {
+          ...team,
+          member_count: memberCount || 0,
+          active_cases: activeCases,
+          completed_cases: completedCases,
+        };
+      })
+    );
+
+    return teamsWithStats.map(mapTeamData);
+  }
+
+  static async getTeamById(teamId: string) {
+    console.log('🔍 Fetching team by ID:', teamId);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.TEAMS)
+      .select(`
+        *,
+        users!teams_manager_id_fkey(id, full_name, email)
+      `)
+      .eq('id', teamId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching team:', error);
+      throw new Error(`Failed to fetch team: ${error.message}`);
+    }
+
+    return mapTeamData(data);
+  }
+
+  static async createTeam(teamData: {
+    name: string;
+    description?: string;
+    organizationId: number;
+    managerId?: number;
+    teamType: string;
+    targetCasesPerMonth?: number;
+  }) {
+    console.log('📝 Creating new team:', teamData);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.TEAMS)
+      .insert({
+        name: teamData.name,
+        description: teamData.description,
+        organization_id: teamData.organizationId,
+        manager_id: teamData.managerId,
+        team_type: teamData.teamType,
+        target_cases_per_month: teamData.targetCasesPerMonth || 50,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating team:', error);
+      throw new Error(`Failed to create team: ${error.message}`);
+    }
+
+    console.log('✅ Team created successfully:', data.id);
+    
+    // Log the creation
+    await AuditLogger.log({
+      userId: teamData.managerId?.toString() || 'system',
+      action: 'CREATE',
+      entityType: 'system',
+      entityId: data.id.toString(),
+      metadata: {
+        teamName: teamData.name,
+        teamType: teamData.teamType,
+        organizationId: teamData.organizationId
+      }
+    });
+
+    return mapTeamData(data);
+  }
+
+  static async updateTeam(teamId: string, updates: {
+    name?: string;
+    description?: string;
+    managerId?: number;
+    teamType?: string;
+    isActive?: boolean;
+    targetCasesPerMonth?: number;
+  }) {
+    console.log('📝 Updating team:', teamId, updates);
+    
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (updates.name !== undefined) updateData.name = updates.name;
+    if (updates.description !== undefined) updateData.description = updates.description;
+    if (updates.managerId !== undefined) updateData.manager_id = updates.managerId;
+    if (updates.teamType !== undefined) updateData.team_type = updates.teamType;
+    if (updates.isActive !== undefined) updateData.is_active = updates.isActive;
+    if (updates.targetCasesPerMonth !== undefined) updateData.target_cases_per_month = updates.targetCasesPerMonth;
+
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.TEAMS)
+      .update(updateData)
+      .eq('id', teamId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating team:', error);
+      throw new Error(`Failed to update team: ${error.message}`);
+    }
+
+    console.log('✅ Team updated successfully');
+    
+    return mapTeamData(data);
+  }
+
+  static async deleteTeam(teamId: string) {
+    console.log('🗑️ Deleting team:', teamId);
+    
+    // First, remove team_id from all users in this team
+    await supabase
+      .from(SUPABASE_TABLES.USERS)
+      .update({ team_id: null })
+      .eq('team_id', teamId);
+
+    // Then delete the team
+    const { error } = await supabase
+      .from(SUPABASE_TABLES.TEAMS)
+      .delete()
+      .eq('id', teamId);
+
+    if (error) {
+      console.error('Error deleting team:', error);
+      throw new Error(`Failed to delete team: ${error.message}`);
+    }
+
+    console.log('✅ Team deleted successfully');
+  }
+
+  static async getUsersByTeamId(teamId: string) {
+    console.log('🔍 Fetching members for team:', teamId);
+    
+    const { data, error} = await supabase
+      .from(SUPABASE_TABLES.USERS)
+      .select(`
+        id,
+        full_name,
+        email,
+        mobile,
+        role,
+        status,
+        is_active,
+        created_at
+      `)
+      .eq('team_id', teamId)
+      .order('full_name', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching team members:', error);
+      return [];
+    }
+
+    return data || [];
+  }
+
+  static async addUserToTeam(userId: string, teamId: string) {
+    console.log('➕ Adding user to team:', userId, teamId);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.USERS)
+      .update({ team_id: parseInt(teamId) })
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding user to team:', error);
+      throw new Error(`Failed to add user to team: ${error.message}`);
+    }
+
+    console.log('✅ User added to team successfully');
+    return data;
+  }
+
+  static async removeUserFromTeam(userId: string) {
+    console.log('➖ Removing user from team:', userId);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.USERS)
+      .update({ team_id: null })
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error removing user from team:', error);
+      throw new Error(`Failed to remove user from team: ${error.message}`);
+    }
+
+    console.log('✅ User removed from team successfully');
+    return data;
+  }
+
+  static async subscribeToTeams(callback: (payload: any) => void) {
+    return supabase
+      .channel('teams-updates')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.TEAMS },
+        callback
+      )
+      .subscribe();
   }
 
   // =============================================================================
@@ -2855,6 +3170,16 @@ export class SupabaseDatabaseService {
       .channel(`documents-${caseId}`)
       .on('postgres_changes',
         { event: '*', schema: 'public', table: SUPABASE_TABLES.DOCUMENTS, filter: `customer_id=eq.${caseId}` },
+        callback
+      )
+      .subscribe();
+  }
+
+  static subscribeToUsers(callback: (payload: any) => void) {
+    return supabase
+      .channel('users-updates')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.USERS },
         callback
       )
       .subscribe();
@@ -5925,10 +6250,8 @@ export class SupabaseDatabaseService {
         organization_id,
         created_at,
         updated_at,
-        phone,
         pan_number,
         aadhaar_number,
-        date_of_birth,
         gender,
         marital_status,
         employment_type,
@@ -5968,10 +6291,8 @@ export class SupabaseDatabaseService {
       organizationId: customer.organization_id?.toString(),
       createdAt: customer.created_at,
       updatedAt: customer.updated_at,
-      phone: customer.phone,
       panNumber: customer.pan_number,
       aadhaarNumber: customer.aadhaar_number,
-      dateOfBirth: customer.date_of_birth,
       gender: customer.gender,
       maritalStatus: customer.marital_status,
       employmentType: customer.employment_type,
@@ -6019,14 +6340,12 @@ export class SupabaseDatabaseService {
     fullName: string;
     email?: string;
     mobile?: string;
-    phone?: string;
     address?: string;
     externalCustomerCode?: string;
     kycStatus?: string;
     organizationId?: number;
     panNumber?: string;
     aadhaarNumber?: string;
-    dateOfBirth?: string;
     dob?: string;
     gender?: string;
     maritalStatus?: string;
@@ -6041,14 +6360,12 @@ export class SupabaseDatabaseService {
       full_name: customerData.fullName,
       email: customerData.email,
       mobile: customerData.mobile,
-      phone: customerData.phone,
       address: customerData.address,
       external_customer_code: customerData.externalCustomerCode,
       kyc_status: customerData.kycStatus || 'pending',
       organization_id: customerData.organizationId,
       pan_number: customerData.panNumber,
       aadhaar_number: customerData.aadhaarNumber,
-      date_of_birth: customerData.dateOfBirth,
       dob: customerData.dob,
       gender: customerData.gender,
       marital_status: customerData.maritalStatus,
@@ -6093,14 +6410,12 @@ export class SupabaseDatabaseService {
     fullName?: string;
     email?: string;
     mobile?: string;
-    phone?: string;
     address?: string;
     externalCustomerCode?: string;
     kycStatus?: string;
     organizationId?: number;
     panNumber?: string;
     aadhaarNumber?: string;
-    dateOfBirth?: string;
     dob?: string;
     gender?: string;
     maritalStatus?: string;
@@ -6125,14 +6440,12 @@ export class SupabaseDatabaseService {
     if (updates.fullName !== undefined) updateData.full_name = updates.fullName;
     if (updates.email !== undefined) updateData.email = updates.email;
     if (updates.mobile !== undefined) updateData.mobile = updates.mobile;
-    if (updates.phone !== undefined) updateData.phone = updates.phone;
     if (updates.address !== undefined) updateData.address = updates.address;
     if (updates.externalCustomerCode !== undefined) updateData.external_customer_code = updates.externalCustomerCode;
     if (updates.kycStatus !== undefined) updateData.kyc_status = updates.kycStatus;
     if (updates.organizationId !== undefined) updateData.organization_id = updates.organizationId;
     if (updates.panNumber !== undefined) updateData.pan_number = updates.panNumber;
     if (updates.aadhaarNumber !== undefined) updateData.aadhaar_number = updates.aadhaarNumber;
-    if (updates.dateOfBirth !== undefined) updateData.date_of_birth = updates.dateOfBirth;
     if (updates.dob !== undefined) updateData.dob = updates.dob;
     if (updates.gender !== undefined) updateData.gender = updates.gender;
     if (updates.maritalStatus !== undefined) updateData.marital_status = updates.maritalStatus;
@@ -12128,6 +12441,480 @@ export class SupabaseDatabaseService {
         callback
       )
       .subscribe();
+  }
+
+  // =============================================================================
+  // SALESPERSON-SPECIFIC METHODS
+  // =============================================================================
+
+  /**
+   * Get customers assigned to a specific salesperson
+   * @param salespersonId - The ID of the salesperson
+   * @param filters - Optional filters for customers
+   */
+  static async getSalespersonCustomers(salespersonId: string, filters?: {
+    kycStatus?: string;
+    riskProfile?: string;
+    searchTerm?: string;
+  }) {
+    console.log('🔍 Fetching customers for salesperson:', salespersonId, filters);
+    
+    let query = supabase
+      .from(SUPABASE_TABLES.CUSTOMERS)
+      .select(`
+        id,
+        full_name,
+        email,
+        mobile,
+        phone,
+        pan_number,
+        aadhaar_number,
+        dob,
+        date_of_birth,
+        gender,
+        marital_status,
+        employment_type,
+        risk_profile,
+        kyc_status,
+        address,
+        external_customer_code,
+        organization_id,
+        user_id,
+        metadata,
+        created_at,
+        updated_at
+      `)
+      .eq('user_id', Number(salespersonId))
+      .order('created_at', { ascending: false });
+
+    // Apply filters
+    if (filters?.kycStatus) {
+      query = query.eq('kyc_status', filters.kycStatus);
+    }
+
+    if (filters?.riskProfile) {
+      query = query.eq('risk_profile', filters.riskProfile);
+    }
+
+    if (filters?.searchTerm) {
+      query = query.or(`full_name.ilike.%${filters.searchTerm}%,email.ilike.%${filters.searchTerm}%,mobile.ilike.%${filters.searchTerm}%`);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('❌ Error fetching salesperson customers:', error);
+      return [];
+    }
+
+    console.log('✅ Found', data?.length || 0, 'customers');
+
+    return data?.map(customer => ({
+      id: customer.id.toString(),
+      userId: customer.user_id?.toString(),
+      name: customer.full_name,
+      fullName: customer.full_name,
+      email: customer.email,
+      phone: customer.mobile || customer.phone,
+      mobile: customer.mobile,
+      panNumber: customer.pan_number,
+      aadhaarNumber: customer.aadhaar_number,
+      dateOfBirth: customer.date_of_birth || customer.dob,
+      dob: customer.date_of_birth || customer.dob,
+      gender: customer.gender,
+      maritalStatus: customer.marital_status,
+      employment: customer.employment_type,
+      employmentType: customer.employment_type,
+      riskProfile: customer.risk_profile,
+      kycStatus: customer.kyc_status,
+      address: customer.address,
+      externalCustomerCode: customer.external_customer_code,
+      organizationId: customer.organization_id,
+      metadata: customer.metadata,
+      createdAt: customer.created_at,
+      updatedAt: customer.updated_at
+    })) || [];
+  }
+
+  /**
+   * Get performance data for a specific salesperson
+   * @param salespersonId - The ID of the salesperson
+   */
+  static async getSalespersonPerformance(salespersonId: string) {
+    console.log('📊 Fetching performance data for salesperson:', salespersonId);
+    
+    const { data, error } = await supabase
+      .from('salesperson_performance')
+      .select('*')
+      .eq('user_id', salespersonId)
+      .single();
+
+    if (error) {
+      console.error('❌ Error fetching salesperson performance:', error);
+      
+      // If view doesn't exist or no data, calculate on the fly
+      return this.calculateSalespersonPerformance(salespersonId);
+    }
+
+    console.log('✅ Performance data fetched successfully');
+
+    return {
+      userId: data.user_id?.toString(),
+      fullName: data.full_name,
+      email: data.email,
+      organizationId: data.organization_id,
+      teamId: data.team_id,
+      monthlyTarget: parseFloat(data.monthly_target || '0'),
+      achievedAmount: parseFloat(data.achieved_amount || '0'),
+      totalCustomers: data.total_customers || 0,
+      verifiedCustomers: data.verified_customers || 0,
+      pendingKycCustomers: data.pending_kyc_customers || 0,
+      totalCases: data.total_cases || 0,
+      openCases: data.open_cases || 0,
+      activeCases: data.active_cases || 0,
+      completedCases: data.completed_cases || 0,
+      rejectedCases: data.rejected_cases || 0,
+      highPriorityCases: data.high_priority_cases || 0,
+      totalClosedAmount: parseFloat(data.total_closed_amount || '0'),
+      pipelineAmount: parseFloat(data.pipeline_amount || '0'),
+      totalTasks: data.total_tasks || 0,
+      openTasks: data.open_tasks || 0,
+      completedTasks: data.completed_tasks || 0,
+      overdueTasks: data.overdue_tasks || 0,
+      totalDocuments: data.total_documents || 0,
+      pendingDocuments: data.pending_documents || 0,
+      verifiedDocuments: data.verified_documents || 0,
+      lastLoginAt: data.last_login_at,
+      lastCaseActivity: data.last_case_activity,
+      completedThisMonth: data.completed_this_month || 0,
+      achievedThisMonth: parseFloat(data.achieved_this_month || '0'),
+      
+      // Calculated fields
+      conversionRate: data.total_cases > 0 
+        ? ((data.completed_cases / data.total_cases) * 100).toFixed(2) 
+        : '0',
+      targetAchievement: data.monthly_target > 0 
+        ? ((parseFloat(data.achieved_this_month || '0') / parseFloat(data.monthly_target)) * 100).toFixed(2) 
+        : '0'
+    };
+  }
+
+  /**
+   * Calculate salesperson performance on-the-fly (fallback if view doesn't exist)
+   */
+  private static async calculateSalespersonPerformance(salespersonId: string) {
+    console.log('🔄 Calculating performance on-the-fly for:', salespersonId);
+    
+    // Get user data
+    const { data: userData } = await supabase
+      .from(SUPABASE_TABLES.USERS)
+      .select('full_name, email, organization_id, team_id, monthly_target, achieved_amount')
+      .eq('id', salespersonId)
+      .single();
+
+    // Get customer count
+    const { data: customers } = await supabase
+      .from(SUPABASE_TABLES.CUSTOMERS)
+      .select('id, kyc_status')
+      .eq('user_id', salespersonId);
+
+    // Get case data
+    const { data: cases } = await supabase
+      .from(SUPABASE_TABLES.CASES)
+      .select('id, status, priority, loan_amount, created_at, updated_at')
+      .eq('assigned_to', salespersonId);
+
+    // Get task data
+    const { data: tasks } = await supabase
+      .from(SUPABASE_TABLES.TASKS)
+      .select('id, status')
+      .eq('assigned_to', salespersonId);
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    return {
+      userId: salespersonId,
+      fullName: userData?.full_name || '',
+      email: userData?.email || '',
+      organizationId: userData?.organization_id,
+      teamId: userData?.team_id,
+      monthlyTarget: parseFloat(userData?.monthly_target || '2500000'),
+      achievedAmount: parseFloat(userData?.achieved_amount || '0'),
+      totalCustomers: customers?.length || 0,
+      verifiedCustomers: customers?.filter(c => c.kyc_status === 'verified').length || 0,
+      pendingKycCustomers: customers?.filter(c => c.kyc_status === 'pending').length || 0,
+      totalCases: cases?.length || 0,
+      openCases: cases?.filter(c => c.status === 'open').length || 0,
+      activeCases: cases?.filter(c => c.status === 'in_progress').length || 0,
+      completedCases: cases?.filter(c => c.status === 'closed').length || 0,
+      rejectedCases: cases?.filter(c => c.status === 'rejected').length || 0,
+      highPriorityCases: cases?.filter(c => c.priority === 'high').length || 0,
+      totalClosedAmount: cases?.filter(c => c.status === 'closed')
+        .reduce((sum, c) => sum + (parseFloat(c.loan_amount || '0')), 0) || 0,
+      pipelineAmount: cases?.filter(c => c.status === 'in_progress')
+        .reduce((sum, c) => sum + (parseFloat(c.loan_amount || '0')), 0) || 0,
+      totalTasks: tasks?.length || 0,
+      openTasks: tasks?.filter(t => t.status === 'open').length || 0,
+      completedTasks: tasks?.filter(t => t.status === 'completed').length || 0,
+      overdueTasks: tasks?.filter(t => t.status === 'overdue').length || 0,
+      totalDocuments: 0,
+      pendingDocuments: 0,
+      verifiedDocuments: 0,
+      lastLoginAt: null,
+      lastCaseActivity: cases?.sort((a, b) => 
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      )[0]?.updated_at || null,
+      completedThisMonth: cases?.filter(c => 
+        c.status === 'closed' && new Date(c.updated_at) >= startOfMonth
+      ).length || 0,
+      achievedThisMonth: cases?.filter(c => 
+        c.status === 'closed' && new Date(c.updated_at) >= startOfMonth
+      ).reduce((sum, c) => sum + (parseFloat(c.loan_amount || '0')), 0) || 0,
+      conversionRate: cases && cases.length > 0 
+        ? ((cases.filter(c => c.status === 'closed').length / cases.length) * 100).toFixed(2)
+        : '0',
+      targetAchievement: '0'
+    };
+  }
+
+  /**
+   * Get team leaderboard
+   * @param filters - Optional filters for leaderboard
+   */
+  static async getTeamLeaderboard(filters?: {
+    organizationId?: number;
+    teamId?: number;
+    limit?: number;
+  }) {
+    console.log('🏆 Fetching team leaderboard:', filters);
+    
+    let query = supabase
+      .from('team_leaderboard')
+      .select('*')
+      .order('performance_score', { ascending: false });
+
+    if (filters?.organizationId) {
+      query = query.eq('organization_id', filters.organizationId);
+    }
+
+    if (filters?.teamId) {
+      query = query.eq('team_id', filters.teamId);
+    }
+
+    if (filters?.limit) {
+      query = query.limit(filters.limit);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('❌ Error fetching leaderboard:', error);
+      return [];
+    }
+
+    console.log('✅ Leaderboard fetched:', data?.length || 0, 'entries');
+
+    return data?.map(entry => ({
+      userId: entry.user_id?.toString(),
+      fullName: entry.full_name,
+      email: entry.email,
+      organizationId: entry.organization_id,
+      teamId: entry.team_id,
+      teamName: entry.team_name,
+      monthlyTarget: parseFloat(entry.monthly_target || '0'),
+      achievedThisMonth: parseFloat(entry.achieved_this_month || '0'),
+      completedThisMonth: entry.completed_this_month || 0,
+      activeCases: entry.active_cases || 0,
+      totalCustomers: entry.total_customers || 0,
+      conversionRate: parseFloat(entry.conversion_rate || '0'),
+      targetAchievementPercentage: parseFloat(entry.target_achievement_percentage || '0'),
+      teamRank: entry.team_rank,
+      overallRank: entry.overall_rank,
+      performanceScore: parseFloat(entry.performance_score || '0')
+    })) || [];
+  }
+
+  /**
+   * Get team members for a salesperson's team
+   * @param teamId - The ID of the team
+   */
+  static async getSalespersonTeamMembers(teamId: string) {
+    console.log('👥 Fetching team members for team:', teamId);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.USERS)
+      .select(`
+        id,
+        full_name,
+        email,
+        mobile,
+        role,
+        is_active,
+        last_login_at,
+        monthly_target,
+        achieved_amount
+      `)
+      .eq('team_id', teamId)
+      .eq('is_active', true)
+      .order('full_name');
+
+    if (error) {
+      console.error('❌ Error fetching team members:', error);
+      return [];
+    }
+
+    console.log('✅ Found', data?.length || 0, 'team members');
+
+    // Get performance data for each team member
+    const membersWithPerformance = await Promise.all(
+      (data || []).map(async (member) => {
+        const performance = await this.getSalespersonPerformance(member.id.toString());
+        
+        // ✅ FIXED: Removed duplicate properties (performance already has these)
+        return {
+          id: member.id.toString(),
+          role: member.role,
+          isActive: member.is_active,
+          mobile: member.mobile,
+          ...performance  // This already includes fullName, email, lastLoginAt, monthlyTarget, achievedAmount
+        };
+      })
+    );
+
+    return membersWithPerformance;
+  }
+
+  /**
+   * Update salesperson monthly achievement
+   * @param salespersonId - The ID of the salesperson
+   * @param achievedAmount - The amount achieved
+   */
+  static async updateSalespersonAchievement(salespersonId: string, achievedAmount: number) {
+    console.log('💰 Updating achievement for salesperson:', salespersonId, achievedAmount);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.USERS)
+      .update({ achieved_amount: achievedAmount })
+      .eq('id', salespersonId)
+      .select();
+
+    if (error) {
+      console.error('❌ Error updating achievement:', error);
+      throw new Error(`Failed to update achievement: ${error.message}`);
+    }
+
+    console.log('✅ Achievement updated successfully');
+    return data?.[0];
+  }
+
+  /**
+   * Refresh salesperson performance materialized view
+   */
+  static async refreshSalespersonPerformance() {
+    console.log('🔄 Refreshing salesperson performance view...');
+    
+    const { error } = await supabase.rpc('refresh_salesperson_performance');
+
+    if (error) {
+      console.error('❌ Error refreshing performance view:', error);
+      // Don't throw error, as the function might not exist yet
+      return false;
+    }
+
+    console.log('✅ Performance view refreshed successfully');
+    return true;
+  }
+
+  /**
+   * Get salesperson's personal statistics (for dashboard)
+   * @param salespersonId - The ID of the salesperson
+   */
+  static async getSalespersonStats(salespersonId: string) {
+    console.log('📈 Fetching stats for salesperson:', salespersonId);
+    
+    const performance = await this.getSalespersonPerformance(salespersonId);
+    
+    return {
+      activeCases: performance.activeCases,
+      pendingDocuments: performance.pendingDocuments,
+      completedToday: 0, // Calculate from today's completed cases
+      overdueTasks: performance.overdueTasks,
+      monthlyTarget: performance.monthlyTarget,
+      achievedThisMonth: performance.achievedThisMonth,
+      targetAchievement: performance.targetAchievement,
+      conversionRate: performance.conversionRate,
+      totalCustomers: performance.totalCustomers,
+      verifiedCustomers: performance.verifiedCustomers,
+      pendingKycCustomers: performance.pendingKycCustomers
+    };
+  }
+
+  /**
+   * Subscribe to customer updates for a salesperson
+   * @param callback - Function to call when updates occur
+   */
+  static subscribeToSalespersonCustomers(callback: (payload: any) => void) {
+    return supabase
+      .channel('salesperson-customers-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: SUPABASE_TABLES.CUSTOMERS },
+        callback
+      )
+      .subscribe();
+  }
+
+  /**
+   * Get case count for a specific customer
+   * @param customerId - The ID of the customer
+   */
+  static async getCustomerCaseCount(customerId: string) {
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.CASES)
+      .select('id, status')
+      .eq('customer_id', customerId);
+
+    if (error) {
+      console.error('Error fetching customer case count:', error);
+      return { total: 0, active: 0, closed: 0 };
+    }
+
+    return {
+      total: data?.length || 0,
+      active: data?.filter(c => c.status === 'in_progress' || c.status === 'open').length || 0,
+      closed: data?.filter(c => c.status === 'closed').length || 0
+    };
+  }
+
+  /**
+   * Get cases for a specific customer
+   * @param customerId - The ID of the customer
+   */
+  static async getCustomerCases(customerId: string) {
+    console.log('🔍 Fetching cases for customer:', customerId);
+    
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLES.CASES)
+      .select(`
+        id,
+        case_number,
+        status,
+        priority,
+        loan_type,
+        loan_amount,
+        created_at,
+        updated_at,
+        assigned_to
+      `)
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('❌ Error fetching customer cases:', error);
+      return [];
+    }
+
+    return data || [];
   }
 }
 

@@ -53,11 +53,11 @@ export interface Customer {
   id: number;
   user_id?: number; // Optional user relationship
   full_name: string; // Changed from name to full_name
-  phone?: string; // Phone number field
+  mobile?: string; // Mobile/phone number (consolidated field)
   email?: string;
   pan_number?: string;
   aadhaar_number?: string;
-  dob?: string; // Date of birth, not date_of_birth
+  dob?: string; // Date of birth (consolidated field)
   gender?: string;
   marital_status?: string;
   employment?: string;
@@ -68,6 +68,9 @@ export interface Customer {
   metadata?: any;
   created_at?: string;
   updated_at?: string;
+  address?: string; // Customer address
+  external_customer_code?: string; // External reference code
+  employment_type?: string; // Employment type
 }
 
 // =============================================================================

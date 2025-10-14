@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { SupabaseDatabaseService } from '../services/supabase-database';
+import { useAuth } from '../contexts/AuthContextFixed';
 import { 
   Case, 
   Document, 
@@ -18,6 +19,7 @@ import {
   Customer,
   SubProduct,
   Department,
+  Team,
   EmploymentType,
   TaskType,
   TaskSlaPolicy,
@@ -258,19 +260,20 @@ export function useDocuments(caseId: string) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const result = await SupabaseDatabaseService.getDocuments(caseId);
+      const result = await SupabaseDatabaseService.getDocuments(caseId, user?.organization_id || user?.organizationId);
       setDocuments(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch documents');
     } finally {
       setLoading(false);
     }
-  }, [caseId]);
+  }, [caseId, user?.organization_id, user?.organizationId]);
 
   const refetch = useCallback(() => {
     fetchData();
@@ -326,7 +329,7 @@ export function useTeamMembers(organizationId?: number) {
         setLoading(true);
       }
       setError(null);
-      const result = await SupabaseDatabaseService.getTeamMembers();
+      const result = await SupabaseDatabaseService.getTeamMembers(organizationId);
       setTeamMembers(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch team members');
@@ -344,7 +347,95 @@ export function useTeamMembers(organizationId?: number) {
     fetchData();
   }, [fetchData]);
 
+  // Set up real-time subscription for team member updates
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    let subscription: any = null;
+
+    const setupSubscription = async () => {
+      try {
+        subscription = await SupabaseDatabaseService.subscribeToUsers((payload) => {
+          console.log('Team member real-time update:', payload);
+          // Refetch team members when changes occur
+          fetchData();
+        });
+      } catch (error) {
+        console.error('Error setting up users subscription:', error);
+      }
+    };
+
+    setupSubscription();
+
+    return () => {
+      if (subscription && typeof subscription.unsubscribe === 'function') {
+        subscription.unsubscribe();
+      }
+    };
+  }, [isInitialized, fetchData]);
+
   return { teamMembers, loading, error, refetch };
+}
+
+// Teams Hook
+export function useTeams(filters?: { organizationId?: number; isActive?: boolean; teamType?: string }) {
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    try {
+      if (!isInitialized) {
+        setLoading(true);
+      }
+      setError(null);
+      const result = await SupabaseDatabaseService.getTeams(filters);
+      setTeams(result as unknown as Team[]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch teams');
+    } finally {
+      setLoading(false);
+      setIsInitialized(true);
+    }
+  }, [filters?.organizationId, filters?.isActive, filters?.teamType, isInitialized]);
+
+  const refetch = useCallback(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Set up real-time subscription for team updates
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    let subscription: any = null;
+
+    const setupSubscription = async () => {
+      try {
+        subscription = await SupabaseDatabaseService.subscribeToTeams((payload) => {
+          console.log('Team real-time update:', payload);
+          // Refetch teams when changes occur
+          fetchData();
+        });
+      } catch (error) {
+        console.error('Error setting up teams subscription:', error);
+      }
+    };
+
+    setupSubscription();
+
+    return () => {
+      if (subscription && typeof subscription.unsubscribe === 'function') {
+        subscription.unsubscribe();
+      }
+    };
+  }, [isInitialized, fetchData]);
+
+  return { teams, loading, error, refetch };
 }
 
 // Audit Logs Hook
@@ -3226,6 +3317,270 @@ export function useUserStatistics() {
       }
     };
   }, []);
+
+  return { stats, loading, error, refetch };
+}
+
+// =============================================================================
+// SALESPERSON-SPECIFIC HOOKS
+// =============================================================================
+
+/**
+ * Hook for fetching customers assigned to a salesperson
+ */
+export function useSalespersonCustomers(salespersonId: string, filters?: {
+  kycStatus?: string;
+  riskProfile?: string;
+  searchTerm?: string;
+}) {
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchCustomers = useCallback(async () => {
+    if (!salespersonId) {
+      setCustomers([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await SupabaseDatabaseService.getSalespersonCustomers(salespersonId, filters);
+      setCustomers(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch customers');
+    } finally {
+      setLoading(false);
+    }
+  }, [salespersonId, filters?.kycStatus, filters?.riskProfile, filters?.searchTerm]);
+
+  const refetch = useCallback(() => {
+    fetchCustomers();
+  }, [fetchCustomers]);
+
+  useEffect(() => {
+    fetchCustomers();
+  }, [fetchCustomers]);
+
+  // Set up real-time subscription for customer updates
+  useEffect(() => {
+    if (!salespersonId) return;
+
+    let subscription: any = null;
+
+    const setupSubscription = async () => {
+      try {
+        subscription = await SupabaseDatabaseService.subscribeToSalespersonCustomers((payload) => {
+          console.log('Customer real-time update:', payload);
+          fetchCustomers();
+        });
+      } catch (error) {
+        console.error('Error setting up salesperson customers subscription:', error);
+      }
+    };
+
+    setupSubscription();
+
+    return () => {
+      if (subscription && typeof subscription.unsubscribe === 'function') {
+        subscription.unsubscribe();
+      }
+    };
+  }, [salespersonId, fetchCustomers]);
+
+  return { customers, loading, error, refetch };
+}
+
+/**
+ * Hook for fetching salesperson performance data
+ */
+export function useSalespersonPerformance(salespersonId: string) {
+  const [performance, setPerformance] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPerformance = useCallback(async () => {
+    if (!salespersonId) {
+      setPerformance(null);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await SupabaseDatabaseService.getSalespersonPerformance(salespersonId);
+      setPerformance(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch performance data');
+    } finally {
+      setLoading(false);
+    }
+  }, [salespersonId]);
+
+  const refetch = useCallback(() => {
+    fetchPerformance();
+  }, [fetchPerformance]);
+
+  useEffect(() => {
+    fetchPerformance();
+  }, [fetchPerformance]);
+
+  // Refresh performance data every 5 minutes
+  useEffect(() => {
+    if (!salespersonId) return;
+
+    const interval = setInterval(() => {
+      fetchPerformance();
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [salespersonId, fetchPerformance]);
+
+  return { performance, loading, error, refetch };
+}
+
+/**
+ * Hook for fetching team leaderboard
+ */
+export function useTeamLeaderboard(filters?: {
+  organizationId?: number;
+  teamId?: number;
+  limit?: number;
+}) {
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchLeaderboard = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await SupabaseDatabaseService.getTeamLeaderboard(filters);
+      setLeaderboard(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch leaderboard');
+    } finally {
+      setLoading(false);
+    }
+  }, [filters?.organizationId, filters?.teamId, filters?.limit]);
+
+  const refetch = useCallback(() => {
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
+
+  // Refresh leaderboard every 10 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchLeaderboard();
+    }, 10 * 60 * 1000); // 10 minutes
+
+    return () => clearInterval(interval);
+  }, [fetchLeaderboard]);
+
+  return { leaderboard, loading, error, refetch };
+}
+
+/**
+ * Hook for fetching salesperson's team members
+ */
+export function useSalespersonTeam(teamId: string | null | undefined) {
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchTeamMembers = useCallback(async () => {
+    if (!teamId) {
+      setTeamMembers([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await SupabaseDatabaseService.getSalespersonTeamMembers(teamId);
+      setTeamMembers(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch team members');
+    } finally {
+      setLoading(false);
+    }
+  }, [teamId]);
+
+  const refetch = useCallback(() => {
+    fetchTeamMembers();
+  }, [fetchTeamMembers]);
+
+  useEffect(() => {
+    fetchTeamMembers();
+  }, [fetchTeamMembers]);
+
+  return { teamMembers, loading, error, refetch };
+}
+
+/**
+ * Hook for fetching salesperson dashboard stats
+ */
+export function useSalespersonStats(salespersonId: string) {
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchStats = useCallback(async () => {
+    if (!salespersonId) {
+      setStats(null);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await SupabaseDatabaseService.getSalespersonStats(salespersonId);
+      setStats(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch stats');
+    } finally {
+      setLoading(false);
+    }
+  }, [salespersonId]);
+
+  const refetch = useCallback(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  // Set up real-time subscriptions for stats updates
+  useEffect(() => {
+    if (!salespersonId) return;
+
+    // Subscribe to case updates
+    const caseSubscription = SupabaseDatabaseService.subscribeToCases((payload) => {
+      console.log('Case update for stats:', payload);
+      fetchStats();
+    });
+
+    // Subscribe to customer updates
+    const customerSubscription = SupabaseDatabaseService.subscribeToSalespersonCustomers((payload) => {
+      console.log('Customer update for stats:', payload);
+      fetchStats();
+    });
+
+    return () => {
+      caseSubscription.unsubscribe();
+      customerSubscription.unsubscribe();
+    };
+  }, [salespersonId, fetchStats]);
 
   return { stats, loading, error, refetch };
 }

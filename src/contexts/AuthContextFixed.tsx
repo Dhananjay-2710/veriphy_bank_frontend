@@ -6,6 +6,15 @@ interface AppUser {
   email?: string | null;
   role?: string | null;
   full_name?: string | null;
+  organization_id?: number | null;
+  organizationId?: number | null;
+  team_id?: number | null;
+  teamId?: number | null;
+  department_id?: number | null;
+  departmentId?: number | null;
+  mobile?: string | null;
+  is_active?: boolean;
+  isActive?: boolean;
 }
 
 interface RegistrationData {
@@ -114,6 +123,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: dbUser.email,
           role: normalizedRole,
           full_name: dbUser.full_name || 'User',
+          organization_id: dbUser.organization_id,
+          organizationId: dbUser.organization_id,
+          team_id: dbUser.team_id,
+          teamId: dbUser.team_id,
+          department_id: dbUser.department_id,
+          departmentId: dbUser.department_id,
+          mobile: dbUser.mobile,
+          is_active: dbUser.is_active,
+          isActive: dbUser.is_active
         };
 
         console.log('Created profile:', profile);
@@ -154,6 +172,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         full_name: authUser.user_metadata?.firstName ? 
           `${authUser.user_metadata.firstName} ${authUser.user_metadata.lastName || ''}`.trim() : 
           'User',
+        organization_id: null,
+        organizationId: null,
+        team_id: null,
+        teamId: null,
+        department_id: null,
+        departmentId: null,
+        mobile: null,
+        is_active: true,
+        isActive: true
       };
     }
 
@@ -178,10 +205,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const normalizedRole = roleMapping[role] || role;
 
     return {
-      id: authUser.id,
-      email: authUser.email,
+      id: dbUser.id.toString(),
+      email: authUser.email || dbUser.email,
       role: normalizedRole,
       full_name: dbUser.full_name || 'User',
+      organization_id: dbUser.organization_id,
+      organizationId: dbUser.organization_id,
+      team_id: dbUser.team_id,
+      teamId: dbUser.team_id,
+      department_id: dbUser.department_id,
+      departmentId: dbUser.department_id,
+      mobile: dbUser.mobile,
+      is_active: dbUser.is_active,
+      isActive: dbUser.is_active
     };
   };
 
@@ -360,6 +396,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             const user = JSON.parse(storedUser);
             console.log('Found stored database user:', user);
+            
+            // ✅ CRITICAL FIX: Check if user object has organization_id
+            // If missing, re-fetch from database to get all fields
+            if (user && !user.organization_id && !user.organizationId) {
+              console.log('⚠️ Stored user missing organization_id, re-fetching from database...');
+              const { data: freshUser } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+              
+              if (freshUser) {
+                const updatedUser: AppUser = {
+                  id: freshUser.id.toString(),
+                  email: freshUser.email,
+                  role: freshUser.role,
+                  full_name: freshUser.full_name,
+                  organization_id: freshUser.organization_id,
+                  organizationId: freshUser.organization_id,
+                  team_id: freshUser.team_id,
+                  teamId: freshUser.team_id,
+                  department_id: freshUser.department_id,
+                  departmentId: freshUser.department_id,
+                  mobile: freshUser.mobile,
+                  is_active: freshUser.is_active,
+                  isActive: freshUser.is_active
+                };
+                localStorage.setItem('veriphy_user', JSON.stringify(updatedUser));
+                if (mounted) {
+                  setUser(updatedUser);
+                  setLoading(false);
+                  return;
+                }
+              }
+            }
+            
             if (mounted) {
               setUser(user);
               setLoading(false);

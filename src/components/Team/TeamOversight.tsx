@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Users, TrendingUp, Award, AlertCircle, Search, Phone, Mail, MessageCircle, Eye, UserCheck, BarChart3, RefreshCw } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { ArrowLeft, Users, TrendingUp, Award, AlertCircle, Search, Phone, Mail, MessageCircle, Eye, UserCheck, BarChart3, RefreshCw, Plus, Edit, Trash2, Save, X, CheckCircle, Briefcase, Target } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { useAuth } from '../../contexts/AuthContextFixed';
-import { useTeamMembers, useCases, useDashboardStats } from '../../hooks/useDashboardData';
+import { useTeamMembers, useCases, useDashboardStats, useTeams } from '../../hooks/useDashboardData';
+import { SupabaseDatabaseService } from '../../services/supabase-database';
+import { Team } from '../../types';
 
 interface TeamOversightProps {
   onBack: () => void;
@@ -19,11 +21,31 @@ export function TeamOversight({ onBack, onNavigateToCase }: TeamOversightProps) 
   const [searchType, setSearchType] = useState('email');
   const [showReassignModal, setShowReassignModal] = useState(false);
   const [selectedCase, setSelectedCase] = useState<string | null>(null);
+  
+  // Teams management state
+  const [showCreateTeamModal, setShowCreateTeamModal] = useState(false);
+  const [showEditTeamModal, setShowEditTeamModal] = useState(false);
+  const [showAssignManagerModal, setShowAssignManagerModal] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [managers, setManagers] = useState<any[]>([]);
+  const [loadingManagers, setLoadingManagers] = useState(false);
+  const [newTeam, setNewTeam] = useState({
+    name: '',
+    description: '',
+    teamType: 'sales' as 'sales' | 'credit-ops' | 'compliance' | 'support' | 'admin',
+    targetCasesPerMonth: 50,
+    managerId: undefined as number | undefined
+  });
 
   // Get real data from Supabase
   const { teamMembers: realTeamMembers, loading: teamLoading, error: teamError, refetch: refetchTeam } = useTeamMembers(user?.organization_id);
   const { cases, loading: casesLoading, error: casesError, refetch: refetchCases } = useCases();
   const { loading: statsLoading, error: statsError, refetch: refetchStats } = useDashboardStats(user?.id || '', user?.role || '');
+  const { teams, loading: teamsLoading, error: teamsError, refetch: refetchTeams } = useTeams({
+    organizationId: user?.organizationId,
+    isActive: true
+  });
 
   // Calculate team stats from real data
   const teamStats = [
@@ -75,6 +97,158 @@ export function TeamOversight({ onBack, onNavigateToCase }: TeamOversightProps) 
     refetchTeam();
     refetchCases();
     refetchStats();
+    refetchTeams();
+  };
+
+  // Toast notification helper
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  // Fetch managers for the organization
+  const fetchManagers = async () => {
+    if (!user?.organizationId) return;
+    
+    setLoadingManagers(true);
+    try {
+      const users = await SupabaseDatabaseService.getUsers(user.organizationId);
+      const managerUsers = users.filter(u => u.role === 'manager' && u.status === 'active');
+      setManagers(managerUsers);
+    } catch (error) {
+      console.error('Error fetching managers:', error);
+      showToast('Failed to fetch managers', 'error');
+    } finally {
+      setLoadingManagers(false);
+    }
+  };
+
+  // Load managers when modals open
+  React.useEffect(() => {
+    if (showCreateTeamModal || showEditTeamModal || showAssignManagerModal) {
+      fetchManagers();
+    }
+  }, [showCreateTeamModal, showEditTeamModal, showAssignManagerModal]);
+
+  // Handle create team
+  const handleCreateTeam = async () => {
+    try {
+      if (!user?.organizationId || !newTeam.name) {
+        showToast('Please fill in all required fields', 'error');
+        return;
+      }
+
+      await SupabaseDatabaseService.createTeam({
+        name: newTeam.name,
+        description: newTeam.description,
+        organizationId: user.organizationId,
+        managerId: newTeam.managerId,
+        teamType: newTeam.teamType,
+        targetCasesPerMonth: newTeam.targetCasesPerMonth
+      });
+
+      showToast('Team created successfully!', 'success');
+      setShowCreateTeamModal(false);
+      setNewTeam({
+        name: '',
+        description: '',
+        teamType: 'sales',
+        targetCasesPerMonth: 50,
+        managerId: undefined
+      });
+      refetchTeams();
+    } catch (error) {
+      console.error('Error creating team:', error);
+      showToast(error instanceof Error ? error.message : 'Failed to create team', 'error');
+    }
+  };
+
+  // Handle update team
+  const handleUpdateTeam = async () => {
+    try {
+      if (!selectedTeam) return;
+
+      await SupabaseDatabaseService.updateTeam(selectedTeam.id, {
+        name: newTeam.name,
+        description: newTeam.description,
+        teamType: newTeam.teamType,
+        targetCasesPerMonth: newTeam.targetCasesPerMonth,
+        managerId: newTeam.managerId
+      });
+
+      showToast('Team updated successfully!', 'success');
+      setShowEditTeamModal(false);
+      setSelectedTeam(null);
+      refetchTeams();
+    } catch (error) {
+      console.error('Error updating team:', error);
+      showToast(error instanceof Error ? error.message : 'Failed to update team', 'error');
+    }
+  };
+
+  // Handle assign manager
+  const handleAssignManager = async (managerId: number) => {
+    try {
+      if (!selectedTeam) return;
+
+      await SupabaseDatabaseService.updateTeam(selectedTeam.id, {
+        managerId
+      });
+
+      showToast('Manager assigned successfully!', 'success');
+      setShowAssignManagerModal(false);
+      setSelectedTeam(null);
+      refetchTeams();
+    } catch (error) {
+      console.error('Error assigning manager:', error);
+      showToast(error instanceof Error ? error.message : 'Failed to assign manager', 'error');
+    }
+  };
+
+  // Handle delete team
+  const handleDeleteTeam = async (teamId: string, teamName: string) => {
+    if (window.confirm(`Are you sure you want to delete "${teamName}"? All team members will be unassigned.`)) {
+      try {
+        await SupabaseDatabaseService.deleteTeam(teamId);
+        showToast('Team deleted successfully!', 'success');
+        refetchTeams();
+      } catch (error) {
+        console.error('Error deleting team:', error);
+        showToast(error instanceof Error ? error.message : 'Failed to delete team', 'error');
+      }
+    }
+  };
+
+  // Open edit modal
+  const handleEditTeam = (team: Team) => {
+    setSelectedTeam(team);
+    setNewTeam({
+      name: team.name,
+      description: team.description || '',
+      teamType: team.teamType,
+      targetCasesPerMonth: team.targetCasesPerMonth,
+      managerId: team.managerId
+    });
+    setShowEditTeamModal(true);
+  };
+
+  // Open assign manager modal
+  const handleOpenAssignManager = (team: Team) => {
+    setSelectedTeam(team);
+    setShowAssignManagerModal(true);
+  };
+
+  // Get team type badge
+  const getTeamTypeBadge = (teamType: string) => {
+    const badges: Record<string, { variant: 'success' | 'info' | 'warning' | 'error'; label: string }> = {
+      'sales': { variant: 'info', label: 'Sales' },
+      'credit-ops': { variant: 'success', label: 'Credit Ops' },
+      'compliance': { variant: 'warning', label: 'Compliance' },
+      'support': { variant: 'info', label: 'Support' },
+      'admin': { variant: 'error', label: 'Admin' }
+    };
+    const badge = badges[teamType] || { variant: 'info', label: teamType };
+    return <Badge variant={badge.variant} size="sm">{badge.label}</Badge>;
   };
 
   // Transform real cases data
@@ -207,6 +381,7 @@ export function TeamOversight({ onBack, onNavigateToCase }: TeamOversightProps) 
 
   const tabs = [
     { id: 'overview', label: 'Team Overview' },
+    { id: 'teams', label: 'Teams' },
     { id: 'individual', label: 'Individual Reports' },
     { id: 'cases', label: 'Case Management' },
     { id: 'customer-search', label: 'Customer Search' },
@@ -462,6 +637,129 @@ export function TeamOversight({ onBack, onNavigateToCase }: TeamOversightProps) 
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {activeTab === 'teams' && (
+        <div className="space-y-6">
+          {/* Create Team Button */}
+          <div className="flex justify-end">
+            <Button onClick={() => setShowCreateTeamModal(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Team
+            </Button>
+          </div>
+
+          {/* Teams Grid */}
+          {teamsLoading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading teams...</p>
+            </div>
+          ) : teamsError ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+                <p className="text-red-600">{teamsError}</p>
+              </CardContent>
+            </Card>
+          ) : teams.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <Users className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                <p className="text-lg font-medium text-gray-900 mb-2">No teams yet</p>
+                <p className="text-gray-600 mb-4">Create your first team to get started</p>
+                <Button onClick={() => setShowCreateTeamModal(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Team
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {teams.map((team) => {
+                const manager = managers.find(m => m.id === team.managerId);
+                
+                return (
+                  <Card key={team.id} className="hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg">{team.name}</CardTitle>
+                          <p className="text-sm text-gray-600 mt-1">{team.description || 'No description'}</p>
+                        </div>
+                        {getTeamTypeBadge(team.teamType)}
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {/* Manager Info */}
+                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center space-x-2">
+                            <Award className="h-4 w-4 text-gray-600" />
+                            <div>
+                              <p className="text-xs text-gray-500">Manager</p>
+                              <p className="text-sm font-medium">
+                                {manager?.full_name || 'Not assigned'}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenAssignManager(team)}
+                          >
+                            {team.managerId ? 'Change' : 'Assign'}
+                          </Button>
+                        </div>
+
+                        {/* Team Stats */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="text-center p-3 bg-blue-50 rounded-lg">
+                            <p className="text-2xl font-bold text-blue-600">{team.memberCount || 0}</p>
+                            <p className="text-xs text-gray-600">Members</p>
+                          </div>
+                          <div className="text-center p-3 bg-green-50 rounded-lg">
+                            <p className="text-2xl font-bold text-green-600">{team.activeCases || 0}</p>
+                            <p className="text-xs text-gray-600">Active Cases</p>
+                          </div>
+                          <div className="text-center p-3 bg-purple-50 rounded-lg">
+                            <p className="text-2xl font-bold text-purple-600">{team.completedCases || 0}</p>
+                            <p className="text-xs text-gray-600">Completed</p>
+                          </div>
+                          <div className="text-center p-3 bg-yellow-50 rounded-lg">
+                            <p className="text-2xl font-bold text-yellow-600">{team.targetCasesPerMonth}</p>
+                            <p className="text-xs text-gray-600">Monthly Target</p>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditTeam(team)}
+                            className="flex-1"
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteTeam(team.id, team.name)}
+                            className="bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -741,6 +1039,194 @@ export function TeamOversight({ onBack, onNavigateToCase }: TeamOversightProps) 
               <Button variant="outline" onClick={() => setShowReassignModal(false)}>
                 Cancel
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create/Edit Team Modal */}
+      {(showCreateTeamModal || showEditTeamModal) && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">
+                {showCreateTeamModal ? 'Create New Team' : 'Edit Team'}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowCreateTeamModal(false);
+                  setShowEditTeamModal(false);
+                  setSelectedTeam(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Team Name *</label>
+                <input
+                  type="text"
+                  value={newTeam.name}
+                  onChange={(e) => setNewTeam({ ...newTeam, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., Elite Sales Team"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  value={newTeam.description}
+                  onChange={(e) => setNewTeam({ ...newTeam, description: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="Brief description of the team"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Team Type *</label>
+                <select
+                  value={newTeam.teamType}
+                  onChange={(e) => setNewTeam({ ...newTeam, teamType: e.target.value as any })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="sales">Sales</option>
+                  <option value="credit-ops">Credit Operations</option>
+                  <option value="compliance">Compliance</option>
+                  <option value="support">Support</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Assign Manager</label>
+                <select
+                  value={newTeam.managerId || ''}
+                  onChange={(e) => setNewTeam({ ...newTeam, managerId: e.target.value ? parseInt(e.target.value) : undefined })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={loadingManagers}
+                >
+                  <option value="">Select a manager (optional)</option>
+                  {managers.map((manager) => (
+                    <option key={manager.id} value={manager.id}>
+                      {manager.full_name} - {manager.email}
+                    </option>
+                  ))}
+                </select>
+                {loadingManagers && <p className="text-xs text-gray-500 mt-1">Loading managers...</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Target Cases</label>
+                <input
+                  type="number"
+                  value={newTeam.targetCasesPerMonth}
+                  onChange={(e) => setNewTeam({ ...newTeam, targetCasesPerMonth: parseInt(e.target.value) || 0 })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="1"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowCreateTeamModal(false);
+                  setShowEditTeamModal(false);
+                  setSelectedTeam(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button onClick={showCreateTeamModal ? handleCreateTeam : handleUpdateTeam}>
+                <Save className="h-4 w-4 mr-2" />
+                {showCreateTeamModal ? 'Create Team' : 'Save Changes'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Manager Modal */}
+      {showAssignManagerModal && selectedTeam && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Assign Manager to {selectedTeam.name}</h3>
+              <button
+                onClick={() => {
+                  setShowAssignManagerModal(false);
+                  setSelectedTeam(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {loadingManagers ? (
+                <p className="text-center py-4 text-gray-600">Loading managers...</p>
+              ) : managers.length === 0 ? (
+                <p className="text-center py-4 text-gray-600">No managers available</p>
+              ) : (
+                managers.map((manager) => (
+                  <div
+                    key={manager.id}
+                    className={`p-4 border rounded-lg cursor-pointer hover:bg-blue-50 transition-colors ${
+                      selectedTeam.managerId === manager.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                    }`}
+                    onClick={() => handleAssignManager(manager.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-900">{manager.full_name}</p>
+                        <p className="text-sm text-gray-600">{manager.email}</p>
+                      </div>
+                      {selectedTeam.managerId === manager.id && (
+                        <CheckCircle className="h-5 w-5 text-blue-600" />
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowAssignManagerModal(false);
+                  setSelectedTeam(null);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-50 animate-slide-up">
+          <div
+            className={`px-6 py-4 rounded-lg shadow-lg ${
+              toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              {toast.type === 'success' ? (
+                <CheckCircle className="h-5 w-5" />
+              ) : (
+                <AlertCircle className="h-5 w-5" />
+              )}
+              <p className="font-medium">{toast.message}</p>
             </div>
           </div>
         </div>

@@ -16,6 +16,7 @@ export const SUPABASE_TABLES = {
   TASKS: 'tasks',
   TASK_TYPES: 'task_types',
   DEPARTMENTS: 'departments',
+  TEAMS: 'teams',
   ROLES: 'roles',
   PERMISSIONS: 'permissions',
   AUDIT_LOG: 'logs',
@@ -1080,6 +1081,27 @@ export function mapTaskSlaPolicyData(taskSlaPolicyData: any) {
     metadata: taskSlaPolicyData.metadata,
     createdAt: taskSlaPolicyData.created_at,
     updatedAt: taskSlaPolicyData.updated_at,
+  };
+}
+
+export function mapTeamData(teamData: any) {
+  return {
+    id: teamData.id?.toString(),
+    name: teamData.name,
+    description: teamData.description,
+    organizationId: teamData.organization_id,
+    managerId: teamData.manager_id,
+    teamType: teamData.team_type || 'sales',
+    isActive: teamData.is_active ?? true,
+    targetCasesPerMonth: teamData.target_cases_per_month || 50,
+    metadata: teamData.metadata || {},
+    createdAt: teamData.created_at,
+    updatedAt: teamData.updated_at,
+    deletedAt: teamData.deleted_at,
+    // Include computed fields if provided
+    memberCount: teamData.member_count,
+    activeCases: teamData.active_cases,
+    completedCases: teamData.completed_cases,
   };
 }
 
